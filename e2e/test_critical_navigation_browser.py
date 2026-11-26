@@ -30,6 +30,18 @@ def _goto_or_skip(page, base_url: str) -> None:
         raise
 
 
+def _wait_js(page, fn: str, timeout: float = 10.0) -> None:
+    """Poll a page.evaluate() predicate from Python instead of page.wait_for_function(),
+    whose string-eval polling is blocked by this app's strict CSP (script-src 'self',
+    no unsafe-eval). page.evaluate() runs via CDP Runtime.callFunctionOn and is unaffected."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if page.evaluate(fn):
+            return
+        time.sleep(0.1)
+    raise TimeoutError(f"condition not met within {timeout}s: {fn}")
+
+
 def _wait_ready(base_url: str, timeout: float = 25.0) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -67,13 +79,26 @@ def test_academic_program_review_and_evidence_hub_navigation() -> None:
                 browser=pw.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage'])
                 page=browser.new_page(viewport={'width':1440,'height':1000}); errors=[]
                 page.on('console',lambda msg: errors.append(msg.text) if msg.type=='error' else None)
-                page.add_init_script("localStorage.setItem('douPilotUser','e2e-admin@local');localStorage.setItem('douPilotSession','1');")
+                page.add_init_script(
+                    "localStorage.setItem('douPilotUser','e2e-admin@local');"
+                    "localStorage.setItem('douPilotSession','1');"
+                    "localStorage.setItem('douOnboarding615:e2e-admin@local','done');"
+                )
                 _goto_or_skip(page, base_url)
-                page.locator('button[data-page="data"]').click(); page.locator('#page-data').wait_for(state='visible')
-                page.locator('button[data-data-view="students"]').click(); page.locator('#academicDataSearch').fill('E2E Navigation Student')
-                page.wait_for_function("document.getElementById('academicDirectoryList').innerText.includes('E2E Navigation Student')")
+                page.locator('#loginGate').wait_for(state='hidden')
+                # Admin pilot login starts with every nav group collapsed; expand the
+                # group before clicking a submenu item it contains (6.70.3 Simple Panel).
+                page.locator('#managementNavGroup .nav-group-toggle').click()
+                # The "Öğrenciler" nav alias both switches the data view to students and
+                # opens the student-create drawer (openAcademicForm); close the drawer
+                # before interacting with the directory list/search behind it.
+                page.locator('button[data-page="students"]').click(); page.locator('#page-data').wait_for(state='visible')
+                page.locator('#academicDrawerClose').click()
+                page.locator('#academicDataSearch').fill('E2E Navigation Student')
+                _wait_js(page, "() => document.getElementById('academicDirectoryList').innerText.includes('E2E Navigation Student')")
+                page.locator('#qualityNavGroup .nav-group-toggle').click()
                 page.locator('button[data-page="programreview"]').click(); page.locator('#page-programreview').wait_for(state='visible')
-                page.wait_for_function("document.getElementById('programReviewList').innerText.includes('E2E Review')")
+                _wait_js(page, "() => document.getElementById('programReviewList').innerText.includes('E2E Review')")
                 page.locator('button[data-page="evidencehub"]').click(); page.locator('#page-evidencehub').wait_for(state='visible')
                 assert page.locator('#evidenceHubList').count()==1
                 assert not errors, 'Browser console errors: ' + ' | '.join(errors)

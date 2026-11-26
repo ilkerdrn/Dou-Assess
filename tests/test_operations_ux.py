@@ -115,7 +115,7 @@ def test_6161_grouped_navigation_and_multi_outcome_ui_contract():
     js = (root / 'app' / 'static' / 'app.js').read_text(encoding='utf-8')
     css = (root / 'app' / 'static' / 'styles.css').read_text(encoding='utf-8')
     assert 'class="grouped-nav final-nav"' in html
-    assert 'Çalışma Alanım' in html and '>Analiz<' in html and '>Kalite<' in html and '>Yönetim<' in html
+    assert 'Ders & Sınav' in html and '>Analiz<' in html and '>Kalite<' in html and 'Yönetim Araçları' in html
     assert 'Akademik Akış' not in html
     assert 'id="managementNavGroup"' in html and 'id="workspaceNavGroup"' in html
     assert 'id="qLo" class="sr-only" multiple' in html
@@ -174,7 +174,7 @@ def test_617_final_product_information_architecture_and_exam_workspace_contract(
         'examDraftForm','draftStartTime','draftLocation','draftWeight','draftBookletCount','draftStaffNotes','duplicateExam'
     ]:
         assert required in ids
-    for label in ['Çalışma Alanım','Derslerim','Sınavlarım','Soru Bankası','Değerlendirme','Analiz','Kalite','Yönetim','Çıktı Yönetimi']:
+    for label in ['Ders & Sınav','Derslerim','Sınavlar','Soru Bankası','Değerlendirme','Analiz','Kalite','Yönetim','Çıktı Yönetimi']:
         assert label in HTML
     assert 'Akademik Akış' not in HTML
     for token in ['workspace-summary','goExamNextAction','recent_activity','next_action','commandItems','openCommandPalette','renderExamWorkspaceSummary']:

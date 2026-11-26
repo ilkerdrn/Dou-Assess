@@ -1731,6 +1731,13 @@ main .page .section-head>span:not(.badge){font-size:11px}
   place-items:center!important;
   padding:24px!important;
 }
+/* Equal-specificity !important rules resolve by source order, so the rule above
+   (display:grid) always beat the generic .hidden{display:none} that comes earlier
+   in this file, keeping the login overlay on top of the app after every login.
+   A higher-specificity selector fixes this regardless of rule order. */
+.login-gate.hidden{
+  display:none!important;
+}
 .login-layout{
   width:min(1440px,100%)!important;
   min-height:min(760px,calc(100vh - 48px))!important;
@@ -1953,3 +1960,4 @@ body.role-management-simple #managementNavGroup:not(.open) .nav-submenu{display:
 
 @media(max-width:1180px){body.role-instructor-simple .dashboard-task-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:980px){body.role-instructor-simple .shell{grid-template-columns:1fr!important}body.role-instructor-simple .sidebar{width:min(310px,88vw)!important}.dashboard-task-grid{grid-template-columns:1fr!important}}
+.mt-16{margin-top:16px}

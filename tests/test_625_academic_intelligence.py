@@ -13,7 +13,7 @@ def test_625_navigation_and_pages_contract():
     assert soup.find(id='page-mycourses') is not None
     assert soup.find(id='page-courseanalytics') is not None
     assert soup.find(id='page-programanalytics') is not None
-    assert 'Derslerim' in HTML and 'Ders Analizi' in HTML and 'Program Analizi' in HTML
+    assert 'Derslerim' in HTML and 'Ders Sonuçları' in HTML and 'Program Analizi' in HTML
 
 def test_625_analytics_api_contract():
     assert '/api/courses/{course_id}/analytics-overview' in MAIN

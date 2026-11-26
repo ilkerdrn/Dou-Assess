@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#9d1730" />
   <meta name="color-scheme" content="light" />
   <title>DOU Assess · Akademik Ölçme, Sınav ve Akreditasyon</title>
+  <link rel="icon" href="/dou-logo.png" />
   <link rel="stylesheet" href="/styles.css?v=6.70-production-hardening&h=6701-671ux&u=6703-simple-panel" />
 </head>
 <body>
@@ -162,7 +163,7 @@
           <div><span class="student-profile-kicker">ÖĞRENCİ PROFİLİ</span><h3 id="studentCardName">Öğrenci seçin</h3><p id="studentCardMeta">Program ve sınıf bilgisi burada görünür.</p><div id="studentCardIdentityBadges" class="student-profile-badges"></div></div>
         </div>
         <div class="student-profile-score-wrap">
-          <div id="studentCardScoreRing" class="student-score-ring" style="--score:0"><div><strong id="studentCardScore">%0</strong><span>genel çıktı</span></div></div>
+          <div id="studentCardScoreRing" class="student-score-ring" data-style="--score:0"><div><strong id="studentCardScore">%0</strong><span>genel çıktı</span></div></div>
           <div class="student-profile-readiness"><span>MEZUNİYET HAZIRLIĞI</span><b id="studentCardReadiness">İzleniyor</b><small id="studentCardReadinessNote">Ölçüm verisi bekleniyor.</small></div>
         </div>
       </section>
@@ -248,7 +249,7 @@
           <div class="section-head"><div><span class="eyebrow">OBS VERİ KÖPRÜSÜ</span><h3>OBS read-only veri köprüsü</h3><p class="muted">Akademik veriyi OBS/Excel kaynağından içeri alın. Ders sonuçlarını OBS-uyumlu Excel olarak dışa aktarın; API write-back yalnız kurum tarafından ayrıca onaylanıp etkinleştirilirse açılır.</p></div><span id="obsModeChip" class="integration-chip">OBS read-only</span></div>
           <label class="file-drop">OBS çalışma kitabı<input id="pilotFile" type="file" accept=".xlsx" /><small>Önce doğrulama yapın; hatalı tek satır bile veritabanına yazılmaz.</small></label>
           <div class="actions"><button id="validateImport" class="ghost">Önce doğrula</button><button id="runImport" class="primary">OBS verisini senkronla</button></div><pre id="importResult" class="result"></pre><a class="download" href="/examples/DOU-Assess-Pilot-Veri-DEMO.xlsx" download>OBS köprü şablonunu indir</a>
-          <div class="form-grid" style="margin-top:16px"><label class="span-2">Sonuç gönderilecek ders<select id="obsResultsCourse"></select></label></div>
+          <div class="form-grid mt-16"><label class="span-2">Sonuç gönderilecek ders<select id="obsResultsCourse"></select></label></div>
           <div class="actions"><button id="obsResultsExport" class="ghost" type="button">OBS sonuç Excel’i</button><button id="obsResultsPush" class="primary" type="button" hidden disabled>OBS API’ye gönder</button></div>
           <small id="obsWritebackNote" class="muted">Read-only güvenli mod aktif. OBS write-back kurumsal onay olmadan kullanılamaz.</small>
         </div>
@@ -890,7 +891,7 @@ Kod doğruluğu | 4
         <div class="accred-period-picker modern-period-picker"><label>Akreditasyon dönemi<select id="accredPeriodSelect"></select></label><button id="accredLoad" class="primary">Dönemi aç</button></div>
       </div>
 
-      <div class="accred-progress-card card"><div><span id="accredProgressText">Dönem seçilmedi</span><span id="accredPeriodBadge" class="badge status-draft">Dönem seçilmedi</span></div><div class="progress-track"><span id="accredProgressFill" style="width:0%"></span></div><div id="accredSummary"></div></div>
+      <div class="accred-progress-card card"><div><span id="accredProgressText">Dönem seçilmedi</span><span id="accredPeriodBadge" class="badge status-draft">Dönem seçilmedi</span></div><div class="progress-track"><span id="accredProgressFill" data-style="width:0%"></span></div><div id="accredSummary"></div></div>
 
       <div id="accredKpis" class="accred-kpi-grid"></div>
 

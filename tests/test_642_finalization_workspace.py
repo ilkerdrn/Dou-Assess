@@ -15,7 +15,7 @@ def test_642_version_and_no_schema_bump():
     assert 'EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"' in MAIN
 
 def test_642_action_center_and_student_workspace_contract():
-    assert 'ACTION CENTER · EKSİKLERİM' in HTML
+    assert 'YAPILACAKLAR' in HTML and 'Sıradaki işiniz' in HTML
     assert 'id="dashboardActionCenter"' in HTML
     assert 'id="studentCardsNav"' in HTML
     assert 'id="page-studentcards"' in HTML

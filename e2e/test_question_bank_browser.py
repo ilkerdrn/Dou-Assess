@@ -15,6 +15,18 @@ from playwright.sync_api import Error as PlaywrightError, sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _wait_js(page, fn: str, timeout: float = 10.0) -> None:
+    """Poll a page.evaluate() predicate from Python instead of page.wait_for_function(),
+    whose string-eval polling is blocked by this app's strict CSP (script-src 'self',
+    no unsafe-eval). page.evaluate() runs via CDP Runtime.callFunctionOn and is unaffected."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if page.evaluate(fn):
+            return
+        time.sleep(0.1)
+    raise TimeoutError(f"condition not met within {timeout}s: {fn}")
+
+
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
@@ -143,13 +155,22 @@ def test_question_bank_create_end_to_end() -> None:
                     if msg.type == "error"
                     else None,
                 )
+                page.add_init_script(
+                    "localStorage.setItem('douPilotUser','e2e-admin@local');"
+                    "localStorage.setItem('douPilotSession','1');"
+                    "localStorage.setItem('douOnboarding615:e2e-admin@local','done');"
+                )
                 _goto_or_skip(page, base_url)
+                page.locator("#loginGate").wait_for(state="hidden")
+                # workspaceNavGroup ships open by default (6.70.3 Simple Panel); no
+                # toggle click needed here.
                 page.locator('button[data-page="bank"]').click()
                 page.locator("#page-bank").wait_for(state="visible")
 
                 page.locator("#bankFocusCreate").click()
-                page.wait_for_function(
-                    "document.body.classList.contains('bank-editor-open') && "
+                _wait_js(
+                    page,
+                    "() => document.body.classList.contains('bank-editor-open') && "
                     "document.getElementById('bankEditorCard').classList.contains('is-open')"
                 )
                 assert page.locator("#bankCourse option").count() >= 1
@@ -168,8 +189,9 @@ def test_question_bank_create_end_to_end() -> None:
                 response = response_info.value
                 assert response.status == 201, response.text()
 
-                page.wait_for_function(
-                    "document.getElementById('bankList').innerText.includes('TCP üç yönlü el sıkışmasının ilk paketi')"
+                _wait_js(
+                    page,
+                    "() => document.getElementById('bankList').innerText.includes('TCP üç yönlü el sıkışmasının ilk paketi')"
                 )
                 assert not page.locator("body").evaluate(
                     "el => el.classList.contains('bank-editor-open')"
