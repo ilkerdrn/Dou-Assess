@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#9d1730" />
+  <meta name="color-scheme" content="light" />
+  <title>DOU Assess · Akademik Ölçme, Sınav ve Akreditasyon</title>
+  <link rel="stylesheet" href="/styles.css?v=6.70-production-hardening&h=6701-671ux&u=6703-simple-panel" />
+</head>
+<body>
+<div id="loginGate" class="login-gate">
+  <div class="login-orb login-orb-a"></div><div class="login-orb login-orb-b"></div>
+  <div class="login-layout">
+    <section class="login-brand-panel">
+      <div class="login-brand-top"><img src="/dou-logo.png" alt="Doğuş Üniversitesi"><span>DOĞUŞ ÜNİVERSİTESİ</span></div>
+      <div class="login-brand-copy">
+        <span class="login-kicker">AKADEMİK ÖLÇME & DEĞERLENDİRME</span>
+        <h1>Akademik ölçmeden kaliteye<br>tek ve bütünleşik çalışma alanı.</h1>
+        <p>Öğretim elemanları kendi derslerinde soru havuzu oluşturur, sınav kâğıdını üretir, okutur ve sonuçları Öğrenim ve Program Çıktıları bazında analiz eder.</p>
+        <div class="login-flow role-flow">
+          <span>01 <b>Ders</b></span><i>→</i><span>02 <b>Ölçme</b></span><i>→</i><span>03 <b>Değerlendirme</b></span><i>→</i><span>04 <b>İyileştirme</b></span>
+        </div>
+      </div>
+      <div class="accreditation-strip"><span>MEDEK</span><span>TURAK</span><span>MÜDEK</span><span>YÖKAK</span><small>kanıt odaklı ölçme-değerlendirme altyapısı</small></div>
+    </section>
+    <section class="login-card-wrap">
+      <div class="login-card">
+        <div class="login-card-brand"><img src="/dou-logo.png" alt="Doğuş Üniversitesi"><div><b>DOU Assess</b><span>Akademik Ölçme, Çıktı ve Kalite Platformu</span></div></div>
+        <div class="login-card-copy"><span class="eyebrow">KURUMSAL GİRİŞ</span><h2>Çalışma alanınıza giriş yapın</h2><p>Yetkinize göre yalnızca bağlı olduğunuz bölüm, program ve dersler görüntülenir.</p></div>
+        <div id="pilotLoginBox" class="login-mode-box">
+          <label>Akademik kullanıcı<select id="loginPilotUser"></select></label>
+          <button id="loginPilotBtn" class="primary login-primary" type="button">Sisteme giriş yap <span>→</span></button>
+          <small>Pilot ortamında kullanıcı seçimi açıktır. Canlı ortamda kurumsal Microsoft hesabı kullanılacaktır.</small>
+        </div>
+        <div id="entraLoginBox" class="login-mode-box hidden">
+          <button id="entraLoginBtn" class="primary login-primary" type="button">Microsoft ile kurumsal giriş <span>→</span></button>
+          <small>Doğuş Üniversitesi Microsoft Entra hesabınızla devam edin.</small>
+        </div>
+        <div class="login-security"><span>✓ Rol bazlı yetkilendirme</span><span>✓ Ders bazlı erişim</span><span>✓ Sınav snapshot & kanıt bütünlüğü</span></div>
+      </div>
+      <p class="login-footer-note">DOU Assess · Akademik kullanım için geliştirilmiştir.</p>
+    </section>
+  </div>
+</div>
+<div class="shell app-shell-hidden">
+  <aside class="sidebar">
+    <div class="brand"><img src="/dou-logo.png" alt="Doğuş Üniversitesi"><div><b>DOU Assess</b><span>Akademik Ölçme ve Kalite Platformu</span></div></div>
+    <nav class="grouped-nav final-nav" data-role-layout="workspace" aria-label="Ana menü">
+      <button data-page="dashboard" class="nav-home nav-primary"><span class="nav-icon">⌂</span><span><b>Ana Sayfa</b><small>Bugün sizi bekleyen işler</small></span></button>
+
+      <div class="nav-group open" id="workspaceNavGroup" data-nav-group="workspace">
+        <button class="nav-group-toggle" type="button" aria-expanded="true"><span><b>Ders & Sınav</b><small>Günlük akademik işleriniz</small></span><i>⌄</i></button>
+        <div class="nav-submenu">
+          <button id="myCoursesNav" data-page="mycourses" class="active"><span class="nav-icon">D</span><span><b>Derslerim</b><small>Atandığınız dersler</small></span></button>
+          <button data-page="exams"><span class="nav-icon">S</span><span><b>Sınavlar</b><small>Hazırla ve sonuçlandır</small></span></button>
+          <button data-page="bank"><span class="nav-icon">?</span><span><b>Soru Bankası</b><small>Sorularınızı oluşturun</small></span></button>
+          <button data-page="grade"><span class="nav-icon">P</span><span><b>Değerlendirme</b><small>Puanlama ve onay</small></span></button>
+        </div>
+      </div>
+
+      <div class="nav-group" id="analysisNavGroup" data-nav-group="analysis">
+        <button class="nav-group-toggle" type="button" aria-expanded="false"><span><b>Sonuçlar</b><small>Başarı ve çıktı analizi</small></span><i>⌄</i></button>
+        <div class="nav-submenu">
+          <button data-page="analytics"><span class="nav-icon">S</span><span><b>Sınav Sonuçları</b><small>Soru ve öğrenci başarısı</small></span></button>
+          <button id="courseAnalyticsNav" data-page="courseanalytics"><span class="nav-icon">D</span><span><b>Ders Sonuçları</b><small>Dönem ve çıktı gelişimi</small></span></button>
+          <button id="programAnalyticsNav" data-page="programanalytics"><span class="nav-icon">P</span><span><b>Program Analizi</b><small>Program Çıktıları ve riskler</small></span></button>
+          <button id="studentCardsNav" data-page="studentcards"><span class="nav-icon">K</span><span><b>Öğrenci Karneleri</b><small>ÖÇ · PÇ · gelişim · PDF</small></span></button>
+        </div>
+      </div>
+
+      <div class="nav-group" id="qualityNavGroup" data-nav-group="quality">
+        <button class="nav-group-toggle" type="button" aria-expanded="false"><span><b>Kalite</b><small>Akreditasyon ve iyileştirme</small></span><i>⌄</i></button>
+        <div class="nav-submenu">
+          <button id="institutionalReadinessNav" data-page="institutionalreadiness"><span class="nav-icon nav-icon-quality">R</span><span><b>Kurumsal Hazırlık</b><small>Program × framework · gap · kanıt</small></span></button>
+          <button id="quality360Nav" data-page="quality360"><span class="nav-icon nav-icon-quality">◆</span><span><b>Kalite & Akreditasyon</b><small>PUKÖ · Kanıt · ÖDR · KİDR</small></span></button>
+          <button id="assessmentAssuranceNav" data-page="assessmentassurance"><span class="nav-icon">G</span><span><b>Ölçme Güvence Planı</b><small>PÇ · direct/indirect · yıllık review</small></span></button>
+          <button id="programReviewNav" data-page="programreview"><span class="nav-icon nav-icon-quality">P</span><span><b>Program Review</b><small>Periyodik değerlendirme · reviewer · final</small></span></button>
+          <button id="evidenceHubNav" data-page="evidencehub"><span class="nav-icon nav-icon-quality">K</span><span><b>Kanıt Merkezi</b><small>Arama · etiket · kullanım · duplicate</small></span></button>
+        </div>
+      </div>
+
+      <div class="nav-group" id="managementNavGroup" data-nav-group="management">
+        <button class="nav-group-toggle" type="button" aria-expanded="false"><span><b>Yönetim Araçları</b><small>Yalnız yetkili kullanıcılar</small></span><i>⌄</i></button>
+        <div class="nav-submenu">
+          <button data-page="programs"><span class="nav-icon">P</span><span><b>Programlar</b><small>Akademik program kapsamı</small></span></button>
+          <button data-page="courses"><span class="nav-icon">D</span><span><b>Dersler</b><small>Ders ve öğretim elemanı kapsamı</small></span></button>
+          <button data-page="students"><span class="nav-icon">Ö</span><span><b>Öğrenciler</b><small>Akademik kayıt kapsamı</small></span></button>
+          <button id="outcomesNav" data-page="outcomes"><span class="nav-icon">Ç</span><span><b>Çıktı Yönetimi</b><small>Öğrenim ve Program Çıktıları</small></span></button>
+          <button id="curriculumMapNav" data-page="curriculummap"><span class="nav-icon">M</span><span><b>Müfredat Haritası</b><small>Ders × PÇ · I/R/M · gap analizi</small></span></button>
+          <button id="assessmentMeasuresNav" data-page="assessmentmeasures"><span class="nav-icon">Ö</span><span><b>Ölçme Planı & Rubrik</b><small>Proje · ödev · sunum · laboratuvar</small></span></button>
+          <button id="surveyNav" data-page="surveys"><span class="nav-icon">A</span><span><b>Anket & Dolaylı Ölçüm</b><small>Öğrenci · mezun · işveren · PÇ</small></span></button>
+          <button id="pilotOpsNav" data-page="import"><span class="nav-icon">I</span><span><b>Entegrasyonlar</b><small>OBS · dönem · UAT</small></span></button>
+          <button id="usersNav" data-page="users"><span class="nav-icon">U</span><span><b>Kullanıcı & Yetki</b><small>Rol ve akademik kapsam</small></span></button>
+          <button id="securityNav" data-page="security"><span class="nav-icon">G</span><span><b>Sistem & Güvenlik</b><small>Sağlık ve güvenlik olayları</small></span></button>
+          <button id="acceptanceNav" data-page="acceptance"><span class="nav-icon">✓</span><span><b>Canlı Kabul</b><small>Production acceptance gate</small></span></button>
+        </div>
+      </div>
+      <button data-page="feedback" class="nav-feedback" title="Sorun, öneri veya kullanım notu gönder"><span class="nav-icon">F</span><span class="nav-copy"><b>Geri Bildirim</b><small>Sorun veya öneri gönder</small></span><span class="nav-feedback-arrow" aria-hidden="true">→</span></button>
+    </nav>
+    <div class="identity-box"><div class="identity-avatar" id="identityAvatar">DA</div><div class="identity-main"><b id="currentUserName">Kimlik yükleniyor</b><span id="currentUserRoles">—</span><small id="currentUserScope">Akademik kapsam yükleniyor</small></div><label id="pilotUserWrap" class="hidden">Pilot kullanıcı<select id="pilotUserSelect"></select></label><button id="logoutBtn" class="identity-logout" type="button" title="Çıkış yap">↪</button></div>
+    <div class="sidebar-foot"><span id="readyDot" class="dot"></span><span id="readyText">API kontrol ediliyor</span></div>
+  </aside>
+  <button id="mobileNavBackdrop" class="mobile-nav-backdrop" type="button" aria-label="Menüyü kapat"></button>
+  <main>
+    <header class="app-header"><button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Menüyü aç" aria-expanded="false"><span></span><span></span><span></span></button><div class="header-title"><div id="pageBreadcrumb" class="page-breadcrumb">DOU Assess / Akademik Yönetim / Program</div><h1 id="pageTitle">Program</h1><p id="pageSub">Akademik programınızı seçin veya yetkiniz varsa oluşturun.</p></div><div class="header-actions"><button id="notificationBtn" class="ghost notification-trigger" type="button" aria-label="Bildirimler">🔔 Bildirimler <span id="notificationBadge" class="notification-badge hidden">0</span></button><button id="guideBtn" class="ghost guide-trigger" type="button">? Kılavuz</button><button id="excelCenterBtn" class="ghost excel-trigger" type="button">⇩ Excel Yükle</button><button id="commandBtn" class="command-trigger ghost" type="button"><span>⌕</span> Ara <kbd>Ctrl K</kbd></button><button id="refreshBtn" class="ghost">Yenile</button></div></header>
+    <div id="toast" class="toast"></div>
+
+    <section id="page-mycourses" class="page">
+      <div class="workspace-hero card">
+        <div><span class="eyebrow">ÇALIŞMA ALANIM</span><h2>Dersleriniz</h2><p class="muted">Dersinizi seçin; sistem ilgili sınavları, değerlendirmeleri, çıktı durumunu ve bekleyen işleri aynı bağlamda açsın.</p></div>
+        <div class="workspace-hero-meta"><span id="myCoursesCount" class="badge">0 ders</span><small>OBS bağlandığında ders atamaları otomatik güncellenir.</small></div>
+      </div>
+      <div id="myCoursesGrid" class="course-workspace-grid"></div>
+      <div id="courseActionPanel" class="course-workspace-shell card hidden">
+        <div class="course-workspace-head">
+          <div><span class="eyebrow">DERS ÇALIŞMA ALANI</span><h3 id="courseActionTitle">Ders</h3><p id="courseActionMeta" class="muted"></p></div>
+          <button id="courseActionClose" class="ghost small" type="button">Ders seçimine dön</button>
+        </div>
+        <div class="course-context-strip" aria-label="Ders çalışma sekmeleri">
+          <button data-course-action="overview" class="active" type="button"><span>⌂</span><b>Genel Bakış</b></button>
+          <button data-course-action="outcomes" type="button"><span>Ç</span><b>Öğrenim Çıktıları</b></button>
+          <button data-course-action="bank" type="button"><span>?</span><b>Soru Bankası</b></button>
+          <button data-course-action="exams" type="button"><span>S</span><b>Sınavlar</b></button>
+          <button data-course-action="grade" type="button"><span>P</span><b>Değerlendirme</b></button>
+          <button data-course-action="courseanalytics" type="button"><span>A</span><b>Analiz</b></button>
+          <button data-course-action="improvement" type="button"><span>↗</span><b>İyileştirme</b></button>
+        </div>
+        <div id="courseWorkspaceOverview" class="course-workspace-overview">
+          <article><span>AKADEMİK BAĞLAM</span><b>Ders odaklı çalışma</b><small>Program kurulum adımları yerine günlük akademik işlerinize odaklanın.</small></article>
+          <article><span>ÖLÇME</span><b>Sınav ve soru</b><small>Öğrenim Çıktıları ile ilişkilendirilmiş ölçme araçlarını yönetin.</small></article>
+          <article><span>SONUÇ</span><b>Analiz ve iyileştirme</b><small>Sonuçları yorumlayın ve gerektiğinde kalite aksiyonuna dönüştürün.</small></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-coursestudents" class="page">
+      <div class="analytics-focus-head card"><div><span class="eyebrow">DERS ÖĞRENCİLERİ</span><h2>Bu dersteki öğrenciler</h2><p class="muted">Ana öğrenci veri ekranı yerine yalnız seçili dersin öğrenci listesini görün.</p></div><label>Ders<select id="courseStudentsCourse"></select></label><button id="loadCourseStudents" class="primary" type="button">Listeyi getir</button></div>
+      <div id="courseStudentsResult" class="card"></div>
+    </section>
+
+    <section id="page-courseanalytics" class="page">
+      <div class="analytics-focus-head card"><div><span class="eyebrow">DERS ANALİZİ</span><h2>Dersin performansını tek ekranda görün</h2><p class="muted">Sınavları tek tek yorumlamak yerine dersin dönem başarısını, Öğrenim Çıktısı açıklarını ve yıllar arası değişimini izleyin.</p></div><label>Ders<select id="courseAnalyticsCourse"></select></label><button id="loadCourseAnalytics" class="primary" type="button">Analizi getir</button></div>
+      <div id="courseAnalyticsResult"></div>
+    </section>
+
+    <section id="page-programanalytics" class="page">
+      <div class="analytics-focus-head card"><div><span class="eyebrow">PROGRAM ANALİZİ</span><h2>Program hedeflerine ulaşıyor muyuz?</h2><p class="muted">Program çıktıları, ölçülmeyen dersler, riskli dersler ve dönem trendlerini yönetim bakışıyla inceleyin.</p></div><label>Program<select id="programAnalyticsProgram"></select></label><button id="loadProgramAnalytics" class="primary" type="button">Programı analiz et</button></div>
+      <div id="programAnalyticsResult"></div>
+    </section>
+
+    <section id="page-studentcards" class="page student-success-page">
+      <div class="student-card-hero student-success-hero card">
+        <div><span class="eyebrow">ÖĞRENCİ BAŞARI & GELİŞİM PROFİLİ</span><h2>Akademik gelişimi tek bakışta görün</h2><p class="muted">Öğrencinin derslerden gelen doğrudan ölçümlerini ÖÇ ve PÇ düzeyinde izleyin; güçlü alanları, gelişim ihtiyacını ve mezuniyet hazırlığını aynı profilde değerlendirin.</p></div>
+        <span id="studentCardStatus" class="badge">Hazır</span>
+      </div>
+      <div class="card student-card-toolbar student-success-toolbar"><label>Öğrenci ara<input id="studentCardSearch" placeholder="Öğrenci no veya ad"></label><label>Öğrenci<select id="studentCardStudent"></select></label><label>Akademik yıl<input id="studentCardYear" placeholder="2026-2027"></label><button id="studentCardLoad" class="primary" type="button">Profili aç</button><button id="studentCardPdf" class="ghost" type="button">PDF karnesi</button><button id="studentCardFreeze" class="ghost" type="button">Mezuniyet snapshot</button></div>
+
+      <section class="student-profile-overview card">
+        <div class="student-profile-identity">
+          <div id="studentCardAvatar" class="student-profile-avatar">Ö</div>
+          <div><span class="student-profile-kicker">ÖĞRENCİ PROFİLİ</span><h3 id="studentCardName">Öğrenci seçin</h3><p id="studentCardMeta">Program ve sınıf bilgisi burada görünür.</p><div id="studentCardIdentityBadges" class="student-profile-badges"></div></div>
+        </div>
+        <div class="student-profile-score-wrap">
+          <div id="studentCardScoreRing" class="student-score-ring" style="--score:0"><div><strong id="studentCardScore">%0</strong><span>genel çıktı</span></div></div>
+          <div class="student-profile-readiness"><span>MEZUNİYET HAZIRLIĞI</span><b id="studentCardReadiness">İzleniyor</b><small id="studentCardReadinessNote">Ölçüm verisi bekleniyor.</small></div>
+        </div>
+      </section>
+
+      <div id="studentCardSummary" class="student-card-summary student-success-metrics"></div>
+
+      <div class="student-card-layout student-success-layout">
+        <div class="card student-outcome-panel"><div class="section-head"><div><span class="eyebrow">PROGRAM ÇIKTILARI</span><h3>PÇ başarı profili</h3><p class="muted">Her program çıktısında öğrencinin bireysel erişim düzeyi, hedef ve hedef farkı.</p></div><div class="student-outcome-legend"><span><i class="legend-dot good"></i>Hedefte</span><span><i class="legend-dot risk"></i>Gelişim gerekli</span><span><i class="legend-dot muted"></i>Ölçülmedi</span></div></div><div id="studentCardPO" class="student-card-outcomes"></div></div>
+        <aside class="student-profile-side">
+          <div class="card student-insight-card"><div class="section-head"><div><span class="eyebrow">AKADEMİK İÇGÖRÜ</span><h3>Güçlü yön & gelişim odağı</h3></div></div><div id="studentCardFocus"></div></div>
+          <div class="card student-profile-note"><span class="eyebrow">NASIL HESAPLANIYOR?</span><p id="studentCardCalculation">Sınav → soru → ÖÇ → PÇ zincirindeki doğrudan ölçümler kullanılır.</p><div class="student-profile-verification"><span>Doğrulama kodu</span><code id="studentCardVerification">—</code></div></div>
+        </aside>
+      </div>
+
+      <div class="card student-course-panel"><div class="section-head"><div><span class="eyebrow">DERS BAZLI GELİŞİM</span><h3>Dersler ve öğrenim çıktıları</h3><p class="muted">Her ders için bireysel başarı düzeyi, ölçülen sınav sayısı ve gelişim gereken ÖÇ'ler.</p></div><span id="studentCardCourseCount" class="badge">0 ders</span></div><div id="studentCardCourses" class="student-card-courses"></div></div>
+    </section>
+
+    <section id="page-dashboard" class="page active">
+      <div class="dashboard-hero role-dashboard card">
+        <div>
+          <div class="dashboard-role-line"><span class="eyebrow">DOU ASSESS</span><span id="dashboardRoleBadge" class="badge">Çalışma alanı</span></div>
+          <h2 id="dashboardGreeting">Bugün ne yapmak istiyorsunuz?</h2>
+          <p id="dashboardRoleCopy" class="muted">Sınav hazırlama, değerlendirme, optik ve akreditasyon işlerini tek yerden devam ettirin.</p>
+        </div>
+        <div id="dashboardActions" class="dashboard-actions">
+          <button id="dashNewExam" class="primary">+ Yeni sınav</button>
+          <button id="dashOpenBank" class="ghost">Soru havuzu</button>
+          <button id="dashOpenScan" class="ghost">Optik oku</button>
+          <button id="dashOpenQuality" class="ghost hidden">Yönetim & Kalite</button>
+          <button id="dashOpenAccred" class="ghost hidden">Akreditasyon</button>
+        </div>
+      </div>
+      <div id="dashboardTaskGrid" class="dashboard-task-grid"></div>
+      <div class="card action-center-card"><div class="section-head"><div><span class="eyebrow">YAPILACAKLAR</span><h3>Sıradaki işiniz</h3><p class="muted">Sadece sizden işlem bekleyen kayıtlar burada görünür.</p></div><span id="actionCenterCount" class="badge">0 iş</span></div><div id="dashboardActionCenter" class="action-center-list"></div></div>
+      <div id="stats" class="stats dashboard-stats"></div>
+      <div class="dashboard-grid">
+        <div class="card dashboard-main-card">
+          <div class="section-head"><div><span class="eyebrow">SON ÇALIŞMALAR</span><h3>Son sınavlarınız</h3></div><button id="dashAllExams" class="ghost small">Tümünü aç</button></div>
+          <div id="dashboardExamList" class="dashboard-exam-list"></div>
+        </div>
+        <div class="dashboard-side">
+          <div class="card attention-card"><div class="section-head"><div><span class="eyebrow">KISA DURUM</span><h3>Bekleyen işler</h3></div></div><div id="dashboardAttention"></div></div>
+          <div class="card"><div class="section-head"><div><span class="eyebrow">SİSTEM</span><h3>Çalışma durumu</h3></div><span id="dashboardHealthBadge" class="badge status-approved">Hazır</span></div><div id="readyBox" class="readybox">Kontrol ediliyor...</div><p id="authModeText" class="muted">Kimlik ve yetki durumu yükleniyor...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-import" class="page reference-workspace-page modern-admin-page">
+      <div class="page-header modern-page-header">
+        <div><span class="eyebrow">KURUMSAL PİLOT</span><h2>OBS, dönem, kimlik ve denetim akışını tek merkezden yönetin</h2><p class="muted">Bilgi İşlem için sistem sağlığını; kalite ekibi için dönem kilidini; akademik veri için OBS/Excel senkronunu görünür ve izlenebilir hale getirir.</p></div>
+        <span id="pilotOpsStatusBadge" class="badge status-ready">Kontrol ediliyor</span>
+      </div>
+      <div id="pilotOpsKpis" class="pilot-kpi-grid"></div>
+      <div id="demoScenarioCard" class="card demo-scenario-card hidden"><div><span class="eyebrow">5 DAKİKALIK DEMO</span><h3>Yönetim sunumu için örnek pilot senaryosu</h3><p class="muted">30 öğrenci, Python dersi, 10 soruluk havuz, Öğrenim ve Program Çıktıları haritası, bir taslak ve sonuçları hazır bir sınav oluşturur. Yalnız pilot ortamında çalışır ve tekrar çalıştırıldığında veri çoğaltmaz.</p></div><button id="createDemoScenario" class="primary">Demo senaryosunu hazırla</button></div>
+      <div class="pilot-uat-grid">
+        <div class="card pilot-readiness-card">
+          <div class="section-head"><div><span class="eyebrow">PİLOT KURULUM SİHİRBAZI</span><h3>Canlı kullanıma ne kadar hazır?</h3><p class="muted">Zorunlu kurumsal adımlar backend verisi ve operasyon heartbeat'lerinden otomatik kontrol edilir.</p></div><div id="pilotReadinessScore" class="readiness-score">—</div></div>
+          <div id="pilotSetupChecklist" class="pilot-checklist"></div>
+        </div>
+        <div class="card pilot-uat-card">
+          <div class="section-head"><div><span class="eyebrow">UAT / KABUL TESTİ</span><h3>Uçtan uca pilot senaryosunu doğrula</h3><p class="muted">Kurulum, sınav, optik, değerlendirme ve kanıt zincirini veri kaybetmeden kontrol eder.</p></div><button id="runPilotUat" class="primary small" type="button">UAT çalıştır</button></div>
+          <div id="pilotUatSummary" class="uat-summary"></div><div id="pilotUatHistory" class="uat-history"></div>
+        </div>
+      </div>
+      <div class="pilot-uat-grid">
+        <div class="card">
+          <div class="section-head"><div><span class="eyebrow">OPERASYONEL SORUN MERKEZİ</span><h3>Teknik hata yerine yapılacak işi göster</h3></div><span id="pilotIssueCount" class="badge">0 sorun</span></div>
+          <div id="pilotIssueCenter" class="pilot-issue-list"></div>
+        </div>
+        <div class="card">
+          <div class="section-head"><div><span class="eyebrow">YEDEK & PERFORMANS</span><h3>Pilot güvenlik ağı</h3><p class="muted">Son backup/restore doğrulamasını ve sunucu sorgu benchmark'ını tek yerde izleyin.</p></div><button id="refreshPilotBenchmark" class="ghost small" type="button">Benchmark yenile</button></div>
+          <div id="pilotBackupStatus" class="pilot-backup-status"></div><div id="pilotBenchmark" class="pilot-benchmark"></div>
+          <div class="command-hint"><b>Gerçek eşzamanlı yük testi</b><code>.\Pilot-Load-Test.ps1 -Requests 120 -Concurrency 10</code></div>
+        </div>
+      </div>
+      <div class="pilot-ops-grid">
+        <div class="card pilot-period-card">
+          <div class="section-head"><div><span class="eyebrow">AKADEMİK DÖNEM</span><h3>Dönem aç / kilitle</h3><p class="muted">Kilitli veya arşivlenmiş dönemde sınav, soru, okuma ve not verisi değiştirilemez.</p></div><button id="bootstrapPeriods" class="ghost small" type="button">Derslerden dönemleri oluştur</button></div>
+          <form id="academicPeriodForm" class="form period-inline-form"><div class="row"><label>Akademik yıl<input id="periodYear" value="2026-2027" required></label><label>Dönem<select id="periodTerm"><option>Güz</option><option>Bahar</option><option>Yaz</option></select></label></div><label>Başlık<input id="periodTitle" value="2026-2027 Güz" required></label><div class="row"><label>Başlangıç<input id="periodStart" type="date"></label><label>Bitiş<input id="periodEnd" type="date"></label></div><button class="primary" type="submit">Dönemi oluştur</button></form>
+          <div id="academicPeriodList" class="period-list"></div>
+        </div>
+        <div class="card obs-bridge-card">
+          <div class="section-head"><div><span class="eyebrow">OBS VERİ KÖPRÜSÜ</span><h3>OBS read-only veri köprüsü</h3><p class="muted">Akademik veriyi OBS/Excel kaynağından içeri alın. Ders sonuçlarını OBS-uyumlu Excel olarak dışa aktarın; API write-back yalnız kurum tarafından ayrıca onaylanıp etkinleştirilirse açılır.</p></div><span id="obsModeChip" class="integration-chip">OBS read-only</span></div>
+          <label class="file-drop">OBS çalışma kitabı<input id="pilotFile" type="file" accept=".xlsx" /><small>Önce doğrulama yapın; hatalı tek satır bile veritabanına yazılmaz.</small></label>
+          <div class="actions"><button id="validateImport" class="ghost">Önce doğrula</button><button id="runImport" class="primary">OBS verisini senkronla</button></div><pre id="importResult" class="result"></pre><a class="download" href="/examples/DOU-Assess-Pilot-Veri-DEMO.xlsx" download>OBS köprü şablonunu indir</a>
+          <div class="form-grid" style="margin-top:16px"><label class="span-2">Sonuç gönderilecek ders<select id="obsResultsCourse"></select></label></div>
+          <div class="actions"><button id="obsResultsExport" class="ghost" type="button">OBS sonuç Excel’i</button><button id="obsResultsPush" class="primary" type="button" hidden disabled>OBS API’ye gönder</button></div>
+          <small id="obsWritebackNote" class="muted">Read-only güvenli mod aktif. OBS write-back kurumsal onay olmadan kullanılamaz.</small>
+        </div>
+      </div>
+      <div class="pilot-ops-grid lower">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">SENKRON GEÇMİŞİ</span><h3>OBS aktarım kayıtları</h3></div><button id="refreshPilotOps" class="ghost small" type="button">Yenile</button></div><div id="pilotSyncHistory"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">DENETİM İZİ</span><h3>Kim, neyi, ne zaman değiştirdi?</h3></div><span class="audit-lock-chip">Değiştirilemez kayıt</span></div><div id="pilotAuditLog"></div></div>
+      </div>
+    </section>
+
+    <section id="page-data" class="page reference-workspace-page modern-admin-page">
+      <div class="page-header modern-page-header academic-data-hero">
+        <div>
+          <span class="eyebrow">AKADEMİK VERİ MERKEZİ</span>
+          <h2>Program, ders ve öğrenciyi tek akışta yönetin</h2>
+          <p class="muted">Ders açın, öğretim elemanı atayın, öğrencileri ekleyin ve derse kaydedin. OBS/Excel aktarımı aynı veri modelini besler.</p>
+        </div>
+        <div class="academic-hero-actions">
+          <button id="dataNewProgram" class="primary" type="button">1 · Program</button>
+          <button id="dataNewCourse" class="ghost" type="button">2 · Ders</button>
+          <button id="dataNewExam" class="ghost" type="button">3 · Sınav</button>
+          <button id="dataNewStudent" class="ghost" type="button">4 · Öğrenci</button>
+          <button id="dataOpenObs" class="ghost secondary-action" type="button">OBS / Excel</button>
+        </div>
+      </div>
+
+      <div id="academicDataStats" class="academic-data-stats"></div>
+
+      <div class="card academic-flow-card" id="academicFlowCard">
+        <div class="section-head"><div><span class="eyebrow">AKADEMİK YAPI DURUMU</span><h3>Kurumsal veri kapsamı</h3><p class="muted">Program, ders, sınav ve öğrenci kapsamını yönetim görünümünde doğrulayın. OBS entegrasyonu sonrasında ana akademik veriler salt okunur olarak senkronize edilir.</p></div><span id="academicFlowStatus" class="badge">1 / 4</span></div>
+        <div id="academicFlowSteps" class="academic-flow-steps"></div>
+        <div id="academicFlowNext" class="academic-flow-next"></div>
+      </div>
+
+      <div class="academic-data-layout">
+        <aside class="card academic-create-panel" id="academicCreatePanel">
+          <div class="section-head academic-create-head">
+            <div><span class="eyebrow">HIZLI İŞLEM</span><h3 id="academicCreateTitle">Program oluştur</h3><p id="academicCreateHelp" class="muted">İlk adım olarak akademik programı tanımlayın veya mevcut programı seçin.</p></div>
+            <div class="academic-create-head-actions"><span id="academicCreateMode" class="badge">Yeni</span><button id="academicDrawerClose" class="icon-button" type="button" aria-label="Paneli kapat">×</button></div>
+          </div>
+          <div id="academicReadOnlyNote" class="data-readonly-note hidden">Bu kullanıcı akademik ana veriyi görüntüleyebilir; oluşturma ve düzenleme için program/bölüm yönetim yetkisi gerekir.</div>
+          <div class="academic-create-tabs" id="academicCreateTabs">
+            <button type="button" data-data-form="program" id="academicProgramTab" class="active">Program</button>
+            <button type="button" data-data-form="course">Ders</button>
+            <button type="button" data-data-form="student">Öğrenci</button>
+            <button type="button" data-data-form="enroll">Derse ata</button>
+          </div>
+
+          <form id="courseCreateForm" class="form academic-form hidden" data-form-panel="course">
+            <label>Program<select id="dataCourseProgram" required></select></label>
+            <div class="row"><label>Ders kodu<input id="dataCourseCode" placeholder="BLP276" required maxlength="64"></label><label>Akademik yıl<input id="dataCourseYear" placeholder="2026-2027" required></label></div>
+            <label>Ders adı<input id="dataCourseName" placeholder="Python Programlama" required></label>
+            <div class="row"><label>Dönem<select id="dataCourseTerm"><option>Güz</option><option>Bahar</option><option>Yaz</option></select></label><label>Geçme eşiği %<input id="dataCoursePassThreshold" type="number" min="0" max="100" step="0.5" value="50"></label><label>Öğretim elemanı<input id="dataCourseInstructor" placeholder="Ad Soyad"></label></div>
+            <label>Kurumsal e-posta<input id="dataCourseEmail" type="email" placeholder="ad.soyad@dogus.edu.tr"></label>
+            <div class="academic-form-actions"><button class="primary" type="submit" id="dataCourseSubmit">Dersi oluştur</button><button class="ghost hidden" type="button" id="dataCourseCancel">Vazgeç</button></div>
+          </form>
+
+          <form id="studentCreateForm" class="form academic-form hidden" data-form-panel="student">
+            <label>Program<select id="dataStudentProgram" required></select></label>
+            <div class="row"><label>Öğrenci no<input id="dataStudentNo" placeholder="202600123" required></label><label>Sınıf<select id="dataStudentClass"><option value="">Seçiniz</option><option>1. Sınıf</option><option>2. Sınıf</option><option>3. Sınıf</option><option>4. Sınıf</option></select></label></div>
+            <label>Ad Soyad<input id="dataStudentName" placeholder="Öğrenci adı soyadı" required></label>
+            <div class="academic-form-actions"><button class="primary" type="submit" id="dataStudentSubmit">Öğrenciyi ekle</button><button class="ghost hidden" type="button" id="dataStudentCancel">Vazgeç</button></div>
+          </form>
+
+          <div class="academic-form hidden" data-form-panel="enroll">
+            <label>Ders<select id="dataEnrollCourse"></select></label>
+            <div id="dataEnrollCourseContext" class="data-context-note">Ders seçildiğinde aynı programdaki öğrenciler listelenir.</div>
+            <label>Öğrenci ara<input id="dataEnrollmentSearch" placeholder="Öğrenci no veya ad ile ara"></label>
+            <label>Öğrenciler<select id="dataEnrollmentStudents" multiple size="8"></select><small>Ctrl/Cmd ile birden fazla öğrenci seçebilirsiniz.</small></label>
+            <div class="academic-form-actions"><button id="dataEnrollSubmit" class="primary" type="button">Seçili öğrencileri derse ata</button><button id="dataEnrollSelectAll" class="ghost" type="button">Tümünü seç</button></div>
+            <div id="dataEnrollmentList" class="enrollment-list"></div>
+          </div>
+
+          <form id="programCreateForm" class="form academic-form" data-form-panel="program">
+            <div class="row"><label>Program kodu<input id="dataProgramCode" placeholder="BILPRG" required maxlength="64"></label><label>Fakülte / MYO<input id="dataProgramFaculty" placeholder="Meslek Yüksekokulu"></label></div>
+            <label>Program adı<input id="dataProgramName" placeholder="Bilgisayar Programcılığı" required></label>
+            <label>Bölüm<input id="dataProgramDepartment" placeholder="Bilgisayar Teknolojileri"></label>
+            <div class="academic-form-actions"><button class="primary" type="submit" id="dataProgramSubmit">Programı oluştur</button><button class="ghost hidden" type="button" id="dataProgramCancel">Vazgeç</button></div>
+          </form>
+        </aside>
+
+        <div class="card academic-directory-card">
+          <div class="section-head academic-directory-head">
+            <div><span class="eyebrow">AKADEMİK DİZİN</span><h3>Akademik yapı</h3><p class="muted">Önce kaydı bulun; ayrıntıya yalnız ihtiyaç olduğunda girin.</p></div>
+            <div class="academic-directory-head-actions"><span id="academicDirectoryCount" class="badge">0 kayıt</span><button id="academicNewRecord" class="primary compact-primary" type="button">+ Yeni kayıt</button></div>
+          </div>
+          <div class="academic-directory-toolbar">
+            <div class="academic-view-tabs">
+              <button type="button" data-data-view="programs" class="active">Programlar</button>
+              <button type="button" data-data-view="courses">Dersler</button>
+              <button type="button" data-data-view="students">Öğrenciler</button>
+            </div>
+            <div class="academic-directory-filters">
+              <label>Program<select id="academicProgramFilter"><option value="">Tüm programlar</option></select></label>
+              <label class="academic-search">Ara<input id="academicDataSearch" placeholder="Kod, ad, öğretim elemanı..."></label>
+            </div>
+          </div>
+          <div id="academicDirectoryList" class="academic-directory-list"></div>
+          <div id="academicStudentPagination" class="bank-pagination hidden"><button id="academicStudentPrev" class="ghost small" type="button">← Önceki</button><span id="academicStudentPageLabel" class="muted">Sayfa 1</span><button id="academicStudentNext" class="ghost small" type="button">Sonraki →</button></div>
+        </div>
+      </div>
+      <button id="academicDrawerBackdrop" class="academic-drawer-backdrop hidden" type="button" aria-label="Paneli kapat"></button>
+
+      <div class="card academic-bulk-import academic-bulk-secondary">
+        <div class="academic-bulk-copy"><span class="eyebrow">EXCEL İLE TOPLU KURULUM</span><h3>Öğrenci, ders kaydı, Öğrenim ve Program Çıktıları, sınav ve soruları tek dosyadan yükleyin</h3><p class="muted">Şablonu indirin, ilgili sayfaları doldurun; önce doğrulayın, sonra atomik olarak içe aktarın. Öğretim elemanı yalnız yetkili olduğu mevcut derslere aktarım yapabilir.</p></div>
+        <div class="academic-bulk-actions"><button id="academicTemplateDownload" class="ghost" type="button">Excel şablonunu indir</button><label class="file-drop compact-file-drop">Doldurulmuş Excel<input id="academicWorkbookFile" type="file" accept=".xlsx"><small>Program · Ders · Öğrenci · Öğrenim ve Program Çıktıları · Sınav · Soru</small></label><button id="academicWorkbookValidate" class="ghost" type="button">Doğrula</button><button id="academicWorkbookImport" class="primary" type="button">İçe aktar</button></div>
+        <pre id="academicWorkbookResult" class="result academic-import-result">Henüz dosya seçilmedi.</pre>
+      </div>
+
+    </section>
+
+    <section id="page-outcomes" class="page reference-workspace-page modern-admin-page">
+      <div class="card outcome-center-hero">
+        <div><span class="eyebrow">ÖĞRENİM VE PROGRAM ÇIKTILARI</span><h2>Ders kazanımlarını sınavdan bağımsız, tek akademik merkezde yönetin</h2><p class="muted">Öğrenim Çıktısı hedeflerini, program çıktılarıyla katkı ilişkisini ve soru havuzundaki ölçüm kapsamını burada tanımlayın. Sınavlar bu canlı merkezden immutable snapshot alır.</p></div>
+        <div class="outcome-hero-actions"><label class="course-picker">Ders<select id="outcomeCourse"></select></label><button id="outcomeBackToExam" class="ghost hidden" type="button">← Sınava geri dön</button></div>
+      </div>
+      <div id="outcomeCenterKpis" class="outcome-center-kpis"></div>
+      <div id="outcomeCoverage" class="outcome-coverage"></div>
+      <div class="grid2 outcome-quick-grid">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">DERS ÖĞRENME ÇIKTISI</span><h3>Yeni Öğrenim Çıktısı oluştur</h3><p class="muted">Ölçülebilir, ders düzeyinde ve hedef yüzdesi tanımlı olmalı.</p></div></div><form id="loQuickForm" class="form"><div class="row"><label>Kod<input id="loCode" placeholder="Ö1" required></label><label>Hedef %<input id="loTarget" type="number" min="0" max="100" value="60" required></label></div><label>Açıklama<input id="loDescription" placeholder="Öğrenci ... yapabilir" required></label><button class="primary" type="submit">Öğrenim Çıktısı ekle</button></form></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM ÇIKTISI</span><h3>Yeni Program Çıktısı oluştur</h3><p class="muted">Program düzeyindeki yeterliği akademik yıl kapsamında tanımlayın.</p></div></div><form id="poQuickForm" class="form"><div class="row"><label>Kod<input id="poCode" placeholder="Program Çıktısı1" required></label><label>Akademik yıl<input id="poYear" readonly></label></div><label>Açıklama<input id="poDescription" placeholder="Mezun ... yapabilir" required></label><button class="primary" type="submit">Program Çıktısı ekle</button></form></div>
+      </div>
+      <div class="grid2 outcome-entity-grid">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">Öğrenim Çıktısı KATALOĞU</span><h3>Ders öğrenme çıktıları</h3></div><span id="loEntityCount" class="badge">0 Öğrenim Çıktısı</span></div><div id="loEntityList" class="outcome-entity-list"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">Program Çıktısı KATALOĞU</span><h3>Program çıktıları</h3></div><span id="poEntityCount" class="badge">0 Program Çıktısı</span></div><div id="poEntityList" class="outcome-entity-list"></div></div>
+      </div>
+      <div class="card matrix-card"><div class="section-head"><div><span class="eyebrow">1–5 KATKI MATRİSİ</span><h3>Öğrenim Çıktısı hangi Program Çıktısı'ye ne kadar katkı sağlıyor?</h3><p class="muted">1: çok düşük · 2: düşük · 3: orta · 4: yüksek · 5: çok yüksek. İlişki yoksa hücre eşleştirilmemiş bırakılır. Değer değişince otomatik kaydedilir.</p></div><span id="outcomeSaveState" class="save-state">Hazır</span></div><div id="outcomeMatrix" class="matrix-wrap"></div></div>
+    </section>
+
+    <section id="page-assessmentmeasures" class="page assessment-measures-page reference-workspace-page modern-admin-page">
+      <div class="assessment-measure-hero card"><div><span class="eyebrow">GENERIC ASSESSMENT ENGINE</span><h2>Ölçme Planı & Rubrikler</h2><p class="muted">Sınav dışındaki proje, ödev, sunum, laboratuvar, staj ve portfolyo çalışmalarını Öğrenim Çıktılarıyla aynı ölçme zincirine bağlayın.</p></div><div class="assessment-measure-filters"><label>Ders<select id="measureCourse"></select></label><span id="measureStatus" class="badge">Hazır</span></div></div>
+      <div id="measureSummary" class="curriculum-map-summary"></div>
+      <div class="assessment-measure-layout">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">ÖLÇME ARAÇLARI</span><h3>Ders ölçme planı</h3><p class="muted">Her ölçme aracını tür, ağırlık, hedef, rubrik ve Öğrenim Çıktısı kapsamıyla yönetin.</p></div></div><div id="measureList"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">YENİ ÖLÇME ARACI</span><h3>Planınıza ölçme ekleyin</h3></div></div><form id="measureCreateForm" class="form"><div class="row"><label>Kod<input id="measureCode" placeholder="PRJ-01" required></label><label>Tür<select id="measureType"><option value="assignment">Ödev</option><option value="project">Proje</option><option value="presentation">Sunum</option><option value="laboratory">Laboratuvar</option><option value="internship">Staj</option><option value="portfolio">Portfolyo</option><option value="capstone">Bitirme / Capstone</option><option value="practical">Uygulama</option><option value="peer_assessment">Akran Değerlendirme</option><option value="exam">Sınav</option></select></label></div><label>Başlık<input id="measureTitle" placeholder="Dönem Projesi" required></label><div class="row"><label>Ağırlık %<input id="measureWeight" type="number" min="0" max="100" value="20"></label><label>Maks. puan<input id="measureMax" type="number" min="1" value="100"></label><label>Hedef %<input id="measureTarget" type="number" min="0" max="100" value="60"></label></div><label>Rubrik<select id="measureRubric"><option value="">Rubriksiz</option></select></label><label>Yönerge<textarea id="measureInstructions" rows="3" placeholder="Öğrenciden beklenen çalışma..."></textarea></label><button class="primary" type="submit">Ölçme aracını oluştur</button></form></div>
+      </div>
+      <div class="assessment-measure-layout rubric-layout">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">RUBRİK KÜTÜPHANESİ</span><h3>Versiyonlanabilir değerlendirme rubrikleri</h3><p class="muted">Kriterleri doğrudan Öğrenim Çıktılarına bağlayın; performans seviyelerini açık tanımlayın.</p></div></div><div id="rubricList"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">RUBRİK TASLAĞI</span><h3>Hızlı rubrik oluştur</h3><p class="muted">Satır biçimi: KOD | Ölçüt | Puan. İlk sürüm dört performans seviyesiyle oluşturulur.</p></div></div><form id="rubricCreateForm" class="form"><label>Rubrik adı<input id="rubricTitle" placeholder="Proje Değerlendirme Rubriği" required></label><label>Kriterler<textarea id="rubricCriteria" rows="7" placeholder="K1 | Teknik doğruluk | 40
+K2 | Çözüm kalitesi | 35
+K3 | Sunum ve dokümantasyon | 25" required></textarea></label><button class="primary" type="submit">Rubrik oluştur</button></form></div>
+      </div>
+    </section>
+
+    <section id="page-surveys" class="page survey-page reference-workspace-page modern-admin-page">
+      <div class="card survey-hero"><div><span class="eyebrow">INDIRECT ASSESSMENT ENGINE</span><h2>Anket & Dolaylı Ölçüm</h2><p class="muted">Öğrenci, mezun, işveren ve dış paydaş görüşlerini Program Çıktıları, PEA ve kalite ölçütleriyle aynı kanıt zincirinde yönetin.</p></div><div class="survey-filters"><label>Program<select id="surveyProgram"></select></label><label>Akademik yıl<input id="surveyYear" value="2026-2027"></label><span id="surveyStatus" class="badge">Hazır</span></div></div>
+      <div id="surveySummary" class="curriculum-map-summary"></div>
+      <div class="survey-layout">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">ANKET KÜTÜPHANESİ</span><h3>Program anketleri ve kampanyalar</h3><p class="muted">Aktif şablonlardan dönemsel kampanya açın; yanıt sayısını ve PÇ bağlantılarını izleyin.</p></div></div><div id="surveyList"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">YENİ ANKET</span><h3>Dolaylı ölçme şablonu oluştur</h3></div></div><form id="surveyCreateForm" class="form"><div class="row"><label>Kod<input id="surveyCode" placeholder="MEZUN-01" required></label><label>Tür<select id="surveyType"><option value="student">Öğrenci</option><option value="graduate">Mezun</option><option value="employer">İşveren</option><option value="external_stakeholder">Dış paydaş</option><option value="faculty">Öğretim elemanı</option><option value="course_evaluation">Ders değerlendirme</option><option value="program_evaluation">Program değerlendirme</option></select></label></div><label>Başlık<input id="surveyTitle" placeholder="Mezun Program Çıktıları Değerlendirmesi" required></label><div class="row"><label>Hedef %<input id="surveyTarget" type="number" min="0" max="100" value="60"></label><label class="survey-anon-check"><span>Anonim</span><input id="surveyAnonymous" type="checkbox" checked></label></div><label>Sorular<textarea id="surveyQuestions" rows="7" placeholder="S1 | Mesleki problemleri çözebilme yeterliğim gelişti | PÇ1
+S2 | Takım çalışmasına etkin katılabiliyorum | PÇ4" required></textarea><small>Satır biçimi: KOD | Soru | PÇ kodu (opsiyonel). Likert 1–5 olarak oluşturulur.</small></label><button class="primary" type="submit">Anket şablonunu oluştur ve aktifleştir</button></form></div>
+      </div>
+      <div class="grid2 survey-bottom">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">DIRECT + INDIRECT</span><h3>Program Çıktısı kanıt dengesi</h3><p class="muted">Varsayılan model %70 doğrudan ölçüm + %30 dolaylı ölçümdür. İki kanal tamamlanmadan birleşik puan üretilmez.</p></div></div><div id="surveyEvidenceMix"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">YÖNETİŞİM KURALI</span><h3>Anket sonuçlarını nasıl kullanıyoruz?</h3></div></div><div class="survey-guide"><article><b>Anonimlik</b><p>Anonim kampanyada katılımcı anahtarı ve kişisel metadata saklanmaz.</p></article><article><b>Kanıt izlenebilirliği</b><p>Her sayısal soru PÇ, PEA veya kalite ölçütüne bağlanabilir.</p></article><article><b>Karar desteği</b><p>Dolaylı ölçüm doğrudan başarı hesabının yerine geçmez; onu tamamlayan ikinci kanaldır.</p></article></div></div>
+      </div>
+    </section>
+
+    <section id="page-assessmentassurance" class="page assessment-assurance-page reference-workspace-page modern-admin-page">
+      <div class="card assessment-assurance-hero"><div><span class="eyebrow">PROGRAM ASSESSMENT ASSURANCE</span><h2>Yıllık Ölçme Güvence Planı</h2><p class="muted">Her Program Çıktısı için doğrudan ve dolaylı ölçme yöntemini, hedefi, sorumluyu ve yıl sonu kararını tek dondurulabilir plan üzerinde yönetin.</p></div><div class="assessment-assurance-filters"><label>Program<select id="assessmentAssuranceProgram"></select></label><label>Akademik yıl<input id="assessmentAssuranceYear" value="2026-2027"></label><span id="assessmentAssuranceStatus" class="badge">Hazır</span></div></div>
+      <div id="assessmentAssuranceSummary" class="curriculum-map-summary"></div>
+      <div class="card assessment-assurance-toolbar"><div><b id="assessmentAssurancePlanTitle">Aktif plan yok</b><small id="assessmentAssurancePlanMeta" class="muted">Mevcut sınav, proje/rubrik ve anket eşleşmelerinden planı otomatik oluşturabilirsiniz.</small></div><div class="actions"><button id="assessmentAssuranceAutoBuild" class="primary" type="button">Mevcut kanıttan plan oluştur</button><button id="assessmentAssuranceReview" class="ghost" type="button" disabled>Yıl sonu review snapshot</button></div></div>
+      <div class="card"><div class="section-head"><div><span class="eyebrow">PÇ GÜVENCE MATRİSİ</span><h3>Plan → kanıt → hedef → karar</h3><p class="muted">Bir PÇ tam planlı sayılmak için en az bir doğrudan ve bir dolaylı ölçme kanalına sahip olmalıdır. Birleşik başarı iki kanalda da gerçek veri oluşmadan hesaplanmaz.</p></div></div><div id="assessmentAssuranceMatrix"></div></div>
+      <div class="grid2 assessment-assurance-bottom">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">YÖNETİŞİM</span><h3>Ölçme güvence kuralı</h3></div></div><div class="survey-guide"><article><b>Plan kapsamı</b><p>Her PÇ için yöntem, kanal, hedef ve sorumlu görünür olmalıdır.</p></article><article><b>Kanıt ayrımı</b><p>Doğrudan ve dolaylı veri ayrı saklanır; ağırlıklı sonuç yalnız ikisi de varsa hesaplanır.</p></article><article><b>Kapanış</b><p>Yıl sonu review immutable snapshot üretir; hedef altı sonuçlar PUKÖ için aday olur.</p></article></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">REVIEW GEÇMİŞİ</span><h3>Dondurulmuş yıllık değerlendirmeler</h3></div></div><div id="assessmentAssuranceReviews"><p class="muted">Henüz review snapshot yok.</p></div></div>
+      </div>
+    </section>
+
+    <section id="page-curriculummap" class="page curriculum-map-page reference-workspace-page modern-admin-page">
+      <div class="card curriculum-map-hero">
+        <div><span class="eyebrow">MÜFREDAT TASARIMI & PROGRAM YETERLİLİĞİ</span><h2>Derslerin Program Çıktılarını nasıl geliştirdiğini görün</h2><p class="muted">I/R/M haritası başarı hesabı değildir; müfredat tasarımını gösterir. I: kazandırmaya başlar · R: pekiştirir · M: mezuniyet düzeyinde ustalaştırır.</p></div>
+        <div class="curriculum-map-filters"><label>Program<select id="curriculumMapProgram"></select></label><label>Müfredat versiyonu<select id="curriculumMapVersion"></select></label><span id="curriculumMapStatus" class="badge">Hazır</span></div>
+      </div>
+      <div id="curriculumMapSummary" class="curriculum-map-summary"></div>
+      <div class="card curriculum-map-matrix-card">
+        <div class="section-head"><div><span class="eyebrow">I / R / M MATRİSİ</span><h3>Ders × Program Çıktısı haritası</h3><p class="muted">Hücreyi I, R veya M olarak işaretleyin. Boş bırakılan hücre o dersin ilgili Program Çıktısına bilinçli bir katkı tanımlamadığını gösterir.</p></div><div class="curriculum-map-legend"><span><i class="irm-dot irm-i"></i>I · Introduced</span><span><i class="irm-dot irm-r"></i>R · Reinforced</span><span><i class="irm-dot irm-m"></i>M · Mastered</span></div></div>
+        <div id="curriculumMapMatrix" class="curriculum-map-matrix"><p class="muted">Program ve müfredat versiyonu seçin.</p></div>
+      </div>
+      <div class="grid2 curriculum-map-bottom">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">GAP ANALİZİ</span><h3>Müfredat riskleri</h3><p class="muted">Kapsanmayan, Mastered seviyesine ulaşmayan ve tek derse bağımlı Program Çıktılarını otomatik bulun.</p></div></div><div id="curriculumMapGaps"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">TASARIM KILAVUZU</span><h3>Haritayı nasıl yorumlamalı?</h3></div></div><div class="curriculum-map-guide"><article><b>I · Introduced</b><p>Öğrenci yeterlikle ilk kez sistematik biçimde karşılaşır.</p></article><article><b>R · Reinforced</b><p>Yeterlik daha karmaşık uygulamalarla pekiştirilir.</p></article><article><b>M · Mastered</b><p>Öğrenciden mezuniyet düzeyinde bağımsız yeterlik beklenir.</p></article><small>ÖÇ→PÇ 1–5 katkı matrisi ölçme modelidir; bu ekran ise müfredat tasarım modelidir. İki yapı birbirini tamamlar.</small></div></div>
+      </div>
+    </section>
+
+    <section id="page-bank" class="page reference-workspace-page modern-admin-page">
+      <div class="bank-hero card">
+        <div><span class="eyebrow">KURUMSAL SORU HAVUZU</span><h2>Derslerinizdeki tüm soruları tek yerde yönetin</h2><p class="muted">Öğretim elemanı yalnız kendi derslerini; program/bölüm yöneticisi ise yetkili olduğu akademik kapsamdaki dersleri görür. Sorular sınava eklendiğinde snapshot alınır.</p></div>
+        <div class="actions"><button id="bankTemplateDownload" class="ghost" type="button">Excel şablonu</button><button id="bankFocusImport" class="ghost" type="button">Excel ile toplu ekle</button><button id="bankFocusCreate" class="primary" type="button">+ Yeni soru oluştur</button></div>
+      </div>
+      <div class="bank-institutional-note"><b>Kurumsal hafıza:</b> Aynı programdaki aynı ders kodunun geçmiş dönem soruları yeni öğretim elemanlarına da görünür. Geçmiş soru doğrudan sınava alınabilir; kaynağı, yılı, yazarı, sürümü ve kullanım geçmişi korunur.</div><div id="bankStats" class="bank-stats"></div>
+      <div id="bankImportCard" class="card bank-import-card hidden">
+        <div class="section-head"><div><span class="eyebrow">TOPLU SORU AKTARIMI</span><h3>Excel ile soru havuzunu doldur</h3><p class="muted">Ders kodu, soru türü, seçenekler, doğru cevap, Öğrenim Çıktısı, konu, zorluk, Bloom, etiket ve klasik soru rubriğini tek dosyadan içe aktarın.</p></div><button id="bankImportClose" class="ghost small" type="button">Kapat</button></div>
+        <div class="bank-import-grid">
+          <label class="file-drop"><input id="bankWorkbookFile" type="file" accept=".xlsx"><strong>Excel dosyasını seç</strong><em>Sadece .xlsx</em></label>
+          <div class="bank-import-actions"><button id="bankWorkbookValidate" class="ghost" type="button">Önce doğrula</button><button id="bankWorkbookImport" class="primary" type="button">Soru havuzuna aktar</button></div>
+        </div>
+        <pre id="bankWorkbookResult" class="result">Henüz dosya seçilmedi.</pre>
+      </div>
+      <div class="bank-layout">
+        <div class="card bank-library-card">
+          <div class="section-head bank-library-head"><div><span class="eyebrow">SORU KÜTÜPHANESİ</span><h3>Yetkili olduğum sorular</h3><p class="muted">Filtre seçmeden açıldığında tüm erişilebilir dersler toplu gösterilir.</p></div><span id="bankResultCount" class="badge">0 soru</span></div>
+          <div class="bank-filterbar">
+            <label>Program / Bölüm<select id="bankFilterProgram"><option value="">Tüm programlar</option></select></label>
+            <label>Ders<select id="bankFilterCourse"><option value="">Tüm yetkili dersler</option></select></label>
+            <label>Durum<select id="bankFilterReview"><option value="">Tüm durumlar</option><option value="draft">Taslak</option><option value="review">Kontrol bekliyor</option><option value="revision">Revizyon</option><option value="approved">Onaylı</option><option value="institutional">Kurumsal</option><option value="retired">Kullanımdan kaldırıldı</option></select></label><label>Tür<select id="bankFilterType"><option value="">Tüm soru türleri</option><option value="mcq">Çoktan seçmeli</option><option value="classic">Klasik</option></select></label>
+            <label>Öğrenim Çıktısı<input id="bankFilterOutcome" placeholder="Örn. Ö1"></label>
+            <label class="bank-search-field">Ara<input id="bankSearch" placeholder="Soru metni, etiket, ders kodu..."></label>
+            <button id="bankSearchBtn" class="ghost" type="button">Filtrele</button>
+            <button id="bankClearFilters" class="ghost" type="button">Temizle</button>
+          </div>
+          <div id="bankActiveScope" class="bank-active-scope"></div>
+          <div id="bankList" class="bank-list-modern"></div><div class="bank-pagination"><button id="bankPagePrev" class="ghost small" type="button" disabled>← Önceki</button><span id="bankPageLabel" class="badge">Sayfa 1</span><button id="bankPageNext" class="ghost small" type="button" disabled>Sonraki →</button></div>
+        </div>
+        <button id="bankEditorBackdrop" class="bank-editor-backdrop" type="button" aria-label="Soru editörünü kapat"></button>
+        <aside class="card bank-editor-card" id="bankEditorCard" role="dialog" aria-modal="true" aria-labelledby="bankEditorTitle">
+          <div class="section-head bank-editor-head"><div><span class="eyebrow">SORU EDİTÖRÜ</span><h3 id="bankEditorTitle">Yeni soru</h3><p class="muted">Soru ders ve Öğrenim Çıktısı ile ilişkilendirilir; sınavlarda tekrar kullanılabilir.</p></div><button id="bankEditorClose" class="icon-close ghost" type="button" aria-label="Soru editörünü kapat">×</button></div>
+          <form id="bankForm" class="form">
+            <label>Ders<select id="bankCourse" required></select></label>
+            <div id="bankCourseContext" class="course-summary muted">Ders seçildiğinde öğretim elemanı ve program bilgisi burada görünür.</div>
+            <div class="row"><label>Tür<select id="bankType"><option value="mcq">Çoktan seçmeli</option><option value="classic">Klasik</option></select></label><label>Varsayılan puan<input id="bankPoints" type="number" min="1" value="10"></label><label id="bankAnswerLinesWrap" class="hidden">Cevap satırı<input id="bankAnswerLines" type="number" min="1" max="40" value="8"></label></div>
+            <div class="row"><label>Konu<input id="bankTopic" placeholder="Örn. Döngüler"></label><label>Ünite<input id="bankUnit" placeholder="Örn. Ünite 4"></label><label>Zorluk<select id="bankDifficulty"><option value="easy">Kolay</option><option value="medium" selected>Orta</option><option value="hard">Zor</option></select></label><label>Bloom<select id="bankBloom"><option value="">—</option><option value="remember">Hatırlama</option><option value="understand">Anlama</option><option value="apply">Uygulama</option><option value="analyze">Analiz</option><option value="evaluate">Değerlendirme</option><option value="create">Yaratma</option></select></label></div>
+            <div class="outcome-picker-block bank-multi-outcome"><label>Bu soru hangi Öğrenim Çıktısı'leri ölçüyor?</label><select id="bankLoSelect" class="sr-only" multiple></select><div id="bankOutcomePicker" class="outcome-chip-picker compact-picker"></div><div id="bankOutcomeContext" class="outcome-context muted">Bir veya birden fazla Öğrenim Çıktısı seçebilirsiniz.</div></div>
+            <label>Soru<textarea id="bankText" rows="5" required placeholder="Soruyu açık ve ölçülebilir biçimde yazın..."></textarea></label>
+            <div id="bankChoices" class="choice-grid modern-choices"><label><span>A</span><input id="bankChoiceA" placeholder="A seçeneği"></label><label><span>B</span><input id="bankChoiceB" placeholder="B seçeneği"></label><label><span>C</span><input id="bankChoiceC" placeholder="C seçeneği"></label><label><span>D</span><input id="bankChoiceD" placeholder="D seçeneği"></label><label><span>E</span><input id="bankChoiceE" placeholder="E seçeneği"></label></div>
+            <label id="bankCorrectWrap">Doğru cevap<select id="bankCorrect"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option></select></label>
+            <div class="row"><label>Görsel (PNG/JPG)<input id="bankImage" type="file" accept="image/png,image/jpeg"></label><label>İnceleyen<input id="bankReviewer" placeholder="Akademik inceleyen"></label></div><div id="bankImagePreview" class="question-image-preview"></div>
+            <label id="bankRubricWrap" class="hidden">Klasik soru rubriği <small>Her satır: Ölçüt | Puan. Toplam puan soru puanına eşit olmalıdır.</small><textarea id="bankRubric" rows="4" placeholder="Algoritma doğruluğu | 4
+Kodlama doğruluğu | 3
+Çıktı | 3"></textarea></label>
+            <label>Etiketler<input id="bankTags" placeholder="final, python, döngüler"></label>
+            <div class="actions"><button id="saveBank" class="primary" type="submit">Soru havuzuna kaydet</button><button id="cancelBankEdit" class="ghost hidden" type="button">Düzenlemeyi iptal et</button></div>
+          </form>
+        </aside>
+      </div>
+    </section>
+
+    <section id="page-exams" class="page">
+      <div class="card exam-center-hero"><div><span class="eyebrow">SINAV MERKEZİ</span><h2>Sınavı bir dosya gibi yönetin: plan, kazanım, soru, uygulama ve kanıt</h2><p class="muted">Tarih, saat, salon, ders başarı notuna etkisi, kitapçık sayısı, sorular, Öğrenim ve Program Çıktıları snapshot’ı ve çıktı durumu tek çalışma alanında tutulur.</p></div><button id="examFocusCreate" class="primary" type="button">+ Yeni sınav oluştur</button></div>
+
+      <div class="card blueprint-card" id="blueprintCard">
+        <div class="section-head"><div><span class="eyebrow">SINAVDAN ÖNCE · BELİRTKE</span><h3>Kapsamı planla, sonra soruları seç</h3><p class="muted">Konu + Öğrenim Çıktısı + Bloom + zorluk + soru adedi hedefini tanımlayın. Sistem onaylı kurumsal havuzda yeterli soru olup olmadığını gösterir.</p></div><span id="blueprintState" class="badge">Plan bekliyor</span></div>
+        <div class="blueprint-toolbar"><label>Ders<select id="blueprintCourse"></select></label><label>Sınav türü<select id="blueprintExamType"><option>Vize</option><option>Final</option><option>Bütünleme</option><option>Kısa Sınav</option><option>Uygulama</option></select></label><label>Toplam soru<input id="blueprintTotalQuestions" type="number" min="1" value="20"></label><button id="blueprintNew" class="ghost" type="button">Yeni plan</button></div>
+        <div id="blueprintRows" class="blueprint-rows"></div>
+        <div class="actions"><button id="blueprintAddRow" class="ghost" type="button">+ Mikro hedef ekle</button><button id="blueprintSave" class="primary" type="button">Belirtkeyi kaydet</button></div>
+        <div id="blueprintSummary" class="blueprint-summary muted">Önce ders seçin.</div>
+      </div>      <div id="examCenterKpis" class="exam-center-kpis"></div>
+      <div class="exam-create-layout exam-center-layout">
+        <div class="card exam-create-card final-exam-create" id="examCreateCard">
+          <div class="section-head"><div><span class="eyebrow">1 DAKİKADA TASLAK</span><h3>Yeni sınav oluştur</h3><p class="muted">Dersi seçin, türü belirleyin; öğrenciler ve kazanımlar otomatik snapshot alınır.</p></div><span class="step-pill">1 / 4</span></div>
+          <form id="examForm" class="form">
+            <label>Ders<select id="examCourse" required></select></label>
+            <div id="examCourseSummary" class="course-summary muted">Ders seçildiğinde öğrenci ve kazanım özeti burada görünür.</div>
+            <div class="preset-row" id="examPresetButtons"><button type="button" data-preset="Vize">Vize</button><button type="button" data-preset="Final" class="active">Final</button><button type="button" data-preset="Bütünleme">Bütünleme</button><button type="button" data-preset="Kısa Sınav">Kısa Sınav</button></div>
+            <div class="row"><label>Sınav adı<input id="examTitle" required placeholder="Final Sınavı"></label><label>Tür<select id="examType"><option>Vize</option><option selected>Final</option><option>Bütünleme</option><option>Mazeret</option><option>Tek Ders</option><option>Muafiyet</option><option>Kısa Sınav</option><option>Uygulama</option></select></label></div>
+            <div class="row"><label>Tarih<input id="examDate" type="date"></label><label>Saat<input id="examStartTime" type="time"></label><label>Süre (dk)<input id="examDuration" type="number" min="1" value="50"></label></div>
+            <div class="row"><label>Salon / Yer<input id="examLocation" placeholder="D-204"></label><label>Ders notuna etkisi %<input id="examWeight" type="number" min="0" max="100" step="0.5" placeholder="40"></label><label>Kitapçık<select id="examBookletCount"><option value="1">A</option><option value="2">A / B</option><option value="4" selected>A / B / C / D</option></select></label></div>
+            <div class="row"><label>Kağıt<select id="examPaperSize"><option>A3</option><option selected>A4</option><option>A5</option></select></label><label>Yön<select id="examPaperOrientation"><option value="portrait" selected>Dikey</option><option value="landscape">Yatay</option></select></label><label>Optik<select id="examOmrMode"><option value="embedded" selected>İlk sayfada</option><option value="separate">Ayrı sayfa</option></select></label><label class="check-label"><input id="examDuplex" type="checkbox"> Çift taraflı baskı</label></div>
+            <details class="advanced-box"><summary>Kurallar / gelişmiş ayarlar</summary><label>Öğrenciye görünen kurallar<textarea id="examInstructions" rows="4" placeholder="Boş bırakırsanız resmî kağıt varsayılan kurallarla oluşturulur."></textarea></label><label>İç ekip notu<textarea id="examStaffNotes" rows="3" placeholder="Gözetmen, salon veya operasyon notu..."></textarea></label></details>
+            <button class="primary large-action" type="submit">Taslağı oluştur →</button>
+          </form>
+        </div>
+        <div class="card exam-library-card final-exam-library">
+          <div class="section-head"><div><span class="eyebrow">SINAV KÜTÜPHANESİ</span><h3>Planlanan ve geçmiş sınavlar</h3></div><span id="examResultCount" class="badge">0 sınav</span></div>
+          <div class="exam-filterbar final-exam-filterbar"><input id="examSearch" placeholder="Sınav veya tür ara"><select id="examCourseFilter"><option value="">Tüm dersler</option></select><select id="examTypeFilter"><option value="">Tüm türler</option><option>Vize</option><option>Final</option><option>Bütünleme</option><option>Mazeret</option><option>Tek Ders</option><option>Muafiyet</option><option>Kısa Sınav</option><option>Uygulama</option></select><select id="examStatusFilter"><option value="">Tüm durumlar</option><option value="draft">Taslak</option><option value="ready">Hazır</option><option value="grading">Puanlama</option><option value="approved">Onaylı</option><option value="archived">Arşiv</option></select></div>
+          <div id="examList" class="final-exam-list"></div>
+        </div>
+      </div>
+
+      <div id="examEditor" class="card exam-workspace final-exam-workspace hidden">
+        <div class="section-head exam-workspace-head"><div><span class="eyebrow">SINAV ÇALIŞMA ALANI</span><h3 id="editorTitle">Sınav</h3><p id="editorMeta" class="muted"></p></div><div class="exam-toolbar"><span id="examStatusBadge" class="badge"></span><button id="duplicateExam" class="ghost small" type="button">Kopya oluştur</button><button id="statusBack" class="ghost small">Geri</button><button id="statusNext" class="primary small">Sonraki durum</button><button id="deleteExam" class="danger small">Taslağı sil</button></div></div>
+        <div id="examDetailStrip" class="exam-detail-strip"></div><div id="examWorkspaceSummary" class="exam-workspace-summary"></div>
+        <div id="examWizardNav" class="wizard-nav final-wizard-nav"><button type="button" class="active" data-step="1"><span>1</span><b>Detaylar</b><small>Plan ve uygulama</small></button><button type="button" data-step="2"><span>2</span><b>Öğrenim ve Program Çıktıları Snapshot</b><small>Dondurulmuş kapsam</small></button><button type="button" data-step="3"><span>3</span><b>Sorular & Puan</b><small>Havuz ve dağılım</small></button><button type="button" data-step="4"><span>4</span><b>Öğrenciler & Çıktı</b><small>Atama, kitapçık ve PDF</small></button></div>
+
+        <div class="wizard-panel" data-wizard-panel="1">
+          <div class="grid2">
+            <div class="soft-panel"><div class="section-head"><div><span class="eyebrow">SINAV DETAYLARI</span><h4>Plan ve uygulama bilgileri</h4></div></div><form id="examDraftForm" class="form"><div class="row"><label>Sınav adı<input id="draftTitle"></label><label>Tür<select id="draftType"><option>Vize</option><option selected>Final</option><option>Bütünleme</option><option>Mazeret</option><option>Tek Ders</option><option>Muafiyet</option><option>Kısa Sınav</option><option>Uygulama</option></select></label></div><div class="row"><label>Tarih<input id="draftDate" type="date"></label><label>Saat<input id="draftStartTime" type="time"></label><label>Süre (dk)<input id="draftDuration" type="number" min="1"></label></div><div class="row"><label>Salon / Yer<input id="draftLocation"></label><label>Ders notuna etkisi %<input id="draftWeight" type="number" min="0" max="100" step="0.5"></label><label>Kitapçık<select id="draftBookletCount"><option value="1">A</option><option value="2">A / B</option><option value="4">A / B / C / D</option></select></label></div><div class="row"><label>Kağıt<select id="draftPaperSize"><option>A3</option><option>A4</option><option>A5</option></select></label><label>Yön<select id="draftPaperOrientation"><option value="portrait">Dikey</option><option value="landscape">Yatay</option></select></label><label>Optik<select id="draftOmrMode"><option value="embedded">İlk sayfada</option><option value="separate">Ayrı sayfa</option></select></label><label class="check-label"><input id="draftDuplex" type="checkbox"> Çift taraflı</label></div><label>Öğrenciye görünen kurallar<textarea id="draftInstructions" rows="4"></textarea></label><label>İç ekip notu<textarea id="draftStaffNotes" rows="3"></textarea></label><button id="saveExamDraft" class="primary" type="submit">Sınav detaylarını kaydet</button></form></div>
+            <div><div id="paperSnapshot" class="snapshot-panel"></div><div class="info-callout"><b>Snapshot bütünlüğü</b><span>Ders, program, öğretim elemanı ve kazanımlar sınav oluşturulduğu anda sabitlenir. Sonraki kurumsal değişiklikler eski sınav kanıtını bozmaz.</span></div></div>
+          </div>
+          <div class="wizard-footer"><span></span><button class="primary wizard-next" type="button" data-go-step="2">Öğrenim ve Program Çıktıları snapshot’ını kontrol et →</button></div>
+        </div>
+
+        <div class="wizard-panel hidden" data-wizard-panel="2">
+          <div class="section-head"><div><span class="eyebrow">SINAV KAZANIM SNAPSHOT'I</span><h4>Bu sınav hangi Öğrenim ve Program Çıktıları kapsamını taşıyor?</h4><p class="muted">Öğrenim ve Program Çıktıları tanımları ayrı merkezde yönetilir. Burada sınav oluşturulduğu andaki dondurulmuş kapsamı ve soru dağılımını kontrol edersiniz.</p></div><div class="actions compact-actions"><button id="refreshExamOutcomes" class="ghost" type="button">↻ Canlı haritadan yenile</button><button id="goOutcomeMap" class="ghost" type="button">Öğrenim ve Program Çıktıları'ni aç</button></div></div>
+          <div id="snapshotBadges" class="badges hidden"></div><div id="examOutcomePlan" class="exam-outcome-plan"></div>
+          <div class="wizard-footer"><button class="ghost" type="button" data-go-step="1">← Bilgiler</button><button class="primary" type="button" data-go-step="3">Soruları oluştur →</button></div>
+        </div>
+
+        <div class="wizard-panel hidden" data-wizard-panel="3">
+          <div id="questionComposerStats" class="composer-stats"></div>
+          <div class="exam-builder-studio">
+            <section class="exam-bank-pane">
+              <div class="builder-pane-head"><div><span class="eyebrow">DERS SORU HAVUZU</span><h4>Hazır soruları seç</h4><p class="muted">Bu sınavın dersine ait soruları filtreleyip toplu olarak ekleyin.</p></div><span id="examBankSelectedCount" class="badge">0 seçili</span></div>
+              <div class="exam-bank-filters">
+                <input id="examBankSearch" placeholder="Soru veya etiket ara">
+                <select id="examBankType"><option value="">Tüm türler</option><option value="mcq">Çoktan seçmeli</option><option value="classic">Klasik</option></select>
+                <select id="examBankOutcome"><option value="">Tüm Öğrenim Çıktısı'ler</option></select>
+              </div>
+              <div class="builder-bulkbar"><button id="examBankSelectAll" class="ghost small" type="button">Görünenleri seç</button><button id="examBankClear" class="ghost small" type="button">Seçimi temizle</button><button id="addSelectedBankToExam" class="primary small" type="button">Seçilenleri sınava ekle →</button></div>
+              <div id="examBankGrid" class="exam-bank-grid"></div>
+            </section>
+
+            <section class="exam-canvas-pane">
+              <div class="builder-pane-head"><div><span class="eyebrow">SINAV TUVALİ</span><h4>Soru sırası ve puan planı</h4><p class="muted">Sıralamayı değiştirin, Öğrenim Çıktısı dağılımını kontrol edin ve toplamı 100 puana tamamlayın.</p></div><span id="questionListCount" class="badge">0 soru</span></div>
+              <div class="exam-canvas-tools"><button id="normalizeExamPoints" class="ghost small" type="button">Puanları 100'e ölçekle</button><span class="muted">Sürükle-bırak veya ↑ ↓ ile sırala</span></div>
+              <div id="examOutcomeCoverage" class="exam-outcome-coverage"></div>
+              <div id="questionList" class="exam-canvas-list"></div>
+            </section>
+          </div>
+
+          <details class="manual-question-panel">
+            <summary><div><span class="eyebrow">MANUEL SORU</span><b id="questionFormTitle">Yeni soru oluştur</b></div><span>Havuzda olmayan yeni bir soru yaz →</span></summary>
+            <div class="manual-question-body">
+              <form id="questionForm" class="form"><input id="qEditId" type="hidden">
+                <div class="row"><label>Sıra<input id="qOrder" type="number" min="1" value="1" required></label><label>Tür<select id="qType"><option value="mcq">Çoktan seçmeli</option><option value="classic">Klasik</option></select></label><label>Puan<input id="qPoints" type="number" min="0.1" step="0.5" value="10" required></label><label id="qAnswerLinesWrap" class="hidden">Cevap satırı<input id="qAnswerLines" type="number" min="1" max="40" value="8"></label></div>
+                <div class="row"><label>Konu<input id="qTopic" placeholder="Konu"></label><label>Ünite<input id="qUnit" placeholder="Ünite"></label><label>Zorluk<select id="qDifficulty"><option value="easy">Kolay</option><option value="medium" selected>Orta</option><option value="hard">Zor</option></select></label><label>Bloom<select id="qBloom"><option value="">—</option><option value="remember">Hatırlama</option><option value="understand">Anlama</option><option value="apply">Uygulama</option><option value="analyze">Analiz</option><option value="evaluate">Değerlendirme</option><option value="create">Yaratma</option></select></label></div>
+                <div class="outcome-picker-block"><label>Bu soru hangi Öğrenim Çıktısı'leri ölçüyor?</label><select id="qLo" class="sr-only" multiple></select><div id="qOutcomePicker" class="outcome-chip-picker"></div><div id="qOutcomeContext" class="outcome-context muted">Bir veya birden fazla Öğrenim Çıktısı seçin; bağlı Program Çıktısı’ler burada görünür.</div></div>
+                <label>Soru<textarea id="qText" rows="4" required placeholder="Soruyu yazın..."></textarea></label>
+                <div id="qChoices" class="choice-grid modern-choices"><label><span>A</span><input id="qChoiceA" placeholder="A seçeneği"></label><label><span>B</span><input id="qChoiceB" placeholder="B seçeneği"></label><label><span>C</span><input id="qChoiceC" placeholder="C seçeneği"></label><label><span>D</span><input id="qChoiceD" placeholder="D seçeneği"></label><label><span>E</span><input id="qChoiceE" placeholder="E seçeneği"></label></div>
+                <div class="row"><label>Görsel (PNG/JPG)<input id="qImage" type="file" accept="image/png,image/jpeg"></label></div><div id="qImagePreview" class="question-image-preview"></div><label id="qRubricWrap" class="hidden">Puanlama rubriği <small>Her satır: Ölçüt | Puan</small><textarea id="qRubric" rows="4" placeholder="Algoritma doğruluğu | 4
+Kod doğruluğu | 4
+Çıktı | 2"></textarea></label>
+                <div id="correctWrap"><label>Doğru cevap</label><select id="qCorrect" class="sr-only"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select><div id="qCorrectButtons" class="correct-buttons"><button type="button" data-answer="A" class="active">A</button><button type="button" data-answer="B">B</button><button type="button" data-answer="C">C</button><button type="button" data-answer="D">D</button><button type="button" data-answer="E">E</button></div></div>
+                <div class="actions"><button class="primary" id="saveQuestion" type="submit">Soruyu kaydet</button><button class="ghost hidden" id="cancelQuestionEdit" type="button">Düzenlemeyi iptal et</button></div>
+              </form>
+            </div>
+          </details>
+          <div class="wizard-footer"><button class="ghost" type="button" data-go-step="2">← Öğrenim ve Program Çıktıları Snapshot</button><button class="primary" type="button" data-go-step="4">Son kontrol ve çıktı →</button></div>
+        </div>
+
+        <div class="wizard-panel hidden" data-wizard-panel="4">
+          <div class="final-check-grid">
+            <div class="final-control-stack">
+              <div id="examReadiness" class="readiness-panel"></div>
+              <div id="examStudentAssignment" class="student-assignment-panel"></div>
+              <div id="finalOutcomeCoverage" class="final-outcome-card"></div>
+              <div id="examApprovalPanel" class="approval-panel"></div>
+            </div>
+            <div class="paper-studio">
+              <div class="paper-studio-head"><div><span class="eyebrow">RESMÎ SINAV KAĞIDI</span><h4>Kitapçık ve çıktı merkezi</h4><p class="muted">Seçtiğiniz kitapçık sayısına göre QR, cevap formu ve öğrenciye özel toplu çıktı aynı sınav snapshot'ından üretilir.</p></div><span class="paper-lock-note">Snapshot korumalı</span></div>
+              <div id="paperHtmlPreview" class="paper-html-preview"></div>
+              <div class="paper-output-grid">
+                <label>Kitapçık<select id="paperBooklet"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+                <button id="openPaper" class="primary" type="button">Seçili PDF'yi aç</button>
+                <button id="showAnswerKey" class="ghost" type="button">Cevap anahtarı</button>
+                <button id="downloadStudentPapers" class="ghost" type="button">Öğrenci kağıtlarını toplu üret</button>
+              </div>
+              <div id="bookletShortcuts" class="booklet-shortcuts"><span>Hızlı kitapçık:</span><button class="ghost small" type="button" data-paper-booklet="A">A</button><button class="ghost small" type="button" data-paper-booklet="B">B</button><button class="ghost small" type="button" data-paper-booklet="C">C</button><button class="ghost small" type="button" data-paper-booklet="D">D</button></div>
+              <pre id="answerKeyBox" class="result hidden"></pre>
+            </div>
+          </div>
+          <div class="wizard-footer"><button class="ghost" type="button" data-go-step="3">← Sorular</button><button id="readyFromWizard" class="primary" type="button">Sınavı hazır durumuna al</button></div>
+        </div>
+      </div>
+    </section>
+
+    <div id="examStudentManagerBackdrop" class="exam-student-manager-backdrop hidden"></div>
+    <aside id="examStudentManager" class="exam-student-manager hidden" aria-label="Sınav öğrenci atama paneli">
+      <div class="exam-student-manager-head">
+        <div><span class="eyebrow">SINAV ÖĞRENCİ ATAMASI</span><h3 id="examStudentManagerTitle">Öğrencileri seç</h3><p id="examStudentManagerSub" class="muted">Ders kayıtlı öğrencilerden bu sınava girecek kişileri seçin.</p></div>
+        <button id="closeExamStudentManager" class="ghost small" type="button">Kapat</button>
+      </div>
+      <div id="examStudentManagerStats" class="exam-student-manager-stats"></div>
+      <div class="exam-student-manager-toolbar">
+        <label class="exam-student-search"><span>Ara</span><input id="examStudentSearch" placeholder="Öğrenci no veya ad soyad"></label>
+        <div class="exam-student-manager-tools"><button id="examStudentSelectAll" class="ghost small" type="button">Tümünü seç</button><button id="examStudentClearAll" class="ghost small" type="button">Seçimi temizle</button></div>
+      </div>
+      <div id="examStudentManagerNotice" class="exam-student-manager-notice hidden"></div>
+      <div id="examStudentManagerList" class="exam-student-manager-list"></div>
+      <div class="exam-student-manager-footer"><div><b id="examStudentSelectedCount">0 öğrenci seçili</b><small>Yalnızca işaretli öğrenciler bu sınavın optik/PDF ve puanlama listesine dahil edilir.</small></div><div class="actions"><button id="cancelExamStudentManager" class="ghost" type="button">Vazgeç</button><button id="saveExamStudentAssignment" class="primary" type="button">Seçimi sınava kaydet</button></div></div>
+    </aside>
+
+    <section id="page-scan" class="page reference-workspace-page modern-admin-page">
+      <div class="card operation-hero scan-hero scan-station-hero">
+        <div><span class="eyebrow">SINAV OKUMA & KONTROL İSTASYONU</span><h3>Toplu tarayın, sistem okusun, yalnızca şüpheli işaretlere karar verin</h3><p class="muted">QR ile sınav–öğrenci–kitapçık eşleşir. Güvenli cevaplar otomatik puanlanır; belirsiz işaretler görsel kanıt ve güven skoru ile inceleme kuyruğuna alınır.</p></div>
+        <div class="scan-exam-control"><label class="operation-select">Sınav<select id="scanExam"></select></label><div id="scanModeStatus" class="scan-mode-status"></div><button id="scanSetGrading" class="ghost small" type="button">Değerlendirme moduna al</button></div>
+      </div>
+      <div class="operation-steps scan-workflow-steps">
+        <div class="operation-step scan-step">
+          <span class="operation-step-no">1</span>
+          <div class="operation-step-copy"><b>Kağıtları hazırla</b><small>Öğrenci QR + A/B/C/D kitapçık</small></div>
+          <div class="operation-step-actions"><button id="downloadPersonalized" class="ghost small">PDF'leri indir</button></div>
+        </div>
+        <div class="operation-step scan-step scan-step-upload">
+          <span class="operation-step-no">2</span>
+          <div class="operation-step-copy"><b>Toplu taramayı yükle</b><small>En fazla 20 PDF / JPG / PNG</small></div>
+          <div class="operation-step-actions scan-upload-actions">
+            <label class="file-drop scan-file-drop"><input id="scanFile" type="file" accept=".pdf,.jpg,.jpeg,.png" multiple><strong>Dosya seç</strong><em id="scanFileCount">0 dosya</em></label>
+            <button id="uploadScan" class="primary small">Taramayı başlat</button>
+          </div>
+        </div>
+        <div class="operation-step scan-step">
+          <span class="operation-step-no">3</span>
+          <div class="operation-step-copy"><b>İstisnaları doğrula</b><small>İşaretleri gör, öğrenci/kitapçığı düzelt</small></div>
+          <div class="operation-step-actions"><button id="refreshReviews" class="ghost small">Kuyruğu yenile</button></div>
+        </div>
+        <div class="operation-step scan-step">
+          <span class="operation-step-no">4</span>
+          <div class="operation-step-copy"><b>Analize aktar</b><small>Sonuçlar Öğrenim Çıktısı → Program Çıktısı hesaplamasına hazır</small></div>
+          <div class="operation-step-actions"><button id="scanOpenAnalytics" class="ghost small">Analizi aç</button></div>
+        </div>
+      </div>
+      <div id="scanQuickStats" class="scan-kpis scan-station-kpis"></div>
+      <div id="scanSummary" class="scan-result hidden"></div>
+      <div class="scan-layout scan-station-layout">
+        <div class="card scan-history-card"><div class="section-head"><div><span class="eyebrow">TARAMA GEÇMİŞİ</span><h3>Oturumlar</h3><p class="muted">Her yükleme ayrı oturumdur; kabul oranı canlı güncellenir.</p></div></div><div id="scanSessions"></div></div>
+        <div class="card review-card scan-review-station"><div class="section-head scan-review-head"><div><span class="eyebrow">İNCELEME KUYRUĞU</span><h3>Karar bekleyen optikler</h3><p class="muted">Turuncu halkalar sistemin kararsız kaldığı işaretleri gösterir. Görsel yalnızca karar desteğidir; kaydedilen cevap sizin onayınızdır.</p></div><div class="review-head-tools"><label>Filtre<select id="scanReviewFilter"><option value="all">Tüm sorunlar</option><option value="AMBIGUOUS_MARK">Belirsiz işaret</option><option value="STUDENT_NOT_IDENTIFIED">Öğrenci bulunamadı</option><option value="STUDENT_NOT_ASSIGNED">Derse kayıtlı değil</option><option value="TOKEN_MISMATCH">QR / kitapçık doğrulama</option><option value="EXAM_NOT_GRADING">Sınav durumu</option></select></label><span id="scanReviewBadge" class="badge status-approved">0 bekleyen</span></div></div><div id="scanReviews"></div></div>
+      </div>
+      <details class="card danger-zone"><summary>Cevap anahtarı düzelt / yeniden puanla</summary><p class="muted">Bu işlem daha önce puanlanmış öğrenci cevaplarını etkiler. Yalnızca doğrulanmış cevap anahtarı hatalarında kullanın.</p><div class="row"><label>Soru ID<input id="regradeQuestion" type="number" min="1"></label><label>Yeni cevap<select id="regradeAnswer"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select></label><label>Neden<input id="regradeReason" placeholder="Örn. cevap anahtarı düzeltmesi"></label><button id="runRegrade" class="danger">Düzelt ve yeniden puanla</button></div><div id="regradeHistory"></div></details>
+    </section>
+
+    <section id="page-grade" class="page reference-workspace-page modern-admin-page">
+      <div class="card operation-hero grade-hero">
+        <div><span class="eyebrow">DEĞERLENDİRME MASASI</span><h3>Öğrenci öğrenci ilerleyin, puanı kaydedip sıradakine geçin</h3><p class="muted">Test cevapları otomatik puanlanır; klasik sorularda taranmış cevap solda, rubrik ve puanlama sağda birlikte açılır.</p></div>
+        <div class="grade-selectors"><label>Sınav<select id="gradeExam"></select></label><label id="gradeStudentWrap">Öğrenci<select id="gradeStudent"></select></label><label>Değerlendirme modu<select id="gradeMode"><option value="student">Öğrenci bazlı</option><option value="question">Soru bazlı seri</option></select></label><label id="gradeQuestionWrap" class="hidden">Klasik soru<select id="gradeQuestion"></select></label><label class="grade-blind-toggle"><input id="gradeBlind" type="checkbox"> <span>Kör değerlendirme</span></label><button id="loadGrade" class="primary">Cevapları aç</button></div>
+      </div>
+      <div class="grade-mode-help"><span><b>Öğrenci bazlı:</b> bir öğrencinin tüm cevaplarını değerlendirin.</span><span><b>Soru bazlı seri:</b> aynı klasik soruyu tüm öğrencilerde art arda puanlayın.</span><span class="kbd-help"><kbd>1–5</kbd> hızlı rubrik · <kbd>Tab</kbd> sonraki ölçüt · <kbd>Ctrl/⌘ + Enter</kbd> kaydet & sonraki</span></div><div id="gradeProgress" class="grade-progress"></div>
+      <div id="gradeStudentSummary" class="grade-student-summary hidden"></div>
+      <form id="gradeForm" class="hidden grade-workspace">
+        <div id="gradeQuestions"></div>
+        <div class="grade-sticky-footer">
+          <button id="gradePrev" class="ghost" type="button">← Önceki öğrenci</button>
+          <div id="gradeLiveTotal" class="grade-live-total"><b>0</b><span>Girilen klasik puan</span></div>
+          <div class="grade-save-actions"><button class="primary" type="submit">Kaydet</button><button id="gradeSaveNext" class="primary secondary-primary" type="button">Kaydet ve sonraki →</button></div>
+          <button id="gradeNext" class="ghost" type="button">Sonraki öğrenci →</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="page-analytics" class="page reference-workspace-page modern-admin-page">
+      <div class="analytics-command card">
+        <div class="analytics-command-copy"><span class="eyebrow">SINAV ANALİZ MERKEZİ</span><h2>Sonuçtan kazanıma, kazanımdan kök nedene tek ekranda inin</h2><p class="muted">Not dağılımı, Öğrenim ve Program Çıktıları hedefleri, soru zorlukları ve öğrenci bazlı detaylar aynı çalışma alanında. Büyük sınıflarda sekme ve sayfalama sayesinde aşağı kaybolmazsınız.</p></div>
+        <div class="analytics-actions"><label>Sınav<select id="analyticsExam"></select></label><button id="loadAnalytics" class="primary">Analizi aç</button><button id="downloadAnalyticsExcel" class="ghost">Excel raporu</button></div>
+      </div>
+      <div id="analyticsResult" class="analytics-workspace"><div class="empty-state card"><b>Bir sınav seçin.</b><span>Not dağılımı, Öğrenim ve Program Çıktıları grafikleri, öğrenci detayları ve soru kök neden analizi burada görünür.</span></div></div>
+      <aside id="analyticsStudentDrawer" class="analytics-drawer hidden" aria-label="Öğrenci analiz detayı"><div class="analytics-drawer-head"><div><span class="eyebrow">ÖĞRENCİ DETAYI</span><h3 id="analyticsStudentDrawerTitle">—</h3></div><button id="analyticsStudentDrawerClose" class="ghost small" type="button">Kapat</button></div><div id="analyticsStudentDrawerBody"></div></aside>
+      <div id="analyticsDrawerBackdrop" class="analytics-drawer-backdrop hidden"></div>
+    </section>
+
+    <section id="page-quality" class="page reference-workspace-page modern-admin-page">
+      <div class="quality-hero card">
+        <div><span class="eyebrow">6.13 · YÖNETİM & KALİTE</span><h2>Program performansını sonuçtan kök nedene kadar izleyin</h2><p class="muted">Program Çıktısı heatmap, ölçüm kapsamı, riskli dersler ve ders → Öğrenim Çıktısı → soru drill-down aynı yönetim ekranında.</p></div>
+        <div class="quality-filterbar">
+          <label>Dönem<select id="qualityPeriod"></select></label>
+          <label>Program<select id="qualityProgram"><option value="">Tüm programlar</option></select></label>
+          <button id="qualityRefresh" class="primary">Dashboard'u yükle</button>
+          <button id="qualityExcel" class="ghost">Excel yönetim raporu</button>
+        </div>
+      </div>
+      <div id="qualityKpis" class="quality-kpi-grid"></div>
+      <div class="card quality-heatmap-card"><div class="section-head"><div><span class="eyebrow">PROGRAM × Program Çıktısı</span><h3>Program çıktısı heatmap</h3><p class="muted">Hücreler onaylı/arşiv sınavlardan hesaplanır; hedef altı sonuçlar doğrudan risk olarak işaretlenir.</p></div><span id="qualityScopeBadge" class="badge">—</span></div><div id="qualityHeatmap" class="quality-heatmap-wrap"></div></div>
+      <div class="quality-grid">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">ÖNCELİK SIRASI</span><h3>Riskli ve ölçülmemiş dersler</h3></div><span id="qualityRiskBadge" class="badge">0</span></div><div id="qualityRisks"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">DÖNEM KARŞILAŞTIRMA</span><h3>Öğrenim ve Program Çıktıları kalite trendi</h3></div></div><div id="qualityTrend"></div></div>
+      </div>
+      <div id="qualityDrilldown" class="card quality-drilldown hidden"></div>
+    </section>
+
+
+    <section id="page-institutionalreadiness" class="page institutional-readiness-page">
+      <div class="page-header modern-page-header ir-hero">
+        <div><span class="eyebrow">INSTITUTIONAL ACCREDITATION READINESS</span><h2>Kurumsal Akreditasyon Hazırlık Merkezi</h2><p class="muted">Programların MEDEK, MÜDEK, TURAK, SABAK, EPDAD ve YÖKAK hazırlığını; kanıt açıklarını, PUKÖ sahipliğini ve yalnız onaylanmış çapraz-framework kanıt ilişkilerini tek merkezden yönetin.</p></div>
+        <div class="ir-toolbar"><label>Akademik yıl<select id="irYear"></select></label><button id="irReload" class="primary" type="button">Görünümü güncelle</button><button id="irFreeze" class="ghost" type="button">Yönetim snapshot'ı dondur</button></div>
+      </div>
+      <div id="irKpis" class="ir-kpis"></div>
+      <div class="ir-grid ir-grid-main">
+        <section class="card"><div class="section-head"><div><span class="eyebrow">FRAMEWORK PORTFÖYÜ</span><h3>Kuruluşlara göre hazırlık</h3><p class="muted">Bu yüzdeler kurum içi hazırlık göstergesidir; resmî akreditasyon puanı değildir.</p></div></div><div id="irFrameworks" class="ir-frameworks"></div></section>
+        <section class="card"><div class="section-head"><div><span class="eyebrow">ÖNCELİKLİ AÇIKLAR</span><h3>Bugün kapanması gerekenler</h3></div><span id="irGapCount" class="badge">0 açık</span></div><div id="irGaps" class="ir-gap-list"></div></section>
+      </div>
+      <section class="card ir-timeline-card"><div class="section-head"><div><span class="eyebrow">RESMÎ SÜREÇ TAKVİMİ</span><h3>Yaklaşan akreditasyon tarihleri</h3><p class="muted">TURAK, SABAK ve EPDAD'ın güncel resmî 2026 takvimlerinden izlenir. Programa özel kuruluş yazıları her zaman önceliklidir.</p></div><span id="irTimelineAsOf" class="badge">—</span></div><div id="irTimeline" class="ir-timeline"></div></section>
+      <section class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM PORTFÖYÜ</span><h3>Program bazlı hazırlık</h3><p class="muted">En düşük hazırlık ve en yüksek açık sayısı önce gösterilir.</p></div></div><div class="table-scroll"><table class="ir-table"><thead><tr><th>Program</th><th>Birim</th><th>Kuruluş</th><th>Hazırlık</th><th>Kanıt</th><th>Açık</th><th>PUKÖ</th><th>Durum</th></tr></thead><tbody id="irPrograms"></tbody></table></div></section>
+      <div class="ir-grid">
+        <section class="card"><div class="section-head"><div><span class="eyebrow">KANIT YENİDEN KULLANIMI</span><h3>Onaylı ortak kanıtlar</h3><p class="muted">Sistem kendiliğinden eşdeğerlik üretmez. Yalnız kalite birimi tarafından onaylanmış crosswalk kayıtları kullanılır.</p></div></div><div id="irReusableEvidence" class="compact-record-list"></div></section>
+        <section class="card"><div class="section-head"><div><span class="eyebrow">CROSS-FRAMEWORK GOVERNANCE</span><h3>Kanıt eşleme onayı</h3></div><span id="irCrosswalkCount" class="badge">0 onaylı</span></div><form id="irCrosswalkForm" class="form premium-form"><div class="row"><label>Kaynak kuruluş<input id="irCrossSrcFamily" placeholder="MEDEK" required></label><label>Kaynak sürüm<input id="irCrossSrcVersion" placeholder="v1.1"></label><label>Kaynak ölçüt<input id="irCrossSrcCode" placeholder="3.2" required></label></div><div class="row"><label>Hedef kuruluş<input id="irCrossDstFamily" placeholder="YÖKAK" required></label><label>Hedef sürüm<input id="irCrossDstVersion" placeholder="2026"></label><label>Hedef ölçüt<input id="irCrossDstCode" placeholder="B.1.5" required></label></div><label>Gerekçe<textarea id="irCrossRationale" rows="2" placeholder="Aynı kanıtın iki çerçevede hangi gerekçeyle destekleyici olduğunu açıklayın."></textarea></label><div class="form-actions"><button class="primary">Taslak eşleme oluştur</button></div></form><div id="irCrosswalks" class="compact-record-list"></div></section>
+      </div>
+      <section class="card"><div class="section-head"><div><span class="eyebrow">YÖNETİM SNAPSHOT'LARI</span><h3>Dondurulmuş kurumsal hazırlık görünümü</h3><p class="muted">Snapshot içeriği SHA-256 ile mühürlenir; geçmiş yönetim görünümü sonradan değişmez.</p></div></div><div id="irSnapshots" class="compact-record-list"></div></section>
+    </section>
+
+    <section id="page-quality360" class="page quality-workspace-page">
+      <div class="card quality-hero quality-command-center">
+        <div class="quality-hero-copy"><span class="eyebrow">KALİTE & AKREDİTASYON MERKEZİ</span><h2>Program kalitesini tek çalışma alanından yönetin.</h2><p class="muted">Üniversite genelinde MEDEK, MÜDEK, TURAK, YÖKAK, ESG ve ACQUIN gibi kalite çerçevelerini programın gerçek akademik verisiyle aynı zincirde yönetin.</p></div>
+        <div class="quality-filterbar quality-context-bar"><label>Program<select id="q360Program"></select></label><label>Akademik yıl<select id="q360Year"></select></label><label>Değerlendirme profili<select id="q360Framework"></select></label><button id="q360Load" class="primary">Görünümü güncelle</button><button id="q360Odr" class="ghost">ÖDR Word</button><button id="q360SelfEval" class="ghost">Öz Değerlendirme</button></div>
+      </div>
+      <div id="qualityExecutiveStrip" class="quality-executive-strip card">
+        <div class="quality-exec-intro"><span class="eyebrow">ÜNİVERSİTE KALİTE NABZI</span><h3>Tek ekrandan kurumsal kalite görünümü</h3><p>Üniversite → akademik birim → program → ders → sınav zincirinde risk, PUKÖ, kanıt ve akreditasyon kapsamını izleyin.</p></div>
+        <div id="qualityExecutiveKpis" class="quality-exec-kpis"></div>
+      </div>
+      <div class="executive-command-grid">
+        <section class="card executive-health-card">
+          <div class="section-head"><div><span class="eyebrow">YÖNETİCİ ÖZETİ</span><h3>Kurumsal kalite skoru</h3><p class="muted">Ölçüm, kanıt ve kapalı PUKÖ döngülerinden açıklanabilir olarak hesaplanır.</p></div><span id="qualityExecutiveHealthBadge" class="badge">—</span></div>
+          <div id="qualityExecutiveHealth" class="executive-health-body"></div>
+        </section>
+        <section class="card executive-attention-card">
+          <div class="section-head"><div><span class="eyebrow">BUGÜN KISA DURUM</span><h3>Yönetim aksiyonları</h3></div></div>
+          <div id="qualityExecutiveInsights" class="executive-insights"></div>
+        </section>
+      </div>
+      <div class="executive-quality-grid">
+        <section class="card"><div class="section-head"><div><span class="eyebrow">AKADEMİK BİRİMLER</span><h3>Kalite görünümü</h3><p class="muted">En fazla dikkat gerektiren birimler önce gösterilir.</p></div></div><div id="qualityFacultyOverview" class="executive-faculty-list"></div></section>
+        <section class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM RİSKİ</span><h3>Öncelikli programlar</h3><p class="muted">Programa tıklayarak kalite çalışma alanını doğrudan açın.</p></div></div><div id="qualityProgramPriority" class="executive-program-list"></div></section>
+        <section class="card"><div class="section-head"><div><span class="eyebrow">AKREDİTASYON HARİTASI</span><h3>Framework dağılımı</h3></div></div><div id="qualityFrameworkDistribution" class="framework-distribution"></div></section>
+      </div>
+      <div id="qualityFrameworkRoute" class="quality-framework-route card"></div>
+      <section class="card quality-action-center"><div class="section-head"><div><span class="eyebrow">AKILLI İYİLEŞTİRME MOTORU</span><h3>Kalite aksiyonları</h3><p class="muted">Sistem ölçüm ve kanıt açıklarını PUKÖ önerisine dönüştürür. Öneri siz onaylamadan işlem oluşturmaz.</p></div><span id="qualityActionCount" class="badge">0 öneri</span></div><div id="qualityActionRecommendations" class="quality-action-list"></div></section>
+      <section class="card quality-escalation-center"><div class="section-head"><div><span class="eyebrow">KALİTE YÖNETİŞİMİ</span><h3>Termin & eskalasyon kuyruğu</h3><p class="muted">Açık PUKÖ döngülerini termin ve sorumluluk seviyesine göre izleyin. Sistem yalnızca yönlendirme üretir; karar ve bildirim insan onayıyla yürütülür.</p></div><span id="qualityEscalationCount" class="badge">0 gecikme</span></div><div id="qualityEscalationSummary" class="quality-escalation-summary"></div><div id="qualityEscalationQueue" class="quality-escalation-list"></div></section>
+      <div class="quality-workspace-tabs" role="tablist" aria-label="Kalite çalışma alanı">
+        <button class="active" type="button" data-q360-workspace="overview">Genel Bakış</button>
+        <button type="button" data-q360-workspace="compliance">Uyum Merkezi <span class="nav-new-dot">30/30</span></button>
+        <button type="button" data-q360-workspace="curriculum">Müfredat & AKTS</button>
+        <button type="button" data-q360-workspace="stakeholder">Paydaş</button>
+        <button type="button" data-q360-workspace="graduate">Mezun</button>
+        <button type="button" data-q360-workspace="faculty">Kadroyu Yönet</button>
+        <button type="button" data-q360-workspace="infra">Altyapı</button>
+        <button type="button" data-q360-workspace="cycle">PUKÖ</button>
+        <button type="button" data-q360-workspace="calendar">Kalite Takvimi</button>
+        <button type="button" data-q360-workspace="governance">Kurul & Karar</button>
+        <button type="button" data-q360-workspace="readiness">Ziyaret Hazırlığı</button>
+        <button type="button" data-q360-workspace="medekodr">MEDEK ÖDR <span class="nav-new-dot">6.45</span></button>
+        <button type="button" data-q360-workspace="selfeval">Öz Değerlendirme</button>
+        <button type="button" data-q360-workspace="institutional">Kurumsal Raporlama</button>
+        <button type="button" data-q360-workspace="strategy">Stratejik Kalite</button>
+        <button type="button" data-q360-workspace="evidence">Kanıtlar</button>
+      </div>
+      <div id="q360Kpis" class="quality-kpi-grid"></div>
+      <div id="q360Overview" class="q360-workspace-panel active" data-q360-panel="overview">
+        <div class="grid2 quality-overview-grid">
+          <div class="card"><div class="section-head"><div><span class="eyebrow">HAZIRLIK SKORU</span><h3>Ölçüt bazlı durum</h3></div><span id="q360Score" class="badge">—</span></div><div id="q360Criteria"></div></div>
+          <div class="card"><div class="section-head"><div><span class="eyebrow">AKTS DENETLEYİCİ</span><h3>Müfredat eşikleri</h3></div></div><div id="q360Curriculum"></div></div>
+        </div>
+        <div class="card quality-module-center"><div class="section-head"><div><span class="eyebrow">VERİ MERKEZİ</span><h3>Yazmak yerine seçin; çoklu veriyi Excel ile aktarın.</h3><p class="muted">Her modülün durumunu görün, tek kayıt ekleyin veya hazır Excel şablonunu indirin.</p></div></div><div id="q360ModuleCards" class="quality-module-grid"></div></div>
+      </div>
+      <div class="q360-workspace-panel" data-q360-panel="compliance">
+        <div class="card compliance-hero-card">
+          <div class="section-head"><div><span class="eyebrow">6.41 · ACCREDITATION COMPLIANCE CORE</span><h3>Resmî gereksinim uyum merkezi</h3><p class="muted">Program Eğitim Amaçları, PÇ bileşenleri, öğrenci/mezun çıktı karnesi, resmî framework snapshot, bütçe, kontrollü doküman, saha ziyareti ve YÖKAK misyon alanları tek zincirde.</p></div><span id="q641ComplianceBadge" class="badge">—</span></div>
+          <div id="q641ComplianceKpis" class="quality-kpi-grid"></div>
+          <div class="compliance-actions"><button id="q641FreezeFramework" class="primary small" type="button">Resmî sürümü dondur</button><button id="q641MatrixDocx" class="ghost small" type="button">Uyum matrisi Word</button><button id="q641BboZip" class="ghost small" type="button">MÜDEK BBO ZIP</button><button id="q641FboZip" class="ghost small" type="button">MÜDEK FBO ZIP</button></div>
+          <div id="q641ComplianceMatrix" class="compliance-matrix-grid"></div>
+        </div>
+        <div class="grid2 compliance-editor-grid">
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">PROGRAM EĞİTİM AMAÇLARI</span><h3>PEA tanımla</h3></div></div><form id="q641PeaForm" class="form premium-form"><div class="row"><label>Kod<input id="q641PeaCode" required placeholder="PEA1"></label><label>Gözden geçirme döngüsü<input id="q641PeaCycle" type="number" min="1" max="10" value="3"></label></div><label>Amaç<textarea id="q641PeaDescription" rows="3" required></textarea></label><label>Paydaş dayanağı<textarea id="q641PeaStakeholder" rows="2"></textarea></label><label>Misyon uyumu<textarea id="q641PeaMission" rows="2"></textarea></label><div class="form-actions"><button class="primary">PEA kaydet</button></div></form><div id="q641PeaList" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">PROGRAM ÇIKTISI BİLEŞENLERİ</span><h3>PÇ alt bileşeni tanımla</h3></div></div><form id="q641PoComponentForm" class="form premium-form"><label>Program çıktısı<select id="q641PoSelect" required></select></label><div class="row"><label>Bileşen kodu<input id="q641PoComponentCode" required placeholder="PÇ1.a"></label><label>Tür<select id="q641PoComponentType"><option value="knowledge">Bilgi</option><option value="skill">Beceri</option><option value="competency">Yetkinlik</option><option value="knowledge-skill-competency">Karma</option></select></label></div><label>Bileşen açıklaması<textarea id="q641PoComponentDescription" rows="3" required></textarea></label><div class="form-actions"><button class="primary">Bileşeni kaydet</button></div></form><div id="q641PoComponentList" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">MEDEK PROGRAMA ÖZGÜ ÇIKTILAR</span><h3>Sürüme göre resmî çıktı kapsaması</h3><p>MEDEK sürümü ve program adına göre gereken çıktıları mevcut PÇ'lerle eşleyin. Tanınmayan programlar otomatik uygun sayılmaz.</p></div><span id="q646MedekProgramSpecificBadge" class="badge">—</span></div><div id="q646MedekProgramSpecific" class="compact-record-list"><div class="compact-record"><b>MEDEK profili seçin</b><span>Programa özgü çıktı kataloğu burada görünecek.</span></div></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">MÜDEK 3.1 · EK-1 + BELGE ODASI</span><h3>Disipline özgü konu ve BBO/FBO hazırlığı</h3><p>EK-1 konularını doğrudan kanıtla izleyin; BBO/FBO klasörlerinin hazır/eksik durumunu tek ekrandan görün.</p></div><span id="q647MudekBadge" class="badge">—</span></div><div id="q647MudekEk1" class="compact-record-list"><div class="compact-record"><b>MÜDEK framework seçin</b><span>EK-1 profili burada görünecek.</span></div></div><hr><div id="q647MudekRooms" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">KONTROLLÜ DOKÜMAN</span><h3>Politika / yönerge / prosedür</h3></div></div><form id="q641DocumentForm" class="form premium-form"><div class="row"><label>Doküman kodu<input id="q641DocumentCode" required placeholder="KAL-POL-001"></label><label>Tür<select id="q641DocumentType"><option value="policy">Politika</option><option value="directive">Yönerge</option><option value="procedure">Prosedür</option><option value="instruction">Talimat</option><option value="form">Form</option><option value="plan">Plan</option></select></label></div><label>Başlık<input id="q641DocumentTitle" required></label><label>Sorumlu<input id="q641DocumentOwner" value="Kalite Koordinatörlüğü"></label><div class="form-actions"><button class="primary">Dokümanı oluştur</button></div></form><hr><form id="q641DocumentRevisionForm" class="form premium-form"><label>Doküman<select id="q641DocumentSelect"></select></label><div class="row"><label>Revizyon no<input id="q641RevisionNo" type="number" min="1" value="1"></label><label>İş akışı<input value="Taslak → İnceleme → Kontrol → Onay" readonly></label></div><label>Değişiklik özeti<input id="q641RevisionSummary"></label><label>İçerik / sürüm notu<textarea id="q641RevisionContent" rows="3"></textarea></label><div class="form-actions"><button class="ghost">Sürümlü revizyon kaydet</button></div></form><div id="q641DocumentList" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">BÜTÇE & KAYNAKLAR</span><h3>Yıllık kalite bütçesi</h3></div></div><form id="q641BudgetForm" class="form premium-form"><div class="row"><label>Tahsis edilen<input id="q641BudgetAllocated" type="number" min="0" step="0.01" value="0"></label><label>Para birimi<select id="q641BudgetCurrency"><option>TRY</option><option>EUR</option><option>USD</option></select></label></div><label>Sorumlu<input id="q641BudgetOwner" value="Program Başkanlığı"></label><div class="form-actions"><button class="primary">Bütçe planını kaydet</button></div></form><div id="q641BudgetSummary" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">YÖKAK MİSYON ALANLARI</span><h3>Faaliyet + KPI + kanıt</h3></div></div><form id="q641MissionForm" class="form premium-form"><div class="row"><label>Alan<select id="q641MissionDomain"><option value="research">Araştırma & Geliştirme</option><option value="social_contribution">Toplumsal Katkı</option><option value="internationalization">Uluslararasılaşma</option></select></label><label>Kod<input id="q641MissionCode" required placeholder="ARG-01"></label></div><label>Faaliyet<input id="q641MissionTitle" required></label><div class="row"><label>Hedef<input id="q641MissionTarget" type="number" step="0.01"></label><label>Gerçekleşen<input id="q641MissionActual" type="number" step="0.01"></label></div><div class="form-actions"><button class="primary">Faaliyeti kaydet</button></div></form><div id="q641MissionSummary" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">AKREDİTASYON YAŞAM DÖNGÜSÜ</span><h3>Başvuru → ÖDR → ziyaret → karar</h3></div></div><form id="q641ApplicationForm" class="form premium-form"><div id="q644MudekRoute" class="mudek-route-box" hidden></div><label>Resmî framework<select id="q641ApplicationFramework" required></select></label><div class="row"><label>Başvuru türü<select id="q641ApplicationType"><option value="general">Genel</option><option value="interim">Ara</option><option value="renewal">Yeniden genel</option><option value="monitoring">İzleme</option></select></label><label>Değerlendirme yöntemi<select id="q649EvaluationMode"><option value="site_visit">Ziyaretle değerlendirme</option><option value="report_only">Raporla değerlendirme</option></select></label><label>Sorumlu<input id="q641ApplicationOwner" value="Program Başkanı"></label></div><div class="form-actions"><button class="primary">Başvuruyu başlat</button></div></form><div id="q641ApplicationList" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">6.50 · MÜDEK DEĞERLENDİRME RAPORU / NİHAİ KARAR</span><h3>Mod seçimi → 30-gün yanıtı → bulgu kapanışı → karar izi</h3><p>Önceki genel değerlendirmedeki zayıflıkları ara değerlendirme kapsamına taşır; ziyaret notları ve belge taleplerini tek zaman çizgisinde izler.</p></div><span id="q648VisitBadge" class="badge">Başvuru seçin</span></div><input id="q648ApplicationId" type="hidden"><div class="compliance-actions"><button id="q648AddFinding" class="ghost small" type="button">Bulgu ekle</button><button id="q648AddVisitNote" class="ghost small" type="button">Ziyaret notu</button><button id="q648Open30Day" class="primary small" type="button">30-gün yanıtını aç</button></div><div id="q648VisitCenter" class="compact-record-list"><div class="compact-record"><b>Başvuru seçilmedi</b><span>Yaşam döngüsü kartından “Ziyaret merkezi”ni açın.</span></div></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">6.53 · MEDEK NİHAİ KARAR / KURUM RAPORU / FREEZE</span><h3>Bireysel PDR → ön uzlaşım → saha taslağı → +7 gün → nihai rapor</h3><p>MEDEK 2026 PDR akışını kurumun ÖDR, saha kanıtı ve değerlendirici çalışma alanlarıyla birlikte izler. Otomatik resmî puan üretmez; takım görüşünü kayıt altına alır.</p></div><span id="q651PdrBadge" class="badge">MEDEK başvurusu seçin</span></div><input id="q651ApplicationId" type="hidden"><div class="compliance-actions"><button id="q651AddPdrItem" class="ghost small" type="button">PDR maddesi ekle</button><button id="q651Open7Day" class="primary small" type="button">+7 gün yanıtını aç</button><button id="q652LoadForms" class="ghost small" type="button">FORM1/2/3</button><button id="q653DecisionReadiness" class="ghost small" type="button">Karar hazırlığı</button><button id="q653RecordDecision" class="primary small" type="button">Nihai karar</button><button id="q653Docx" class="ghost small" type="button">Kurum raporu DOCX</button><button id="q653Pdf" class="ghost small" type="button">PDF</button><button id="q653Freeze" class="danger small" type="button">Dönemi dondur</button></div><div id="q652FormCenter" class="compact-record-list"><div class="compact-record"><b>FORM1 / FORM2 / FORM3</b><span>MEDEK PDR form analizleri burada izlenecek.</span></div></div><div id="q651PdrCenter" class="compact-record-list"><div class="compact-record"><b>MEDEK başvurusu seçilmedi</b><span>Yaşam döngüsü kartından “MEDEK PDR” seçeneğini açın.</span></div></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">KADRO & MEZUN İZLEME</span><h3>CV, ders yükü ve 1–3–5 yıl takip</h3></div></div><form id="q641FacultyWorkloadForm" class="form premium-form"><label>Öğretim elemanı<select id="q641FacultySelect"></select></label><div class="row"><label>Ders kodu<input id="q641WorkloadCourse"></label><label>Haftalık saat<input id="q641WorkloadHours" type="number" min="0" step="0.5" value="0"></label></div><label>Dönem<select id="q641WorkloadTerm"><option>Güz</option><option>Bahar</option><option>Yaz</option></select></label><div class="form-actions"><button class="ghost">Ders yükünü kaydet</button></div></form><hr><form id="q641FacultyCvForm" class="form premium-form"><div class="row"><label>CV sürümü<input id="q641CvVersion" type="number" min="1" value="1"></label><label>Format<select id="q641CvFormat"><option value="YOKSIS-UAK">YÖKSİS / ÜAK</option><option value="institutional">Kurumsal</option></select></label></div><label>En yüksek derece<input id="q641CvDegree"></label><label>Uzmanlık / akademik profil<textarea id="q641CvExpertise" rows="2"></textarea></label><div class="form-actions"><button class="ghost">CV snapshot kaydet</button></div></form><hr><form id="q641GraduateFollowupForm" class="form premium-form"><label>Mezun<select id="q641GraduateSelect"></select></label><div class="row"><label>Takip yılı<select id="q641FollowupYear"><option value="1">1. yıl</option><option value="3">3. yıl</option><option value="5">5. yıl</option></select></label><label>Durum<input id="q641FollowupStatus" value="Çalışıyor"></label></div><div class="form-actions"><button class="ghost">Mezun takibini kaydet</button></div></form><div id="q641PeopleSummary" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">ÖĞRENCİ / MEZUN ÇIKTI KARNESİ</span><h3>Kümülatif ÖÇ → PÇ başarısı</h3><p>Sınavlar ve dersler boyunca bireysel çıktı başarısını mezuniyet anında dondurun.</p></div></div><label>Öğrenci<select id="q641StudentSelect"></select></label><div class="compliance-actions"><button id="q641StudentCardLoad" class="ghost small" type="button">Karneyi hesapla</button><button id="q641StudentCardFreeze" class="primary small" type="button">Mezuniyet snapshot dondur</button></div><div id="q641StudentCard" class="student-outcome-card"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">ALTYAPI YAŞAM DÖNGÜSÜ</span><h3>Bakım · İSG · erişilebilirlik</h3></div></div><form id="q641MaintenanceForm" class="form premium-form"><label>Altyapı<select id="q641InfraSelect"></select></label><div class="row"><label>Bakım türü<select id="q641MaintenanceType"><option value="periodic">Periyodik</option><option value="corrective">Düzeltici</option><option value="isg">İSG</option><option value="accessibility">Erişilebilirlik</option></select></label><label>Plan tarihi<input id="q641MaintenanceDate" type="date"></label></div><div class="form-actions"><button class="ghost">Bakım kaydı oluştur</button></div></form><div id="q641MaintenanceSummary" class="compact-record-list"></div></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">RESMÎ ŞABLON KASASI</span><h3>Kuruluşun birebir dosyasını kilitle</h3><p>DOCX/XLSX/PDF/ZIP kaynak dosyası SHA-256 ile dondurulur.</p></div></div><form id="q641TemplateUploadForm" class="form premium-form"><label>Şablon<select id="q641TemplateSelect"></select></label><label class="premium-file-field">Resmî kaynak dosyası<input id="q641TemplateFile" type="file" required accept=".docx,.xlsx,.pdf,.zip"></label><div class="form-actions"><button class="primary">Yükle ve dondur</button></div></form><div id="q641TemplateList" class="compact-record-list"></div></div>
+        </div>
+      </div>
+      <div class="q360-workspace-panel" data-q360-panel="selfeval">
+        <div class="card self-evaluation-shell">
+          <div class="section-head"><div><span class="eyebrow">ÖZ DEĞERLENDİRME RAPORU</span><h3>Kanıta dayalı rapor oluşturucu</h3><p class="muted">Sistem yalnız doğrulanmış kalite sinyallerinden taslak üretir; nihai onay yetkili kurulda kalır.</p></div><button id="q360SelfEvalDownload" class="primary small" type="button">Word taslağını indir</button></div>
+          <div id="q360SelfEvalSummary" class="self-eval-summary"></div>
+          <div id="q360SelfEvalCriteria" class="self-eval-criteria"></div>
+        </div>
+      </div>
+      <div class="q360-workspace-panel" data-q360-panel="institutional">
+        <div class="card institutional-report-shell">
+          <div class="section-head"><div><span class="eyebrow">KURUMSAL RAPORLAMA</span><h3>Program ÖDR → Birim ÖDR → Üniversite KİDR</h3><p class="muted">Alt programların doğrulanmış kalite kayıtlarını üst rapora izlenebilir biçimde birleştirir.</p></div><div class="institutional-report-actions"><select id="q360InstitutionalFaculty"><option value="">Tüm üniversite</option></select><button id="q360InstitutionalLoad" class="ghost small" type="button">Raporu oluştur</button><button id="q360InstitutionalDownload" class="primary small" type="button">Word indir</button></div></div>
+          <div id="q360InstitutionalSummary" class="quality-kpi-grid"></div>
+          <div class="institutional-report-grid"><div><span class="eyebrow">ÖNCELİKLİ GELİŞTİRME</span><div id="q360InstitutionalPriorities" class="executive-insights"></div></div><div><span class="eyebrow">GÜÇLÜ ALANLAR</span><div id="q360InstitutionalStrengths" class="executive-insights"></div></div></div>
+          <div class="table-wrap"><table class="premium-table"><thead><tr><th>Program</th><th>Birim</th><th>Çerçeve</th><th>Hazırlık</th><th>Kanıt</th><th>Açık PUKÖ</th></tr></thead><tbody id="q360InstitutionalPrograms"></tbody></table></div>
+        </div>
+      </div>
+      <div class="q360-workspace-panel" data-q360-panel="strategy">
+        <div class="card strategy-quality-shell">
+          <div class="section-head"><div><span class="eyebrow">STRATEJİK KALİTE YÖNETİMİ</span><h3>Stratejik Plan → KPI → PUKÖ → Kanıt</h3><p class="muted">Üniversite, birim ve program hedeflerini ölçülebilir KPI'larla izleyin. Skorlar kurum içi yönetim göstergesidir.</p></div><button id="q360StrategyLoad" class="ghost small" type="button">Güncelle</button></div>
+          <div id="q360StrategySummary" class="quality-kpi-grid"></div>
+          <div id="q360StrategyObjectives" class="strategy-objective-list"></div>
+        </div>
+        <div class="grid2 strategy-editor-grid">
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">STRATEJİK HEDEF</span><h3>Yeni hedef tanımla</h3></div></div><form id="q360StrategyObjectiveForm" class="form premium-form">
+            <div class="row"><label>Kod<input id="q360StrategyCode" placeholder="SH-01" required></label><label>Kapsam<select id="q360StrategyScope"><option value="university">Üniversite</option><option value="faculty">Fakülte / MYO</option><option value="department">Bölüm</option><option value="program">Program</option></select></label></div>
+            <label>Kapsam adı<input id="q360StrategyScopeName" value="Doğuş Üniversitesi"></label><label>Hedef başlığı<input id="q360StrategyTitle" required placeholder="Öğrenme çıktılarında sürekli iyileştirme"></label>
+            <div class="row"><label>Sorumlu<input id="q360StrategyOwner" placeholder="Kalite Koordinatörlüğü"></label><label>Termin<input id="q360StrategyDue" type="date"></label></div><button class="primary" type="submit">Stratejik hedefi kaydet</button>
+          </form></div>
+          <div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">KPI</span><h3>Hedefe gösterge bağla</h3></div></div><form id="q360StrategyKpiForm" class="form premium-form">
+            <label>Stratejik hedef<select id="q360StrategyObjectiveSelect" required></select></label><div class="row"><label>KPI kodu<input id="q360StrategyKpiCode" placeholder="KPI-01" required></label><label>Gösterge<input id="q360StrategyKpiName" required></label></div>
+            <div class="row"><label>Başlangıç<input id="q360StrategyBaseline" type="number" step="0.01" value="0"></label><label>Hedef<input id="q360StrategyTarget" type="number" step="0.01" value="100"></label><label>Gerçekleşen<input id="q360StrategyActual" type="number" step="0.01" value="0"></label></div>
+            <div class="row"><label>Birim<input id="q360StrategyUnit" value="%"></label><label>Yön<select id="q360StrategyDirection"><option value="higher">Yüksek daha iyi</option><option value="lower">Düşük daha iyi</option></select></label></div><button class="primary" type="submit">KPI ekle</button>
+          </form></div>
+        </div>
+      </div>
+      <div class="q360-workspace-panel" data-q360-panel="readiness">
+        <div class="card accreditation-readiness-shell">
+          <div class="section-head"><div><span class="eyebrow">AKREDİTASYON ZİYARET MODU</span><h3>Kriter → kanıt → PUKÖ hazır olma matrisi</h3><p class="muted">MEDEK / MÜDEK / TURAK / YÖKAK / ESG / ACQUIN için kurum içi hazırlık görünümü. Resmî akreditasyon puanı değildir.</p></div><div class="visit-mode-actions"><span id="q360VisitScore" class="badge">—</span><button id="q360VisitModeToggle" class="ghost small" type="button">Ziyaret görünümü</button></div></div>
+          <div id="q360VisitKpis" class="quality-kpi-grid"></div>
+          <div id="q360VisitPriority" class="visit-priority-list"></div>
+          <div class="table-wrap"><table class="premium-table visit-readiness-table"><thead><tr><th>Ölçüt</th><th>Hazırlık</th><th>Kanıt</th><th>PUKÖ</th><th>Eksikler</th><th>Durum</th></tr></thead><tbody id="q360VisitMatrix"></tbody></table></div>
+        </div>
+      </div>
+      <div class="q360-workspace-panel" data-q360-panel="medekodr">
+        <div class="card medek-odr-shell">
+          <div class="section-head"><div><span class="eyebrow">MEDEK 2026 · ÖDR v1.1</span><h3>ÖDR Hazırlık & Kanıt Merkezi</h3><p class="muted">58 ayrıntılı ÖDR satırını, Ek I / Ek II hazırlığını ve doğrudan kanıt bağlantılarını izler. Bu ekran resmî MEDEK puanı veya kararı üretmez.</p></div><div class="medek-odr-actions"><select id="q645MedekOdrType" aria-label="Değerlendirme türü"><option value="general">Genel değerlendirme</option><option value="interim">Ara değerlendirme</option></select><span id="q645MedekOdrScore" class="badge">—</span><button id="q645MedekOdrDownload" class="primary small" type="button">Hazırlık Word</button></div></div>
+          <div id="q645MedekOdrScope" class="medek-odr-scope muted"></div>
+          <div id="q645MedekOdrKpis" class="quality-kpi-grid"></div>
+          <div class="grid2 medek-odr-top-grid"><div><div class="section-head"><div><span class="eyebrow">ÖNCELİKLİ AÇIKLAR</span><h4>ÖDR ön kontrol</h4></div></div><div id="q645MedekOdrPriority" class="visit-priority-list"></div></div><div><div class="section-head"><div><span class="eyebrow">EKLER</span><h4>Ek I / Ek II</h4></div></div><div id="q645MedekOdrAppendices" class="medek-odr-appendices"></div></div></div>
+          <div class="section-head"><div><span class="eyebrow">ANA BÖLÜM</span><h4>Ölçüt bazlı 58 ÖDR satırı</h4><p class="muted">Framework alt ölçütleri ile ÖDR soru satırları ayrı izlenir; üst ölçüt kanıtı ayrıntılı ÖDR satırını otomatik yeşile çeviremez.</p></div></div>
+          <div id="q645MedekOdrMatrix" class="medek-odr-matrix"></div>
+        </div>
+      </div>
+      <div class="q360-workspace-panel" data-q360-panel="curriculum"><div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">MÜFREDAT & AKTS</span><h3>Ders kaydı ekle</h3><p>Standart dönem, sınıf ve kategori kataloglardan seçilir.</p></div><button class="ghost small" type="button" data-q360-template="curriculum">Excel şablonu</button></div><form id="q360CurriculumForm" class="form premium-form"><div class="row"><label>Dönem<select id="q360CurrTerm"></select></label><label>Sınıf<select id="q360CurrClass"></select></label></div><div class="row"><label>Ders kodu<input id="q360CurrCode" required></label><label>Ders adı<input id="q360CurrName" required></label></div><div class="row"><label>AKTS<input id="q360CurrEcts" type="number" min="0" step="0.5" value="5"></label><label>Kategori<select id="q360CurrCategory"></select></label></div><div class="check-row"><label><input id="q360CurrProfessional" type="checkbox"> Mesleki</label><label><input id="q360CurrSpecific" type="checkbox"> Program özgü</label><label><input id="q360CurrStakeholder" type="checkbox"> Dış paydaş önerili</label><label><input id="q360CurrApplied" type="checkbox"> Uygulama / güncel teknoloji</label></div><div class="form-actions"><button class="primary">Dersi kaydet</button></div></form></div></div>
+      <div class="q360-workspace-panel" data-q360-panel="stakeholder"><div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">PAYDAŞ</span><h3>Paydaş kaydı ekle</h3></div><button class="ghost small" type="button" data-q360-template="stakeholders">Excel şablonu</button></div><form id="q360StakeholderForm" class="form premium-form"><div class="row"><label>Paydaş türü<select id="q360StakeType"></select></label><label>Katılım türü<select id="q360StakeEngagement"></select></label></div><label>Ad / Kurum<input id="q360StakeName" required placeholder="Paydaş veya kurul adı"></label><label>Geri bildirim<textarea id="q360StakeFeedback" rows="3"></textarea></label><label>Sonuç / aksiyon<textarea id="q360StakeAction" rows="2"></textarea></label><div class="form-actions"><button class="primary">Paydaşı kaydet</button></div></form></div></div>
+      <div class="q360-workspace-panel" data-q360-panel="graduate"><div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">MEZUN İZLEME</span><h3>Mezun kaydı ekle</h3></div><button class="ghost small" type="button" data-q360-template="graduates">Excel şablonu</button></div><form id="q360GraduateForm" class="form premium-form"><div class="row"><label>Mezun anahtarı<input id="q360GradKey" required placeholder="MZ-2026-001"></label><label>Mezuniyet yılı<input id="q360GradYear" type="number" value="2026"></label></div><label>Ad Soyad<input id="q360GradName"></label><label>İstihdam durumu<select id="q360GradStatus"></select></label><div class="row"><label>İşveren<input id="q360GradEmployer"></label><label>Pozisyon<input id="q360GradJob"></label></div><div class="form-actions"><button class="primary">Mezunu kaydet</button></div></form></div></div>
+      <div class="q360-workspace-panel" data-q360-panel="faculty"><div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">ÖĞRETİM KADROSU</span><h3>Kadro kaydı ekle</h3></div><button class="ghost small" type="button" data-q360-template="faculty">Excel şablonu</button></div><form id="q360FacultyForm" class="form premium-form"><div class="row"><label>Unvan<select id="q360FacultyTitle"></select></label><label>Çalışma türü<select id="q360FacultyEmployment"></select></label></div><label>Ad Soyad<input id="q360FacultyName" required></label><label>E-posta<input id="q360FacultyEmail" type="email" required></label><label>Uzmanlık<input id="q360FacultyExpertise"></label><div class="form-actions"><button class="primary">Kadroya ekle</button></div></form></div></div>
+      <div class="q360-workspace-panel" data-q360-panel="infra"><div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">LABORATUVAR & ALTYAPI</span><h3>Altyapı kaydı ekle</h3></div><button class="ghost small" type="button" data-q360-template="infrastructure">Excel şablonu</button></div><form id="q360InfraForm" class="form premium-form"><label>Tür<select id="q360InfraType"></select></label><label>Ad<input id="q360InfraName" required></label><div class="row"><label>Konum<input id="q360InfraLocation"></label><label>Kapasite<input id="q360InfraCapacity" type="number" min="0"></label></div><label>Kalite durumu<select id="q360InfraStatus"></select></label><div class="form-actions"><button class="primary">Altyapıyı kaydet</button></div></form></div></div>
+      <div class="q360-workspace-panel" data-q360-panel="cycle"><div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">PUKÖ</span><h3>Kalite döngüsü oluştur</h3><p>İyileştirmeyi sorumlu, termin ve kanıt zinciriyle yönetin.</p></div><button class="ghost small" type="button" data-q360-template="quality_cycles">Excel şablonu</button></div><form id="q360CycleForm" class="form premium-form"><div class="row"><label>Ölçüt<select id="q360CycleCriterion"></select></label><label>Durum<select id="q360CycleStatus"></select></label></div><label>Başlık<input id="q360CycleTitle" required></label><div class="row"><label>Sorumlu<input id="q360CycleOwner" value="Program Başkanı"></label><label>Termin<input id="q360CycleDue" type="date"></label></div><div class="puko-grid"><label><span>1 · Planla</span><textarea id="q360CyclePlan" rows="3"></textarea></label><label><span>2 · Uygula</span><textarea id="q360CycleDo" rows="3"></textarea></label><label><span>3 · Kontrol Et</span><textarea id="q360CycleCheck" rows="3"></textarea></label><label><span>4 · Önlem Al</span><textarea id="q360CycleAct" rows="3"></textarea></label></div><div class="form-actions"><button class="primary">PUKÖ döngüsünü kaydet</button></div></form><div class="quality-closure-wrap"><div class="section-head"><div><span class="eyebrow">KANITTAN KAPANIŞA</span><h4>Kapanış inceleme kuyruğu</h4><p>Sistem kanıtı ve sorumluluğu kontrol eder; kapanış kararı sizde kalır.</p></div><span id="q360ClosureBadge" class="badge">—</span></div><div id="q360ClosureList" class="quality-closure-list"></div></div></div></div>
+      <div class="q360-workspace-panel" data-q360-panel="calendar">
+        <div class="card q360-editor-card quality-calendar-shell">
+          <div class="q360-editor-head"><div><span class="eyebrow">QUALITY CALENDAR</span><h3>Kalite takvimi & sorumluluk merkezi</h3><p>Toplantı, PUKÖ termini, kanıt teslimi ve değerlendirme tarihlerini tek yerde yönetin.</p></div><span id="q360CalendarBadge" class="badge">—</span></div>
+          <div id="q360CalendarKpis" class="quality-calendar-kpis"></div>
+          <div class="quality-calendar-layout">
+            <form id="q360CalendarForm" class="form premium-form quality-calendar-form">
+              <div class="row"><label>Tür<select id="q360CalendarType"><option value="meeting">Toplantı</option><option value="evidence_deadline">Kanıt teslimi</option><option value="pdca_deadline">PUKÖ termini</option><option value="review">Kalite değerlendirmesi</option><option value="audit">Denetim / ziyaret</option><option value="other">Diğer</option></select></label><label>Durum<select id="q360CalendarStatus"><option value="planned">Planlandı</option><option value="in_progress">Devam ediyor</option><option value="done">Tamamlandı</option><option value="cancelled">İptal</option></select></label></div>
+              <label>Başlık<input id="q360CalendarTitle" required placeholder="Örn. MÜDEK kanıt teslim kontrolü"></label>
+              <div class="row"><label>Tarih<input id="q360CalendarStart" type="date" required></label><label>Son tarih<input id="q360CalendarDue" type="date"></label></div>
+              <div class="row"><label>Sorumlu<input id="q360CalendarOwner" placeholder="Ad Soyad / Birim"></label><label>Sorumlu rol<input id="q360CalendarOwnerRole" placeholder="Program Başkanı, Kalite Birimi..."></label></div>
+              <div class="row"><label>İlgili ölçüt<input id="q360CalendarCriterion" placeholder="3.2"></label><label>Beklenen kanıt<input id="q360CalendarEvidence" placeholder="Kurul kararı, analiz raporu..."></label></div>
+              <label>Not<textarea id="q360CalendarNotes" rows="2"></textarea></label>
+              <div class="form-actions"><button class="primary">Takvime ekle</button></div>
+            </form>
+            <div class="quality-calendar-stream-wrap"><div class="section-head"><div><span class="eyebrow">YAKLAŞAN İŞLER</span><h4>Kurumsal kalite akışı</h4></div></div><div id="q360CalendarStream" class="quality-calendar-stream"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="q360-workspace-panel" data-q360-panel="governance"><div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">KURUL & KARAR</span><h3>Karar zincirini aksiyona bağla</h3><p>Kurul kararını kayıt altına alın; gerektiğinde tek tıkla PUKÖ döngüsüne dönüştürün.</p></div><button class="ghost small" type="button" data-q360-template="governance">Excel şablonu</button></div><form id="q360GovForm" class="form premium-form"><label>Kurul türü<select id="q360GovBody"></select></label><div class="row"><label>Toplantı tarihi<input id="q360GovMeetingDate" type="date"></label><label>Toplantı no<input id="q360GovMeeting" required></label></div><label>Karar no<input id="q360GovDecision" required></label><label>Konu<input id="q360GovSubject" required></label><label>Karar<textarea id="q360GovText" rows="4" required></textarea></label><div class="form-actions"><button class="primary">Kararı kaydet</button></div></form><div class="quality-governance-action-wrap"><div class="section-head"><div><span class="eyebrow">KARARDAN AKSİYONA</span><h4>Kurul kararları</h4><p>Uygulama gerektiren kararları sorumlu ve termin ile PUKÖ'ye taşıyın.</p></div></div><div id="q360GovernanceList" class="quality-governance-action-list"></div></div></div></div>
+      <div class="q360-workspace-panel" data-q360-panel="evidence"><div class="card q360-editor-card"><div class="q360-editor-head"><div><span class="eyebrow">KANIT MERKEZİ</span><h3>Program kanıtı yükle</h3><p>Dosya bütünlüğü SHA-256 ile izlenir ve ilgili ölçütle ilişkilendirilir.</p></div></div><form id="q360EvidenceForm" class="form premium-form"><label>Ölçüt<select id="q360EvidenceCriterion"><option value="">Genel program kanıtı</option></select></label><label>Kategori<input id="q360EvidenceCategory" value="quality"></label><label>Açıklama<textarea id="q360EvidenceDescription" rows="2"></textarea></label><label class="premium-file-field">Dosya<input id="q360EvidenceFile" type="file" required></label><div class="form-actions"><button class="primary">Kanıtı yükle</button></div></form><div class="q360-evidence-list-wrap"><h4>Son kanıtlar</h4><div id="q360EvidenceList"></div></div></div></div>
+    </section>
+
+    <section id="page-accreditation" class="page reference-workspace-page modern-admin-page">
+      <div class="page-header modern-page-header accred-command-hero">
+        <div class="accred-command-copy"><span class="eyebrow">6.11 · AKREDİTASYON MERKEZİ</span><h2>Programın ölçme kanıtını tek merkezde yönetin</h2><p class="muted">Ders → sınav → Öğrenim Çıktısı → Program Çıktısı zincirini dönem bazında birleştirin; eksik kazanımları, iyileştirme aksiyonlarını ve MIN/AVG/MAX temsilî kanıtları aynı çalışma alanından tamamlayın.</p><div id="accredContext" class="accred-context"></div></div>
+        <div class="accred-period-picker modern-period-picker"><label>Akreditasyon dönemi<select id="accredPeriodSelect"></select></label><button id="accredLoad" class="primary">Dönemi aç</button></div>
+      </div>
+
+      <div class="accred-progress-card card"><div><span id="accredProgressText">Dönem seçilmedi</span><span id="accredPeriodBadge" class="badge status-draft">Dönem seçilmedi</span></div><div class="progress-track"><span id="accredProgressFill" style="width:0%"></span></div><div id="accredSummary"></div></div>
+
+      <div id="accredKpis" class="accred-kpi-grid"></div>
+
+      <div class="accred-toolbar card accred-commandbar">
+        <div><button id="accredSync" class="ghost">↻ Sınavları eşitle</button><button id="accredFreezeAll" class="ghost">MIN/AVG/MAX dondur</button><button id="accredExcel" class="ghost">Excel değerlendirme raporu</button></div>
+        <div><button id="accredDownload" class="primary">Akreditasyon kanıt ZIP'i</button><button id="accredReady" class="ghost">Hazır olarak işaretle</button><button id="accredArchive" class="ghost">Arşivle</button></div>
+      </div>
+
+      <div class="card accred-matrix-card">
+        <div class="section-head"><div><span class="eyebrow">DERS × PROGRAM ÇIKTISI</span><h3>Program Çıktısı ölçüm matrisi</h3><p class="muted">Her hücre, o dersin dönem içindeki sınavlarından hesaplanan Program Çıktısı başarı ortalamasını gösterir. Hedefin altındaki hücreler iyileştirme gerektirir.</p></div><div id="accredPoLegend" class="matrix-legend"></div></div>
+        <div id="accredMatrix" class="accred-matrix-wrap"></div>
+      </div>
+
+      <div class="accred-center-grid">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">BAŞARISIZ KAZANIMLAR</span><h3>Öğrenim Çıktısı açıkları ve aksiyon kapsamı</h3><p class="muted">Hedefin altında kalan Öğrenim Çıktısı'ler en büyük başarı farkından başlayarak sıralanır.</p></div><span id="accredGapBadge" class="badge">0 açık</span></div><div id="accredGaps"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">MIN / AVG / MAX</span><h3>Temsilî öğrenci kanıtları</h3><p class="muted">Dondurulan seçimler tarihsel kanıttır; puanlar sonradan değişse bile sessizce yeniden seçilmez.</p></div><span id="accredRepBadge" class="badge">0%</span></div><div id="accredRepresentatives"></div></div>
+      </div>
+
+      <div class="card accred-actions-register"><div class="section-head"><div><span class="eyebrow">SÜREKLİ İYİLEŞTİRME</span><h3>Program aksiyon kayıt defteri</h3><p class="muted">Sınav bazında açılan aksiyonları dönem seviyesinde sorumlu, termin ve durumlarıyla izleyin.</p></div><span id="accredActionBadge" class="badge">0 aksiyon</span></div><div id="accredActions"></div></div>
+
+      <div class="accred-main-grid">
+        <div class="card"><div class="section-head"><div><span class="eyebrow">DERSLER</span><h3>Dönem ölçüm kapsamı</h3></div></div><div id="accredCourses"></div></div>
+        <div class="card"><div class="section-head"><div><span class="eyebrow">SINAVLAR & KANIT</span><h3>Sınav bazlı kontrol listesi</h3></div></div><div id="accredExams"></div></div>
+      </div>
+
+      <details class="accred-setup"><summary>Kurulum / profil ve yeni dönem oluştur</summary><div class="grid2 setup-grid">
+        <div class="card"><h3>Akreditasyon profili</h3><p class="muted">MEDEK, TURAK veya kurum içi süreçlerde istenen kontrol listesine göre sürümlü profil tanımlayın. Resmî gereklilikler değişebildiği için kanıt türleri yapılandırılabilir tutulur.</p><form id="accredProfileForm" class="form"><div class="row"><label>Kod<input id="accredProfileCode" placeholder="Örn. MEDEK-2026" required></label><label>Sürüm<input id="accredProfileVersion" placeholder="1.0" required></label></div><label>Profil adı<input id="accredProfileName" placeholder="Akreditasyon Değerlendirme Profili" required></label><label>Genel kanıt türleri <span class="muted">virgülle</span><input id="accredGeneralKinds" placeholder="exam_paper"></label><label>MIN/AVG/MAX için kanıt türleri <span class="muted">virgülle</span><input id="accredRepKinds" value="answer_sheet"></label><div class="check-row"><label><input id="accredRequireReps" type="checkbox" checked> MIN/AVG/MAX zorunlu</label><label><input id="accredRequireActions" type="checkbox" checked> Başarısız Öğrenim Çıktısı için aksiyon zorunlu</label></div><button class="primary" type="submit">Profili oluştur</button></form></div>
+        <div class="card"><h3>Yeni akreditasyon dönemi</h3><form id="accredPeriodForm" class="form"><label>Program<select id="accredProgram"></select></label><label>Profil<select id="accredProfile"></select></label><div class="row"><label>Akademik yıl<input id="accredYear" value="2026-2027"></label><label>Dönem<select id="accredTerm"><option>Güz</option><option>Bahar</option><option>Yaz</option></select></label></div><label>Dönem adı<input id="accredTitle" placeholder="2026-2027 Güz · IAT Akreditasyon Dosyası"></label><button class="primary" type="submit">Dönemi oluştur ve sınavları bağla</button></form></div>
+      </div></details>
+    </section>
+
+    <section id="page-programreview" class="page program-review-page reference-workspace-page modern-admin-page">
+      <div class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM REVIEW</span><h2>Periyodik Program Değerlendirmesi</h2><p class="muted">Akreditasyon başvurusundan bağımsız olarak programın profil, müfredat, öğrenme sonuçları, kadro, kaynak, paydaş ve eylem planını reviewer kontrollü bir çalışma alanında yönetin.</p></div><span id="programReviewStatusBadge" class="badge">Hazırlık</span></div>
+        <div class="row program-review-toolbar"><label>Program<select id="programReviewProgram"></select></label><label>Akademik yıl<input id="programReviewYear" value="2026-2027"></label><label>Şablon<select id="programReviewTemplate"></select></label></div>
+        <div class="actions"><button id="programReviewReload" class="ghost" type="button">Yenile</button><button id="programReviewCreateDefaultTemplate" class="ghost" type="button">Standart şablon oluştur</button><button id="programReviewCreate" class="primary" type="button">Yeni Program Review</button></div>
+      </div>
+      <div class="grid2 program-review-grid"><div class="card"><div class="section-head"><div><h3>Review dönemleri</h3><p class="muted">Program ve akademik yıla göre sürümlü değerlendirme kayıtları.</p></div></div><div id="programReviewList" class="compact-record-list"></div></div><div class="card"><div class="section-head"><div><h3>İlerleme</h3><p class="muted">Onaylanan bölüm oranı ve final hazırlığı.</p></div></div><div id="programReviewProgress" class="muted">Bir review seçin.</div></div></div>
+      <div id="programReviewWorkspace" class="card hidden"><div class="section-head"><div><span class="eyebrow">REVIEW WORKSPACE</span><h3 id="programReviewWorkspaceTitle">Program Review</h3><p id="programReviewWorkspaceMeta" class="muted"></p></div><button id="programReviewFinalize" class="primary small" type="button">Final snapshot oluştur</button></div><div id="programReviewSections" class="program-review-sections"></div></div>
+    </section>
+
+    <section id="page-evidencehub" class="page evidence-hub-page reference-workspace-page modern-admin-page">
+      <div class="card"><div class="section-head"><div><span class="eyebrow">EVIDENCE HUB 2.0</span><h2>Kurumsal Kanıt Merkezi</h2><p class="muted">Sınav kanıtlarını, Quality360 dosyalarını ve kontrollü doküman revizyonlarını taşımadan tek arama ve yeniden kullanım yüzeyinde birleştirir.</p></div><button id="evidenceHubDuplicates" class="ghost" type="button">Duplicate SHA</button></div>
+        <div class="evidence-hub-filters"><label>Program<select id="evidenceHubProgram"><option value="">Yetkili tüm programlar</option></select></label><label>Kaynak<select id="evidenceHubSource"><option value="">Tümü</option><option value="exam">Sınav</option><option value="quality">Quality360</option><option value="controlled">Kontrollü doküman</option></select></label><label>Bütünlük<select id="evidenceHubIntegrity"><option value="">Tümü</option><option value="verified">Doğrulanmış</option><option value="unchecked">Kontrol bekliyor</option><option value="mismatch">Hash uyuşmazlığı</option><option value="missing">Dosya eksik</option></select></label><label>Etiket<input id="evidenceHubTag" placeholder="Örn. Program Çıktıları"></label><label class="wide">Ara<input id="evidenceHubQuery" placeholder="Dosya, açıklama, ölçüt veya doküman kodu"></label><button id="evidenceHubSearch" class="primary" type="button">Ara</button></div>
+        <div id="evidenceHubTarget" class="muted hidden"></div>
+      </div>
+      <div class="grid2 evidence-hub-layout"><div class="card"><div class="section-head"><div><h3>Kanıt kayıtları</h3><p id="evidenceHubCount" class="muted">Arama bekleniyor.</p></div></div><div id="evidenceHubList" class="evidence-hub-list"></div><div class="actions evidence-hub-pager"><button id="evidenceHubPrev" class="ghost small" type="button">← Önceki</button><span id="evidenceHubPageInfo" class="muted">1</span><button id="evidenceHubNext" class="ghost small" type="button">Sonraki →</button></div></div><div class="card"><div class="section-head"><div><h3>Kanıt detayı</h3><p class="muted">Etiketleri ve Program Review kullanım zincirini görün.</p></div></div><div id="evidenceHubDetail" class="muted">Bir kanıt seçin.</div></div></div>
+    </section>
+
+    <section id="page-evidence" class="page reference-workspace-page modern-admin-page evidence-reference-page">
+      <div class="page-header modern-page-header"><div><span class="eyebrow">KANIT YÖNETİMİ</span><h2>Sınav Kanıtları</h2><p class="muted">Sınav kağıdı, cevap kağıdı, rubrik ve iyileştirme kayıtlarını sürümlü ve bütünlük kontrollü biçimde yönetin.</p></div><div class="page-header-meta"><span class="badge status-ready">SHA-256 izleniyor</span></div></div>
+      <div class="grid2"><div class="card"><h3>Kanıt yükle</h3><form id="evidenceForm" class="form"><label>Sınav<select id="evidenceExam"></select></label><label>Öğrenci<select id="evidenceStudent"><option value="">Genel sınav kanıtı</option></select></label><div class="row"><label>Kanıt türü<select id="evidenceKind"><option value="exam_paper">Sınav kağıdı</option><option value="answer_sheet">Cevap kağıdı</option><option value="rubric">Rubrik</option><option value="meeting_record">Toplantı / İyileştirme</option><option value="other">Diğer</option></select></label><label>Kategori<input id="evidenceCategory" value="general" placeholder="general / medek / student"></label></div><label>Açıklama<textarea id="evidenceDescription" rows="3" placeholder="Kanıtın hangi ölçütü desteklediğini yazın..."></textarea></label><label>Saklama bitişi<input id="evidenceRetention" type="date"><small>Boşsa kurum varsayılan saklama süresi uygulanır.</small></label><label>Dosya<input id="evidenceFile" type="file" accept=".pdf,.jpg,.jpeg,.png" required></label><button class="primary">Kanıtı yükle</button></form></div><div class="card"><h3>Kanıt paketi</h3><p class="muted">Sınav metadata, Öğrenim ve Program Çıktıları analizi ve yüklenmiş kanıtları tek ZIP içinde üretir.</p><button id="downloadPackage" class="primary">Seçili sınavın ZIP paketini indir</button><div id="evidenceList"></div></div></div>
+    </section>
+    <section id="page-feedback" class="page reference-workspace-page modern-admin-page">
+      <div class="page-header modern-page-header feedback-hero"><div><span class="eyebrow">PİLOT GERİ BİLDİRİM</span><h2>Kullandığınız yerde not bırakın</h2><p class="muted">Öğretim elemanı ve yöneticilerin pilot sırasında gördüğü sorunları, gereksiz adımları veya geliştirme önerilerini doğrudan ürün ekibine aktarır.</p></div><span id="feedbackScopeBadge" class="badge">Pilot</span></div>
+      <div class="feedback-grid">
+        <div class="card"><h3>Yeni geri bildirim</h3><form id="feedbackForm" class="form"><div class="row"><label>Konu<select id="feedbackCategory"><option value="usability">Kullanım kolaylığı</option><option value="exam">Sınav hazırlama</option><option value="scan">Optik okuma</option><option value="analysis">Öğrenim ve Program Çıktıları analizi</option><option value="accreditation">Akreditasyon</option><option value="bug">Hata / sorun</option><option value="general">Genel öneri</option></select></label><label>Puan<select id="feedbackRating"><option value="">Puan vermeden gönder</option><option value="5">5 · Çok iyi</option><option value="4">4 · İyi</option><option value="3">3 · Orta</option><option value="2">2 · Zorlandım</option><option value="1">1 · Kullanamadım</option></select></label></div><label>Bulunduğun ekran<input id="feedbackPage" readonly></label><label>Ne oldu / neyi değiştirelim?<textarea id="feedbackMessage" rows="6" minlength="3" maxlength="4000" placeholder="Örn. Soru havuzunda filtreyi bulmakta zorlandım; ders filtresi üstte sabit kalabilir." required></textarea></label><button class="primary" type="submit">Geri bildirimi gönder</button></form></div>
+        <div class="card"><div class="section-head"><div><h3>Pilot kayıtları</h3><p id="feedbackListHint" class="muted">Kendi gönderdiğiniz geri bildirimler gösterilir.</p></div><select id="feedbackStatusFilter"><option value="">Tümü</option><option value="open">Açık</option><option value="reviewed">İnceleniyor</option><option value="resolved">Çözüldü</option></select></div><div id="feedbackList" class="feedback-list"></div></div>
+      </div>
+    </section>
+    <section id="page-acceptance" class="page production-acceptance-page reference-workspace-page modern-admin-page">
+      <div class="card ir-hero"><div><span class="eyebrow">PRODUCTION ACCEPTANCE GATE</span><h2>Canlı Kurum Kabul Merkezi</h2><p class="muted">Kodun hazır olması ile kurumun gerçek ortam kabulünü ayırır. Entra, Proliz/OBS, TLS, OMR, backup/restore, resmî şablon ve gerçek program pilotu kanıtla kapatılır.</p></div><div><span id="acceptanceScore" class="badge">0%</span></div></div>
+      <div id="acceptanceSummary" class="ir-kpis"></div>
+      <section class="card"><div class="section-head"><div><span class="eyebrow">KABUL KAPILARI</span><h3>Release öncesi kurum imzaları</h3><p class="muted">Sistem sinyali teknik hazırlığı gösterir; kabul ancak kanıt referansı ile yetkili kullanıcı tarafından kapatılır.</p></div><button id="acceptanceReload" class="ghost" type="button">Yenile</button></div><div id="acceptanceGates" class="compact-record-list"></div></section>
+    </section>
+
+    <section id="page-security" class="page reference-workspace-page modern-admin-page security-reference-page">
+      <div class="page-header modern-page-header"><div><span class="eyebrow">SİSTEM & GÜVENLİK</span><h2>Production Operasyon Merkezi</h2><p class="muted">Güvenlik sinyallerini, worker/scheduler durumunu, kanıt bütünlüğünü ve doğrulanmış yedekleri tek ekrandan izleyin.</p></div><div class="page-header-meta"><span id="securityHeroState" class="badge">Canlı kontrol</span></div></div>
+      <div class="grid2">
+        <div class="card"><div class="section-head"><div><h3>Production güvenlik durumu</h3><p class="muted">Pilot ve production yapılandırmasını ayrı değerlendirir; gerçek secret değerlerini arayüzde göstermez.</p></div><span id="securityStatusBadge" class="badge">Kontrol</span></div><div id="securityDiagnostics"></div></div>
+        <div class="card"><h3>Kurumsal kimlik hazırlığı</h3><div id="securityEntra"></div><p class="muted">Production modunda yalnız tek-tenant Microsoft Entra access token kabul edilir. Tenant, audience, istemci ve scope doğrulamaları sunucu tarafındadır.</p></div>
+      </div>
+      <div class="card"><div class="section-head"><div><h3>Kanıt bütünlüğü</h3><p class="muted">Sınav, Quality360 ve kontrollü doküman depolarındaki dosyaları SHA-256 kayıtlarıyla worker kuyruğunda doğrulayın.</p></div><button id="runEvidenceIntegrityScan" class="primary small" type="button">Bütünlük taramasını kuyruğa al</button></div><div id="evidenceIntegrityStatus" class="muted">Henüz toplu tarama çalıştırılmadı.</div></div>
+      <div class="card"><div class="section-head"><div><span class="eyebrow">OPERATIONS &amp; AUTOMATION</span><h3>Worker, scheduler ve backup</h3><p class="muted">Ağır işleri API isteğinden ayırır; deadline bildirimlerini ve doğrulanmış yedekleri merkezi olarak izler.</p></div><div class="row"><button id="refreshOperations" class="ghost small" type="button">Yenile</button><button id="runSchedulerNow" class="ghost small" type="button">Scheduler çalıştır</button><button id="queueBackupNow" class="primary small" type="button">Backup kuyruğa al</button></div></div><div id="operationsSummary" class="muted">Operasyon durumu yükleniyor…</div></div>
+      <div class="card"><div class="section-head"><div><h3>Güvenlik olayları</h3><p class="muted">Yetkisiz kimlik, host, HTTPS ve istek boyutu reddetmeleri burada izlenir.</p></div><button id="refreshSecurityEvents" class="ghost small">Yenile</button></div><div id="securityEvents"></div></div>
+    </section>
+
+    <section id="page-users" class="page reference-workspace-page modern-admin-page users-reference-page">
+      <div class="page-header modern-page-header"><div><span class="eyebrow">KİMLİK & YETKİ</span><h2>Kullanıcı ve Akademik Kapsam Yönetimi</h2><p class="muted">Kullanıcı eşlemelerini ve en dar akademik yetki kapsamını güvenli biçimde yönetin.</p></div><div class="page-header-meta"><span class="badge status-ready">RBAC etkin</span></div></div>
+      <div class="grid2">
+        <div class="card"><h3>Kullanıcı oluştur / Entra eşle</h3><p class="muted">DOU Assess parola saklamaz. Pilot kullanıcı veya Microsoft Entra nesne kimliği ile eşleme yapılır.</p><form id="userForm" class="form"><label>Ad Soyad<input id="userName" required></label><label>E-posta<input id="userEmail" type="email" required></label><div class="row"><label>Kaynak<select id="userAuthSource"><option value="pilot">Pilot</option><option value="entra">Microsoft Entra</option></select></label><label>Entra Object ID<input id="userObjectId" placeholder="oid · opsiyonel"></label></div><label>Tenant ID<input id="userTenantId" placeholder="Bilgi İşlem tenant GUID · opsiyonel"></label><button class="primary" type="submit">Kullanıcıyı kaydet</button></form><hr><button id="syncInstructorUsers" class="ghost">Ders öğretim elemanlarından kullanıcı eşle</button></div>
+        <div class="card role-scope-card"><div class="section-head"><div><span class="eyebrow">AKADEMİK YETKİ</span><h3>Kullanıcıya kapsam ata</h3><p class="muted">Üç akademik hesap tipi kullanılır: Öğretim Görevlisi, Program Başkanı ve Kalite Müdürü. Teknik yönetici hesabı yalnız sistem bakımı içindir.</p></div></div><form id="roleForm" class="form"><label>Kullanıcı<select id="roleUser"></select></label><label>Akademik hesap tipi<select id="roleName"><option value="instructor">Öğretim Görevlisi</option><option value="program_head">Program Başkanı</option><option value="quality">Kalite Müdürü</option></select></label><div id="roleScopeHint" class="role-scope-hint"></div><div class="row"><label id="roleProgramWrap">Program<select id="roleProgram"><option value="">—</option></select></label><label id="roleCourseWrap">Ders<select id="roleCourse"><option value="">—</option></select></label></div><div class="row"><label id="roleFacultyWrap">Fakülte / MYO kapsamı<input id="roleFaculty" placeholder="Örn. Meslek Yüksekokulu"></label><label id="roleDepartmentWrap">Bölüm kapsamı<input id="roleDepartment" placeholder="Örn. Bilgisayar Teknolojileri"></label></div><label id="roleProgramTextWrap">Program adı/kodu kapsamı<input id="roleProgramText" placeholder="Program adı veya kodu"></label><button class="primary" type="submit">Akademik yetkiyi ata</button></form></div>
+      </div>
+      <div class="card user-admin-card"><div class="section-head"><div><h3>Kullanıcılar ve yetkiler</h3><p class="muted">Yetkiler en dar akademik kapsam üzerinden uygulanır.</p></div><span id="entraReadiness" class="badge">Entra kontrol</span></div><div id="userList"></div></div>
+    </section>
+
+  </main>
+</div>
+<div id="workflowModal" class="workflow-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="workflowModalTitle">
+  <div class="workflow-modal-card">
+    <div class="workflow-modal-head"><div><span id="workflowModalEyebrow" class="eyebrow">İŞLEM</span><h3 id="workflowModalTitle">İşlemi tamamla</h3><p id="workflowModalDescription" class="muted"></p></div><button id="workflowModalClose" class="icon-button" type="button" aria-label="Kapat">×</button></div>
+    <form id="workflowModalForm" class="form workflow-modal-form"><div id="workflowModalFields"></div><div class="workflow-modal-actions"><button id="workflowModalCancel" class="ghost" type="button">Vazgeç</button><button id="workflowModalSubmit" class="primary" type="submit">Kaydet</button></div></form>
+  </div>
+</div>
+
+<div id="onboardingModal" class="onboarding-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle"><div class="onboarding-card"><div class="onboarding-top"><span class="eyebrow">DOU ASSESS · HIZLI BAŞLANGIÇ</span><button id="onboardingClose" class="ghost small" type="button">Geç ×</button></div><div id="onboardingBody"></div><div class="onboarding-footer"><span id="onboardingProgress">1 / 4</span><div><button id="onboardingPrev" class="ghost" type="button">Geri</button><button id="onboardingNext" class="primary" type="button">Devam</button></div></div></div></div>
+
+<div id="guideBackdrop" class="drawer-backdrop hidden"></div>
+<aside id="guideDrawer" class="help-drawer hidden" aria-label="Kullanım kılavuzu">
+  <div class="help-drawer-head"><div><span class="eyebrow">DOU ASSESS · KULLANIM KILAVUZU</span><h3 id="guideTitle">Bu ekranda ne yapmalıyım?</h3></div><button id="guideClose" class="ghost small" type="button">Kapat</button></div>
+  <div id="guideRoleFlow" class="guide-role-flow"></div><div id="guideContent" class="guide-content"></div>
+</aside>
+<div id="excelCenterModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <div class="excel-center-card"><div class="section-head"><div><span class="eyebrow">EXCEL VERİ MERKEZİ</span><h2>Şablon → Doğrula → İçe aktar</h2><p class="muted">Bulunduğunuz modüle veya rolünüze uygun veri türünü seçin. Hatalı dosya sisteme yazılmaz.</p></div><button id="excelCenterClose" class="ghost small" type="button">Kapat</button></div>
+  <div id="excelCenterSteps" class="excel-center-steps"><span>1 Şablonu indir</span><span>2 Doldur</span><span>3 Doğrula</span><span>4 İçe aktar</span></div>
+  <div id="excelCenterKinds" class="excel-kind-grid"></div>
+  <div id="excelCenterWork" class="excel-center-work hidden"><div id="excelSelectedInfo"></div><label class="file-drop"><input id="excelCenterFile" type="file" accept=".xlsx"><strong>Excel dosyasını seçin</strong><em id="excelCenterFileName">Dosya seçilmedi</em></label><div class="actions"><button id="excelTemplateBtn" class="ghost" type="button">Şablonu indir</button><button id="excelValidateBtn" class="ghost" type="button">Önce doğrula</button><button id="excelImportBtn" class="primary" type="button">İçe aktar</button></div><pre id="excelCenterResult" class="import-result"></pre></div>
+  </div>
+</div>
+<div id="notificationModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="notificationTitle">
+  <div class="notification-center-card">
+    <div class="section-head"><div><span class="eyebrow">OPERASYON &amp; AKSİYON</span><h2 id="notificationTitle">Bildirim Merkezi</h2><p class="muted">Yaklaşan terminler, gecikmiş kalite aksiyonları ve ölçme güvence görevleri.</p></div><button id="notificationClose" class="ghost small" type="button">Kapat</button></div>
+    <div class="notification-toolbar"><span id="notificationCount" class="muted">Bildirimler yükleniyor…</span><button id="notificationReadAll" class="ghost small" type="button">Tümünü okundu yap</button></div>
+    <div id="notificationList" class="notification-list"><p class="muted">Bildirimler yükleniyor…</p></div>
+  </div>
+</div>
+<div id="commandPalette" class="command-overlay hidden"><div class="command-card"><div class="command-search-wrap"><span>⌕</span><input id="commandSearch" placeholder="Ekran, işlem veya modül ara..." autocomplete="off"><button id="commandClose" class="ghost small" type="button">Esc</button></div><div id="commandList" class="command-list"></div><div class="command-footer"><span>↑↓ seçim</span><span>Enter aç</span><span>Esc kapat</span></div></div></div>
+<script src="/runtime-core.js?v=6.70-production-hardening&h=6701-671ux"></script>
+<script src="/modules/assessment-engine.js?v=6.70-production-hardening"></script>
+<script src="/app.js?v=6.70-production-hardening&h=6701-671ux"></script>
+</body>
+</html>

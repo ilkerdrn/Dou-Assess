@@ -1,0 +1,17 @@
+.git
+__pycache__
+*.pyc
+.env
+backups
+.pytest_cache
+.env.production
+secrets/postgres_password.txt
+
+# Runtime/test artifacts are never baked into the production image.
+dou_assess.db
+data/evidence/*
+!data/evidence/.gitkeep
+data/scans/*
+!data/scans/.gitkeep
+data/ops/*
+!data/ops/.gitkeep

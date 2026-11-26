@@ -1,0 +1,25 @@
+# DOU Assess 6.61 — Survey & Indirect Assessment Validation
+
+- Version: `6.61-survey-indirect-assessment`
+- Schema: `0035_survey_indirect_assessment`
+- New entities: SurveyTemplate, SurveyQuestion, SurveyQuestionTarget, SurveyCampaign, SurveyResponse, SurveyAnswer.
+- Survey audiences: student, graduate, employer, external stakeholder, faculty, course evaluation, program evaluation.
+- Target links: Program Outcome, PEA, quality/accreditation criterion.
+- Anonymous data rule: respondent key hash and respondent metadata are empty for anonymous campaigns.
+- Identified duplicate guard: SHA-256 respondent-key hash per campaign.
+- Public campaign endpoints require an opaque token and open/date-valid campaign.
+- Direct + indirect evidence mix is transparent and keeps channels separate; combined score requires both channels.
+- Target 6.61 tests: 3/3 PASS.
+- Full regression: 215/215 PASS via isolated test groups.
+  - Group 1: 41/41
+  - Group 2: 40/40
+  - Group 3: 57/57
+  - Group 4A: 27/27
+  - Group 4B: 50/50
+- Fresh migration `0001 -> 0035_survey_indirect_assessment`: PASS.
+- Upgrade `0034_generic_assessment_rubric -> 0035_survey_indirect_assessment`: PASS.
+- Classic Scan acceptance: PASS.
+- Legacy Classic Scan acceptance: PASS.
+- Complete Assessment Engine acceptance: PASS.
+- Lifecycle acceptance: PASS.
+- Pilot UAT: 41/41 PASS (`accreditation_ready=true`).
