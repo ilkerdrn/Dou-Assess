@@ -158,7 +158,7 @@ de0f7c48a94fe392c9dbb148d21fa51bdd8cd50c346ce08ad3486291907da540  ./app/services
 e2b5bc778d63d6e6f37f8296be0be74c4f4ff3c5d431f756a4b000e478a0a5e8  ./app/services/quality360.py
 bf4a8d9a73e059a840b34d654589c8f362d9c560f7519d5c98665151e01bae67  ./app/services/question_bank_import.py
 b52274b3d052558c9ed977a5f6389ebd7d67c775f045c3a5b549a702d70a06e5  ./app/services/scan.py
-162129d962a02c96a91daa27acf23c98ed05d11abc43e34dea6b8260d2b872f3  ./app/static/app.js
+18f564849984a2a8e008b1142749ceb5a8f532df9ded38f14ca5cc32cf55a623  ./app/static/app.js
 bb5acf25d3a99146eb0d84137ee8e479c61e3c45ff3a9a1a0b1caa1ce53472c5  ./app/static/dou-logo.png
 e3a2d3ed28c4655379a389584cf355daee127a697a66c4848dfaa5621f1e2c6f  ./app/static/evaluator.css
 2dfd7be9e5a3e175675783c422b3eeec11d698ccf340ecbec6e51fadacbe1bd3  ./app/static/evaluator.html
@@ -168,11 +168,11 @@ a1fba9b1b21510780f3e5fbf8d1c679ee2437ccac06a0952b34980b060804c52  ./app/static/e
 1a6bd8cc7d91581b7433a815396ad0c13f60c1f6121c0b1e7c628961ad1802eb  ./app/static/examples/DOU-Assess-Bilgisayar-Teknolojisi-Soru-Havuzu-72-Soru.xlsx
 5823fc53b1e688db96d13c2374c4816ae39016af2bb0dbf140f2f92f83ffbeaf  ./app/static/examples/DOU-Assess-Pilot-Veri-DEMO.xlsx
 9823447242e704c215ea968b3ed19ffc97bd019e77c2b120cc27a7f0321a298c  ./app/static/examples/DOU-Assess-Soru-Havuzu-Sablonu.xlsx
-71974a3a6a4d8452fffa6b1af93f50bd729e88ac0d1b3271a9bc307c88dac595  ./app/static/index.html
+d6b527a329af7580a4d22c0b1d84771c620e4292f7de20291cf6cf942c8dea60  ./app/static/index.html
 1f4e870a12d51061ef5e824fa78a89038d319bceadb3487b3447316b4bc78e3b  ./app/static/modules/assessment-engine.js
 8b349f581d464e4d38ef98a029800c0e3815d1f0f594000b2090fedbdc8f0c49  ./app/static/question-bank-hotfix-6401.js
 8cd2bfa65c6c0c2701a1e4a76cdf9a45f80dc4e447d16dc6d4eb971bca8ccb9e  ./app/static/runtime-core.js
-55e9b95dbe5e2f379cb8564b9eeea10cc4c0a169263bba1c62e93ea3417322eb  ./app/static/styles.css
+b15fa04cedd8fd982d483d4f5f49670af3a379d7710a45803db09ca85f4d8a1f  ./app/static/styles.css
 b9a1516941341e3f579a51e9b22cafe855554c904d1ba342bd717ebf4843e3ea  ./app/survey_api.py
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./app/tools/__init__.py
 9f9cfa7990265ae93cb6ed3445d3f1c302020baf22832f0e1924213d32f6a46f  ./app/tools/generate_omr_fixture.py

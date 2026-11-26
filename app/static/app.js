@@ -1732,7 +1732,8 @@ async function loadQualityEscalations(){
     const data=await api('GET',`/api/quality360/escalations?academic_year=${encodeURIComponent(year)}`),s=data.summary||{},items=data.items||[];
     const badge=document.getElementById('qualityEscalationCount');if(badge)badge.textContent=`${Number(s.overdue_count||0)} gecikme`;
     if(sumBox)sumBox.innerHTML=[[s.overdue_count||0,'Geciken'],[s.due_soon_count||0,'7 gün içinde'],[s.unscheduled_count||0,'Terminsiz'],[s.institutional_escalation_count||0,'Kurumsal eskalasyon']].map(x=>`<div><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join('');
-    if(!items.length){box.innerHTML='<div class="empty-state success-state"><b>Takip bekleyen kalite aksiyonu yok.</b><span>Açık PUKÖ terminleri kontrol altında.</span></div>';return;}
+    if(!items.length){box.innerHTML='<div class="empty-state success-state"><b>Takip bekleyen kalite aksiyonu yok.</b><span>Açık PUKÖ terminleri kontrol altında.</span></div>';setSectionCollapsed('qualityEscalation',true);return;}
+    setSectionCollapsed('qualityEscalation',false);
     box.innerHTML=items.slice(0,12).map(x=>{const state=x.escalation_state||'due_soon',lvl=Number(x.escalation_level||0);return `<article class="quality-escalation-row ${esc(state)} level-${lvl}"><div class="quality-escalation-level"><span>${state==='overdue'?`L${lvl}`:state==='due_soon'?'Yakın':'Termin'}</span></div><div class="quality-escalation-copy"><div class="quality-escalation-title"><b>${esc(x.program_name)}</b><small>${esc(x.faculty||'')} ${x.department?'· '+esc(x.department):''}</small></div><h4>${esc(x.title)}</h4><p>${esc(x.recommended_action)}</p><div class="quality-escalation-meta"><span><small>Ölçüt</small><b>${esc(x.criterion_code)}</b></span><span><small>Sorumlu</small><b>${esc(x.owner||'Atanmamış')}</b></span><span><small>Sonraki seviye</small><b>${esc(x.next_role)}</b></span><span><small>Termin</small><b>${esc(x.due_date||'Belirlenmedi')}</b></span></div></div><div class="quality-escalation-age"><b>${state==='overdue'?`${x.days_overdue} gün`:(state==='due_soon'?`${x.days_remaining} gün`:'—')}</b><span>${esc(x.label)}</span><button type="button" class="ghost compact" data-quality-program="${x.program_id}">Programı aç</button></div></article>`}).join('');
     box.querySelectorAll('[data-quality-program]').forEach(btn=>btn.addEventListener('click',()=>{const pid=Number(btn.dataset.qualityProgram);const sel=document.getElementById('q360Program');if(sel&&pid){sel.value=String(pid);Promise.all([loadQuality360(),loadQualityFrameworkRoute(),loadQualityActions()]);sel.scrollIntoView({behavior:'smooth',block:'center'});}}));
   }catch(e){box.innerHTML=`<div class="empty-state"><b>Eskalasyon kuyruğu hazırlanamadı.</b><span>${esc(e.message)}</span></div>`;}
@@ -1743,7 +1744,8 @@ async function loadQualityActions(){
   try{
     const data=await api('GET',`/api/quality360/programs/${pid}/action-recommendations?academic_year=${encodeURIComponent(year)}${fw?`&framework_id=${fw}`:''}`);
     const proposals=data.proposals||[], badge=document.getElementById('qualityActionCount');if(badge)badge.textContent=`${proposals.length} öneri`;
-    if(!proposals.length){box.innerHTML='<div class="empty-state success-state"><b>Kritik kalite aksiyonu görünmüyor.</b><span>Ölçütler hedef aralıkta. Dönemsel izlemeye devam edin.</span></div>';return;}
+    if(!proposals.length){box.innerHTML='<div class="empty-state success-state"><b>Kritik kalite aksiyonu görünmüyor.</b><span>Ölçütler hedef aralıkta. Dönemsel izlemeye devam edin.</span></div>';setSectionCollapsed('qualityAction',true);return;}
+    setSectionCollapsed('qualityAction',false);
     box.innerHTML=proposals.slice(0,8).map((x,i)=>`<article class="quality-action-card ${esc(x.severity)}"><div class="quality-action-top"><span class="quality-action-severity">${x.severity==='critical'?'Kritik':x.severity==='high'?'Yüksek':'İzle'}</span><span>${esc(x.framework_family)} · ${esc(x.criterion_code)} · %${Math.round(Number(x.score||0))}</span></div><div class="quality-action-copy"><h4>${esc(x.title)}</h4><p>${esc(x.why)}</p></div><div class="quality-action-meta"><span><small>Sorumlu</small><b>${esc(x.owner_role)}</b></span><span><small>Önerilen termin</small><b>${esc(x.suggested_due_date)}</b></span><span><small>Beklenen kanıt</small><b>${esc((x.expected_evidence||[])[0]||'Kalite kanıtı')}</b></span></div><details><summary>Neden önerildi?</summary><ul>${(x.gap_signals||[]).map(g=>`<li>${esc(g)}</li>`).join('')}</ul></details><button type="button" class="primary compact" data-quality-action-index="${i}">PUKÖ olarak başlat</button></article>`).join('');
     box.querySelectorAll('[data-quality-action-index]').forEach(btn=>btn.addEventListener('click',async()=>{const x=proposals[Number(btn.dataset.qualityActionIndex)];if(!x)return;btn.disabled=true;try{await api('POST','/api/quality360/action-recommendations/accept',{program_id:x.program_id,academic_year:x.academic_year,framework_id:x.framework_id,criterion_code:x.criterion_code,title:x.title,owner:x.owner_role,due_date:x.suggested_due_date,plan_text:x.plan_text,do_text:x.do_text,check_text:x.check_text,act_text:x.act_text,expected_evidence:x.expected_evidence||[]});toast('Kalite aksiyonu PUKÖ döngüsü olarak başlatıldı.');await Promise.all([loadQualityActions(),loadQuality360(),loadQualityExecutive()]);}catch(e){toast(e.message,'error');btn.disabled=false;}}));
   }catch(e){box.innerHTML=`<div class="empty-state"><b>Aksiyon önerileri hazırlanamadı.</b><span>${esc(e.message)}</span></div>`;}
@@ -2133,6 +2135,16 @@ document.getElementById('pilotUserSelect').addEventListener('change',e=>{localSt
 document.getElementById('loginPilotBtn')?.addEventListener('click',()=>{const email=document.getElementById('loginPilotUser')?.value;if(!email)return;localStorage.setItem('douPilotUser',email);localStorage.setItem('douPilotSession','1');location.reload();});
 document.getElementById('loginPilotUser')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPilotBtn')?.click();});
 document.getElementById('logoutBtn')?.addEventListener('click',()=>{localStorage.removeItem('douPilotSession');sessionStorage.removeItem('douEntraAccessToken');location.reload();});
+function setSectionCollapsed(key,collapsed){
+  const section=document.querySelector(`[data-collapsible="${key}"]`);const btn=document.querySelector(`[data-collapse-toggle="${key}"]`);
+  if(!section)return;
+  section.classList.toggle('is-collapsed',collapsed);
+  if(btn){btn.textContent=collapsed?'Göster':'Gizle';btn.setAttribute('aria-expanded',String(!collapsed));}
+}
+document.querySelectorAll('.section-collapse-toggle').forEach(btn=>btn.addEventListener('click',()=>{
+  const key=btn.dataset.collapseToggle;const section=document.querySelector(`[data-collapsible="${key}"]`);
+  setSectionCollapsed(key,!section?.classList.contains('is-collapsed'));
+}));
 document.getElementById('entraLoginBtn')?.addEventListener('click',()=>startEntraLogin().catch(e=>toast(e.message,'error')));
 document.getElementById('obsLoginBox')?.addEventListener('submit',async ev=>{
   ev.preventDefault();
