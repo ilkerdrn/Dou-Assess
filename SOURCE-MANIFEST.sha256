@@ -172,7 +172,7 @@ a1fba9b1b21510780f3e5fbf8d1c679ee2437ccac06a0952b34980b060804c52  ./app/static/e
 1f4e870a12d51061ef5e824fa78a89038d319bceadb3487b3447316b4bc78e3b  ./app/static/modules/assessment-engine.js
 8b349f581d464e4d38ef98a029800c0e3815d1f0f594000b2090fedbdc8f0c49  ./app/static/question-bank-hotfix-6401.js
 8cd2bfa65c6c0c2701a1e4a76cdf9a45f80dc4e447d16dc6d4eb971bca8ccb9e  ./app/static/runtime-core.js
-5b0729350486a29b016e68efe76e8fa3f54103479165e54820065883828a3cdb  ./app/static/styles.css
+55e9b95dbe5e2f379cb8564b9eeea10cc4c0a169263bba1c62e93ea3417322eb  ./app/static/styles.css
 b9a1516941341e3f579a51e9b22cafe855554c904d1ba342bd717ebf4843e3ea  ./app/survey_api.py
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./app/tools/__init__.py
 9f9cfa7990265ae93cb6ed3445d3f1c302020baf22832f0e1924213d32f6a46f  ./app/tools/generate_omr_fixture.py
