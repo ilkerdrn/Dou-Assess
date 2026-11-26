@@ -46,10 +46,16 @@ Beklenen schema: `0031_medek_final_decision`
 
 ## 6. Backup / restore
 ```bash
+export BACKUP_ENCRYPTION_KEY="$(openssl rand -base64 48)"   # bir kez üret, güvenli bir sırlar yöneticisinde (örn. Vault/KMS) sakla, her yedekte aynısını kullan
 bash Backup-Server.sh
 CONFIRM_RESTORE=YES bash Restore-Server.sh /path/to/backup
 ```
 Restore işlemi destructive olduğu için explicit `CONFIRM_RESTORE=YES` ister.
+
+`BACKUP_ENCRYPTION_KEY` olmadan `Backup-Server.sh` **başarısız olur** — `.env` ve `secrets/` (DB parolası dahil) artık şifresiz yedeklenmiyor, `secrets-and-env.tar.enc` olarak AES-256 ile şifreleniyor. Felaket kurtarma için geri açma:
+```bash
+openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENCRYPTION_KEY -in secrets-and-env.tar.enc | tar -xf -
+```
 
 ## 7. Sunucuya çıkmadan doldurulması zorunlu dış bağımlılıklar
 - Gerçek Microsoft Entra tenant/client/audience/scope/redirect bilgileri
