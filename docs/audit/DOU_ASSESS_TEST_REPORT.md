@@ -1,19 +1,30 @@
 # DOU Assess – Test Raporu
 
-**Denetlenen kaynak:** `ilkerdrn/Dou-Assess` @ `e98e723` (kullanıcının yüklediği `DOU-Assess-6.70.3-SIMPLE-PANEL-FULL.zip`)
+**Denetlenen kaynak:** `ilkerdrn/Dou-Assess` @ `e6d20d0` (başlangıç: kullanıcının yüklediği `DOU-Assess-6.70.3-SIMPLE-PANEL-FULL.zip`, commit `e98e723`)
 **Tarih:** 2026-11-26
 **Ortam:** Claude Code bulut konteyneri, Linux, Python 3.13.18, SQLite (test varsayılanı), Chromium 1243 (Playwright 1.57.0). **Production sunucusu ve PostgreSQL bu ortamda YOK.**
 
 > Bu rapordaki her sonuç aşağıdaki komutlarla bu oturumda gerçekten çalıştırılmıştır. Çalıştırılmayanlar açıkça `NOT_VERIFIED` işaretlidir.
 
-## 1. Çalıştırılan testler
+## 0. Güncelleme — denetim sonrası düzeltmeler uygulandı
+
+İlk denetimde (commit `e98e723`) 259/263 pytest + 0/2 E2E PASS idi (aşağıdaki §1-2 o anı belgeler). Denetim sonrasında aynı oturumda **gerçek kök nedenler bulunup düzeltildi** (commit `e6d20d0`):
+
+- **Kritik, üretim etkili CSS hatası:** `.login-gate{display:grid!important}` (6.70.1 hotfix) ile jenerik `.hidden{display:none!important}` kuralı aynı özgüllükte çakışıyordu; dosyada daha sonra gelen kural kazandığı için **giriş ekranı başarılı login sonrasında asla kapanmıyor, tüm uygulamayı z-index:1000 ile kaplıyordu**. `.login-gate.hidden{display:none!important}` (daha yüksek özgüllük) eklenerek düzeltildi — `app/static/styles.css`.
+- **CSP ihlali (23+3 nokta):** `app/static/app.js` ve `app/static/index.html` içinde dinamik yüzde/skor çubukları `style="width:${x}%"` gibi satır-içi stil öznitelikleriyle render ediliyordu; production CSP'si (`style-src 'self'`, `unsafe-inline` yok) bunları **sessizce engelliyordu** — yani ilerleme çubukları, başarı yüzdeleri, sağlık skorları gerçekte hiç görünmüyordu. `data-style` + `MutationObserver` tabanlı CSSOM hydration mekanizmasıyla düzeltildi (CSSOM `.style.x=` yazımları CSP style-src'den etkilenmiyor, doğrulandı).
+- **`/favicon.ico` 404:** `<link rel="icon">` eksikti; mevcut logo favicon olarak bağlandı.
+- 4 eski pytest sözleşme testi ve 2 E2E testi, 6.70.3'ün kasıtlı menü/metin değişikliklerine göre güncellendi (bkz. §2).
+
+**Düzeltme sonrası sonuç: 263/263 pytest PASS, 2/2 E2E PASS.** Komutlar ve kanıtlar aynen aşağıda; §2'deki kök-neden analizi hâlâ geçerli ve önemli (ileride benzer hatalar için).
+
+## 1. Çalıştırılan testler (ilk tarama, commit `e98e723`)
 
 | # | Test | Komut | Sonuç |
 |---|---|---|---|
-| T1 | Backend unit/integration/API (SQLite) | `.venv/bin/python -m pytest tests/ -q` | **259 PASS / 4 FAIL** (263 test, ~42 sn). İki ayrı çalıştırmada aynı sonuç (tekrarlanabilir). |
-| T2 | Tarayıcı E2E (Playwright/Chromium) | `.venv/bin/python -m pytest e2e/ -q` | **0 PASS / 2 FAIL** |
-| T3 | Bağımlılık kurulumu (belgelenen yol) | `pip install -r requirements.txt -r requirements-dev.lock` | **BAŞARISIZ DEĞİL ama eksik:** `bs4` hiçbir lock dosyasında yok → 3 test dosyası `ModuleNotFoundError` ile toplanamadı. `pip install beautifulsoup4` sonrası T1 çalıştı. |
-| T4 | Kaynak bütünlük manifesti | `sha256sum -c SOURCE-MANIFEST.sha256` | **4 uyuşmazlık:** `app/static/app.js`, `index.html`, `styles.css` (+ benim eklediğim `.gitignore`); 3 `data/*/.gitkeep` dosyası pakette yok. |
+| T1 | Backend unit/integration/API (SQLite) | `.venv/bin/python -m pytest tests/ -q` | **259 PASS / 4 FAIL** (263 test, ~42 sn). İki ayrı çalıştırmada aynı sonuç (tekrarlanabilir). **Düzeltme sonrası: 263/263 PASS.** |
+| T2 | Tarayıcı E2E (Playwright/Chromium) | `.venv/bin/python -m pytest e2e/ -q` | **0 PASS / 2 FAIL.** **Düzeltme sonrası: 2/2 PASS.** |
+| T3 | Bağımlılık kurulumu (belgelenen yol) | `pip install -r requirements.txt -r requirements-dev.lock` | **BAŞARISIZ DEĞİL ama eksik:** `bs4` hiçbir lock dosyasında yok → 3 test dosyası `ModuleNotFoundError` ile toplanamadı. `pip install beautifulsoup4` sonrası T1 çalıştı. **Henüz düzeltilmedi** — `requirements-dev.lock`'a eklenmeli. |
+| T4 | Kaynak bütünlük manifesti | `sha256sum -c SOURCE-MANIFEST.sha256` | **4 uyuşmazlık:** `app/static/app.js`, `index.html`, `styles.css` (+ benim eklediğim `.gitignore`); 3 `data/*/.gitkeep` dosyası pakette yok. Düzeltmeler bu dosyaları ayrıca değiştirdiği için manifest artık daha da eski; **manifest yeniden üretilmeli.** |
 
 ## 2. Başarısız testler ve kök neden
 
@@ -23,10 +34,10 @@
 | `test_642_action_center_and_student_workspace_contract` | `'ACTION CENTER · EKSİKLERİM'` yok | Aynı |
 | `test_operations_ux::test_6161_grouped_navigation…` | `'Çalışma Alanım'` yok | Aynı (index.html'de grup adı artık "Ders & Sınav") |
 | `test_operations_ux::test_617_final_product_information_architecture…` | `'Çalışma Alanım'` yok | Aynı |
-| `e2e/test_question_bank_browser.py` | `button[data-page="bank"]` **görünür değil**, 30 sn timeout | `app/static/app.js:2007-2012`: nav grupları yalnızca `instructor` rolü (Ders & Sınav) veya `qualityOnly` için açık bırakılıyor. E2E pilot **admin** ile girdiği için tüm gruplar kapalı → "Soru Bankası" gizli. |
-| `e2e/test_critical_navigation_browser.py` | `button[data-page="data"]` bulunamadı/görünmez | Aynı mekanizma + `data-page="data"` düğmesi `index.html`'de statik yok |
+| `e2e/test_question_bank_browser.py` | `button[data-page="bank"]` **görünür değil**, 30 sn timeout | **Gerçek kök neden (ilk hipotezim yanlıştı — düzeltiyorum):** `workspaceNavGroup` admin için de varsayılan açık; sorun nav grubu değil, **giriş ekranının hiç kapanmaması** (bkz. §0). `data-page="data"` düğmesi de 6.70.3'te kaldırılmış, yerine `programs`/`courses`/`students` ayrı düğmeleri geldi (test eski seçiciyi kullanıyordu). |
+| `e2e/test_critical_navigation_browser.py` | `button[data-page="data"]` bulunamadı/görünmez | Aynı — giriş ekranı CSS hatası + kaldırılmış `data-page="data"` düğmesi |
 
-**Sonuç:** 6.70.3, **tam regresyon çalıştırılmadan** yayınlanmış. `SIMPLE-PANEL-6.70.3.md` yalnızca "Focused regression: 17/17 PASS" bildiriyor; `CHANGELOG.md` 6.70 için "253/253 PASS" diyordu. Gerçekte 6.70.3 kodunda tam suite 4 regresyon + 2 E2E kırığı içeriyor. Bu kırıklar uygulamanın çalışmadığı anlamına gelmez (API testleri geçiyor); **admin kullanıcı için ana iş akışına ek tıklama gerektiren bir UX değişikliği** ve güncellenmemiş test sözleşmeleridir.
+**Sonuç (güncellenmiş):** 6.70.3, **tam regresyon çalıştırılmadan** yayınlanmış. `SIMPLE-PANEL-6.70.3.md` yalnızca "Focused regression: 17/17 PASS" bildiriyor; `CHANGELOG.md` 6.70 için "253/253 PASS" diyordu. 4 pytest regresyonu gerçekten yalnızca **isim değişikliği** kaynaklıydı (test güncellenmemiş, uygulama doğru). 2 E2E kırığı ise görünürde "6.70.3 regresyonu" gibi duruyordu ama kök neden araştırıldığında **6.70.1'den kalma, önceden fark edilmemiş kritik bir CSS hatası** (login ekranı asla kapanmıyor) ve **CSP ile satır-içi stillerin sessizce engellenmesi** (23+3 nokta — tüm dinamik ilerleme çubukları/skor göstergeleri gerçekte render olmuyordu) olduğu ortaya çıktı. Üçü de bu oturumda düzeltildi (bkz. §0).
 
 ## 3. Ortama bağlı / taşınabilirlik sorunları
 
