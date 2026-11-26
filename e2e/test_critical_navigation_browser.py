@@ -76,7 +76,7 @@ def test_academic_program_review_and_evidence_hub_navigation() -> None:
                 tpl=c.post('/api/program-review/templates',json={'code':'E2E-PR','version':'1.0','title':'E2E Program Review','sections':[{'key':'profile','title':'Program Profili','guidance':'Test'}]}); assert tpl.status_code==201,tpl.text
                 rv=c.post(f'/api/programs/{pid}/program-reviews',json={'template_id':tpl.json()['id'],'academic_year':'2026-2027','title':'E2E Review','owner':'e2e-admin@local'}); assert rv.status_code==201,rv.text
             with sync_playwright() as pw:
-                browser=pw.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage'])
+                browser=pw.chromium.launch(headless=True,executable_path=os.environ.get('PLAYWRIGHT_CHROMIUM_PATH') or None,args=['--no-sandbox','--disable-dev-shm-usage'])
                 page=browser.new_page(viewport={'width':1440,'height':1000}); errors=[]
                 page.on('console',lambda msg: errors.append(msg.text) if msg.type=='error' else None)
                 page.add_init_script(

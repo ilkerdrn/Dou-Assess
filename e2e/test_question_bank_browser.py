@@ -144,7 +144,7 @@ def test_question_bank_create_end_to_end() -> None:
             with sync_playwright() as p:
                 browser = p.chromium.launch(
                     headless=True,
-                    executable_path="/usr/bin/chromium",
+                    executable_path=os.environ.get("PLAYWRIGHT_CHROMIUM_PATH") or None,
                     args=["--no-sandbox", "--disable-dev-shm-usage"],
                 )
                 page = browser.new_page(viewport={"width": 1440, "height": 1000})
