@@ -1,5 +1,7 @@
 import base64
+import json
 from dataclasses import replace
+from urllib.parse import urlsplit, parse_qs
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +13,27 @@ from app.services import obs_proliz
 Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
 client = TestClient(app)
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes):
+        self._payload = payload
+
+    def read(self) -> bytes:
+        return self._payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _mock_urlopen(captured: list, body: object):
+    def _urlopen(req, timeout=None):
+        captured.append(req)
+        return _FakeResponse(json.dumps(body).encode("utf-8"))
+    return _urlopen
 
 
 def test_671_auth_header_requires_credentials(monkeypatch):
@@ -76,3 +99,32 @@ def test_671_probe_failure_records_failed_sync_run(monkeypatch):
 
     runs = client.get("/api/integrations/sync-runs", params={"limit": 5}).json()
     assert any(x["provider"] == "obs-proliz" and x["status"] == "failed" for x in runs)
+
+
+def test_671_check_akademik_user_sends_credentials_as_query_params(monkeypatch):
+    monkeypatch.setattr(obs_proliz, "settings", replace(obs_proliz.settings, obs_proliz_username="svc", obs_proliz_password="svc-pass"))
+    captured: list = []
+    monkeypatch.setattr(obs_proliz.urlrequest, "urlopen", _mock_urlopen(captured, True))
+    result = obs_proliz.check_akademik_user("teacher@dogus.edu.tr", "teacher-pass")
+    assert result is True
+    assert len(captured) == 1
+    req = captured[0]
+    parsed = urlsplit(req.full_url)
+    qs = parse_qs(parsed.query)
+    assert qs["userName"] == ["teacher@dogus.edu.tr"]
+    assert qs["Pass"] == ["teacher-pass"]
+    # The service account authenticates the call itself; it must not leak into the URL.
+    assert "svc-pass" not in req.full_url
+    assert req.headers["Authorization"].startswith("Basic ")
+
+
+def test_671_fetch_akademisyen_verdigi_dersi_alan_ogrenci_builds_expected_query(monkeypatch):
+    monkeypatch.setattr(obs_proliz, "settings", replace(obs_proliz.settings, obs_proliz_username="svc", obs_proliz_password="svc-pass"))
+    captured: list = []
+    monkeypatch.setattr(obs_proliz.urlrequest, "urlopen", _mock_urlopen(captured, [{"OgrenciNo": "20260001"}]))
+    result = obs_proliz.fetch_akademisyen_verdigi_dersi_alan_ogrenci("12345678901", donem_id="2026-2027-Guz", ders_id="BLP1001")
+    assert result == [{"OgrenciNo": "20260001"}]
+    qs = parse_qs(urlsplit(captured[0].full_url).query)
+    assert qs["Tck"] == ["12345678901"]
+    assert qs["DonemId"] == ["2026-2027-Guz"]
+    assert qs["DersId"] == ["BLP1001"]

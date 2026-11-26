@@ -85,6 +85,21 @@ def fetch_akademisyen_verdigi_ders(tck: str, donem_id: str | None = None) -> obj
     return _get("/Obs/Genel/AkademisyenVerdigiDers", {"Tck": tck, "DonemId": donem_id})
 
 
+def fetch_akademisyen_verdigi_dersi_alan_ogrenci(tck: str, donem_id: str | None = None, ders_id: str | None = None) -> object:
+    return _get("/Obs/Genel/AkademisyenVerdigiDersiAlanOgrenci", {"Tck": tck, "DonemId": donem_id, "DersId": ders_id})
+
+
+def check_akademik_user(user_name: str, password: str) -> object:
+    """Validates a teacher's own OBS username/password against Proliz. The call
+    itself still authenticates to Proliz with the DOU Assess service account
+    (OBS_PROLIZ_USERNAME/PASSWORD); userName/Pass here are the teacher's own
+    credentials being checked, passed as Proliz's contract requires.
+    NOTE: response shape is unconfirmed (undocumented in swagger) — do not
+    build login/session logic on this until a real sample response has been
+    inspected (see /api/auth/obs-login design note)."""
+    return _get("/Obs/Genel/AkademikUserCheck", {"userName": user_name, "Pass": password})
+
+
 def fetch_durumu_degisen_akademisyen(degisiklik_baslangic_tarihi: str) -> object:
     return _get("/Obs/Genel/DurumuDegisenAkademisyen", {"degisilikBaslangicTarihi": degisiklik_baslangic_tarihi})
 
