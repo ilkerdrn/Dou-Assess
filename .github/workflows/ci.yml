@@ -26,7 +26,9 @@ jobs:
         run: python -m pytest tests/ -q
 
   e2e-tests:
-    runs-on: ubuntu-latest
+    # Playwright 1.57 does not yet support Ubuntu 26.04, which ubuntu-latest now
+    # resolves to; pin to the LTS version it officially supports.
+    runs-on: ubuntu-24.04
     needs: backend-tests
     steps:
       - uses: actions/checkout@v4
