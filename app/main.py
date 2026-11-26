@@ -47,6 +47,7 @@ from .services.scan import ScanError, analyze_page, decode_upload, iter_decode_u
 from .services.accreditation import freeze_representatives, freeze_period_representatives, period_dashboard, representative_rows, sync_period_exams
 from .services.quality import quality_dashboard as build_quality_dashboard, course_quality_drilldown, course_lineage_analytics
 from .services.integrity import scan_evidence_integrity
+from .services import obs_proliz
 from .quality360_api import router as quality360_router
 from .compliance_api import router as compliance_router
 from .academic_structure_api import router as academic_structure_router
@@ -3849,6 +3850,33 @@ def integration_sync_runs(limit: int = 50, db: Session = Depends(get_db)):
         "id": x.id, "provider": x.provider, "filename": x.filename, "mode": x.mode, "source_sha256": x.source_sha256,
         "status": x.status, "summary": x.summary or {}, "created_at": x.created_at.isoformat() if x.created_at else None,
     } for x in rows]
+
+
+@app.get("/api/integrations/obs/proliz/status")
+def proliz_status():
+    require_roles("admin")
+    return {
+        "enabled": settings.obs_proliz_enabled,
+        "base_url": settings.obs_proliz_base_url,
+        "username_configured": bool(settings.obs_proliz_username),
+        "password_configured": bool(settings.obs_proliz_password),
+    }
+
+
+@app.get("/api/integrations/obs/proliz/probe")
+def proliz_probe(endpoint: str = "akademik_donem", db: Session = Depends(get_db)):
+    require_roles("admin")
+    if not settings.obs_proliz_enabled:
+        raise HTTPException(503, "OBS_PROLIZ_ENABLED=false; Proliz entegrasyonu kapalı")
+    try:
+        data = obs_proliz.probe(endpoint)
+    except obs_proliz.ProlizError as exc:
+        run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"probe-{endpoint}", mode="probe", source_sha256="n/a", status="failed", summary={"error": str(exc)[:500]})
+        db.add(run); db.flush(); audit(db, "obs_proliz_probe_failed", "integration_sync_run", run.id, {"endpoint": endpoint, "error": str(exc)[:500]}); _commit(db)
+        raise HTTPException(502, str(exc)) from exc
+    run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"probe-{endpoint}", mode="probe", source_sha256="n/a", status="success", summary={"endpoint": endpoint})
+    db.add(run); db.flush(); audit(db, "obs_proliz_probe", "integration_sync_run", run.id, {"endpoint": endpoint}); _commit(db)
+    return {"endpoint": endpoint, "data": data}
 
 
 @app.post("/api/integrations/obs/workbook/validate")

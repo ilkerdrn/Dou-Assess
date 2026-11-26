@@ -83,6 +83,13 @@ class Settings:
     obs_results_token: str = _secret("OBS_RESULTS_TOKEN", "")
     obs_results_timeout_seconds: int = int(os.getenv("OBS_RESULTS_TIMEOUT_SECONDS", "15"))
 
+    # Proliz OBS read-only academic data pull (DogusAPI, HTTP Basic Auth).
+    obs_proliz_enabled: bool = _bool("OBS_PROLIZ_ENABLED", False)
+    obs_proliz_base_url: str = os.getenv("OBS_PROLIZ_BASE_URL", "https://portalapi.dogus.edu.tr").strip().rstrip("/")
+    obs_proliz_username: str = _secret("OBS_PROLIZ_USERNAME", "")
+    obs_proliz_password: str = _secret("OBS_PROLIZ_PASSWORD", "")
+    obs_proliz_timeout_seconds: int = int(os.getenv("OBS_PROLIZ_TIMEOUT_SECONDS", "20"))
+
     rate_limit_enabled: bool = _bool("RATE_LIMIT_ENABLED", _env_is_production())
     api_rate_limit_per_minute: int = int(os.getenv("API_RATE_LIMIT_PER_MINUTE", "600"))
     upload_rate_limit_per_minute: int = int(os.getenv("UPLOAD_RATE_LIMIT_PER_MINUTE", "30"))
