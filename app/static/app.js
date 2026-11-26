@@ -1941,9 +1941,9 @@ document.addEventListener('keydown',e=>{if(e.altKey&&e.key.toLowerCase()==='n'){
 async function loadIdentity(){
   state.authConfig=await api('GET','/api/auth/config');
   applyObsIntegrationPolicy();
-  const pilotBox=document.getElementById('pilotLoginBox');const entraBox=document.getElementById('entraLoginBox');
+  const pilotBox=document.getElementById('pilotLoginBox');const entraBox=document.getElementById('entraLoginBox');const obsBox=document.getElementById('obsLoginBox');
   if(!state.authConfig.auth_required){
-    pilotBox?.classList.remove('hidden');entraBox?.classList.add('hidden');
+    pilotBox?.classList.remove('hidden');entraBox?.classList.add('hidden');obsBox?.classList.add('hidden');
     try{state.pilotUsers=await api('GET','/api/auth/pilot-users');}
     catch(e){localStorage.removeItem('douPilotUser');state.pilotUsers=await api('GET','/api/auth/pilot-users');}
     const saved=localStorage.getItem('douPilotUser');
@@ -1957,8 +1957,11 @@ async function loadIdentity(){
       return false;
     }
     localStorage.setItem('douPilotUser',chosen);
+  }else if(state.authConfig.auth_provider==='obs'){
+    pilotBox?.classList.add('hidden');entraBox?.classList.add('hidden');obsBox?.classList.remove('hidden');
+    if(!sessionStorage.getItem('douEntraAccessToken')){showLoginGate();return false;}
   }else{
-    pilotBox?.classList.add('hidden');entraBox?.classList.remove('hidden');
+    pilotBox?.classList.add('hidden');entraBox?.classList.remove('hidden');obsBox?.classList.add('hidden');
     if(!sessionStorage.getItem('douEntraAccessToken')){showLoginGate();return false;}
   }
   state.currentUser=await api('GET','/api/auth/me');
@@ -2131,6 +2134,24 @@ document.getElementById('loginPilotBtn')?.addEventListener('click',()=>{const em
 document.getElementById('loginPilotUser')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPilotBtn')?.click();});
 document.getElementById('logoutBtn')?.addEventListener('click',()=>{localStorage.removeItem('douPilotSession');sessionStorage.removeItem('douEntraAccessToken');location.reload();});
 document.getElementById('entraLoginBtn')?.addEventListener('click',()=>startEntraLogin().catch(e=>toast(e.message,'error')));
+document.getElementById('obsLoginBox')?.addEventListener('submit',async ev=>{
+  ev.preventDefault();
+  const errBox=document.getElementById('obsLoginError');const btn=document.getElementById('obsLoginBtn');
+  const username=document.getElementById('obsLoginUsername')?.value.trim();
+  const password=document.getElementById('obsLoginPassword')?.value;
+  if(!username||!password)return;
+  errBox?.classList.add('hidden');btn.disabled=true;
+  try{
+    const r=await fetch('/api/auth/obs-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+    const data=await r.json();
+    if(!r.ok)throw new Error(msgText(data));
+    sessionStorage.setItem('douEntraAccessToken',data.access_token);
+    location.reload();
+  }catch(e){
+    if(errBox){errBox.textContent=e.message||'Giriş başarısız.';errBox.classList.remove('hidden');}
+    btn.disabled=false;
+  }
+});
 
 function studentCardStatusLabel(status){return status==='achieved'?'Hedef sağlandı':status==='not_measured'?'Ölçülmedi':'Gelişim gerekli';}
 function studentInitials(name=''){const p=String(name||'').trim().split(/\s+/).filter(Boolean);return (p.length>1?`${p[0][0]}${p[p.length-1][0]}`:(p[0]?.slice(0,2)||'Ö')).toLocaleUpperCase('tr-TR');}

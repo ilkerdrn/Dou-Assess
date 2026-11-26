@@ -153,26 +153,59 @@ def validate_entra_access_token(token: str) -> dict[str, Any]:
     return claims
 
 
+def mint_obs_session_token(user: m.AppUser) -> str:
+    if not settings.obs_jwt_secret:
+        raise HTTPException(503, "OBS_JWT_SECRET yapılandırılmamış")
+    now = datetime.now(timezone.utc)
+    claims = {
+        "sub": str(user.id),
+        "email": user.email,
+        "auth_source": "obs",
+        "iat": now,
+        "exp": now + timedelta(minutes=max(5, settings.obs_jwt_expires_minutes)),
+    }
+    return jwt.encode(claims, settings.obs_jwt_secret, algorithm="HS256")
+
+
+def validate_obs_session_token(token: str) -> dict[str, Any]:
+    if not settings.obs_jwt_secret:
+        raise HTTPException(503, "OBS_JWT_SECRET yapılandırılmamış")
+    try:
+        return jwt.decode(token, settings.obs_jwt_secret, algorithms=["HS256"], options={"require": ["exp", "iat", "sub"]})
+    except jwt.PyJWTError as exc:
+        detail = f": {exc}" if settings.app_env == "pilot" else ""
+        raise HTTPException(401, f"OBS oturum belirteci geçersiz{detail}")
+
+
 def resolve_request_user(db: Session, request: Request) -> dict[str, Any]:
     if settings.auth_required:
-        if settings.auth_provider != "entra":
-            raise HTTPException(503, "AUTH_REQUIRED açık ancak AUTH_PROVIDER=entra değil")
-        auth = request.headers.get("Authorization", "")
-        if not auth.lower().startswith("bearer "):
-            raise HTTPException(401, "Bearer access token gerekli")
-        claims = validate_entra_access_token(auth.split(" ", 1)[1].strip())
-        oid = str(claims["oid"])
-        tid = str(claims["tid"])
-        email = str(claims.get("preferred_username") or claims.get("email") or claims.get("upn") or "").strip().lower()
-        user = db.scalar(select(m.AppUser).where(m.AppUser.external_object_id == oid, m.AppUser.tenant_id == tid))
-        if not user and settings.entra_auto_link_by_email and email:
-            user = db.scalar(select(m.AppUser).where(m.AppUser.email == email))
-            if user and not user.external_object_id:
-                user.external_object_id = oid
-                user.tenant_id = tid
-                user.auth_source = "entra"
-        if not user:
-            raise HTTPException(403, "Bu Microsoft hesabı DOU Assess kullanıcısı olarak yetkilendirilmemiş")
+        if settings.auth_provider == "entra":
+            auth = request.headers.get("Authorization", "")
+            if not auth.lower().startswith("bearer "):
+                raise HTTPException(401, "Bearer access token gerekli")
+            claims = validate_entra_access_token(auth.split(" ", 1)[1].strip())
+            oid = str(claims["oid"])
+            tid = str(claims["tid"])
+            email = str(claims.get("preferred_username") or claims.get("email") or claims.get("upn") or "").strip().lower()
+            user = db.scalar(select(m.AppUser).where(m.AppUser.external_object_id == oid, m.AppUser.tenant_id == tid))
+            if not user and settings.entra_auto_link_by_email and email:
+                user = db.scalar(select(m.AppUser).where(m.AppUser.email == email))
+                if user and not user.external_object_id:
+                    user.external_object_id = oid
+                    user.tenant_id = tid
+                    user.auth_source = "entra"
+            if not user:
+                raise HTTPException(403, "Bu Microsoft hesabı DOU Assess kullanıcısı olarak yetkilendirilmemiş")
+        elif settings.auth_provider == "obs":
+            auth = request.headers.get("Authorization", "")
+            if not auth.lower().startswith("bearer "):
+                raise HTTPException(401, "Bearer oturum belirteci gerekli")
+            claims = validate_obs_session_token(auth.split(" ", 1)[1].strip())
+            user = db.scalar(select(m.AppUser).where(m.AppUser.id == int(claims["sub"])))
+            if not user:
+                raise HTTPException(403, "Kullanıcı bulunamadı")
+        else:
+            raise HTTPException(503, "AUTH_REQUIRED açık ancak AUTH_PROVIDER entra veya obs değil")
     else:
         if not getattr(settings, "pilot_auth_enabled", True):
             raise HTTPException(503, "Pilot kimlik doğrulaması bu ortamda devre dışı")

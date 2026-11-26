@@ -28,7 +28,7 @@ from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 from .db import engine, get_db, SessionLocal
 from . import models as m
 from .schemas import (
-    AddBankQuestionRequest, AddBankQuestionsBatchRequest, QuestionReorderRequest, NormalizeQuestionPointsRequest, BulkEnrollRequest, CourseCreate, CourseUpdate, ExamCreate, ExamDuplicateRequest, ExamStatusUpdate, ExamUpdate, ImprovementCreate,
+    ObsLoginRequest, AddBankQuestionRequest, AddBankQuestionsBatchRequest, QuestionReorderRequest, NormalizeQuestionPointsRequest, BulkEnrollRequest, CourseCreate, CourseUpdate, ExamCreate, ExamDuplicateRequest, ExamStatusUpdate, ExamUpdate, ImprovementCreate,
     LearningOutcomeCreate, LearningOutcomeUpdate, OutcomeMappingCreate, ProgramCreate, ProgramUpdate,
     ProgramOutcomeCreate, ProgramOutcomeUpdate, QuestionBankCreate, QuestionBankUpdate, QuestionReviewRequest, BlueprintCreate, BlueprintStatusRequest, QuestionCreate, QuestionUpdate, ResponsesSubmit, StudentCreate, StudentUpdate, ScanReviewOut, ScanReviewResolve, AnswerKeyRegradeRequest,
     AccreditationProfileCreate, AccreditationPeriodCreate, AccreditationPeriodStatusUpdate, ImprovementUpdate,
@@ -48,6 +48,7 @@ from .services.accreditation import freeze_representatives, freeze_period_repres
 from .services.quality import quality_dashboard as build_quality_dashboard, course_quality_drilldown, course_lineage_analytics
 from .services.integrity import scan_evidence_integrity
 from .services import obs_proliz
+from .services.obs_proliz_sync import ObsLoginError, teacher_login_and_sync
 from .quality360_api import router as quality360_router
 from .compliance_api import router as compliance_router
 from .academic_structure_api import router as academic_structure_router
@@ -66,7 +67,7 @@ from .authz import (
     ROLE_LABELS, VALID_ROLES, auth_config, can_access_course, can_access_program, can_manage_accreditation_program,
     current_user, has_role, require_course_access, require_exam_access, require_program_access, require_roles,
     require_student_access, require_course_management, resolve_request_user, reset_current_user, set_current_user, visible_course_ids, visible_program_ids,
-    visible_course_id_select, visible_program_id_select, ensure_period_values_writable,
+    visible_course_id_select, visible_program_id_select, ensure_period_values_writable, mint_obs_session_token,
 )
 
 enforce_production_security()
@@ -143,7 +144,7 @@ def _commit(db: Session):
 
 
 
-_PUBLIC_API = {"/api/health", "/api/ready", "/api/auth/config"}
+_PUBLIC_API = {"/api/health", "/api/ready", "/api/auth/config", "/api/auth/obs-login"}
 
 
 def _auth_error_payload(exc: HTTPException) -> JSONResponse:
@@ -685,6 +686,34 @@ def _sync_instructor_users_internal(db: Session, *, auth_source: str = "pilot") 
 @app.get("/api/auth/config")
 def auth_configuration():
     return auth_config()
+
+
+@app.post("/api/auth/obs-login")
+def obs_login(payload: ObsLoginRequest, db: Session = Depends(get_db)):
+    if settings.auth_provider != "obs":
+        raise HTTPException(503, "AUTH_PROVIDER=obs değil; bu giriş yolu kapalı")
+    if not settings.obs_proliz_enabled:
+        raise HTTPException(503, "OBS_PROLIZ_ENABLED=false; Proliz entegrasyonu kapalı")
+    username = payload.username.strip()
+    try:
+        db.rollback()
+        with db.begin():
+            user, stats = teacher_login_and_sync(db, username, payload.password, payload.donem_id)
+            audit(db, "obs_login", "app_user", user.id, {"username": username, **{k: v for k, v in stats.items() if k != "donem_id"}, "donem_id": stats.get("donem_id")})
+            run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="success", summary=stats)
+            db.add(run)
+    except ObsLoginError as exc:
+        db.rollback()
+        run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="failed", summary={"error": str(exc)[:500]})
+        db.add(run); db.flush(); audit(db, "obs_login_failed", "integration_sync_run", run.id, {"username": username, "error": str(exc)[:500]}); _commit(db)
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    except obs_proliz.ProlizError as exc:
+        db.rollback()
+        run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="failed", summary={"error": str(exc)[:500]})
+        db.add(run); db.flush(); audit(db, "obs_login_failed", "integration_sync_run", run.id, {"username": username, "error": str(exc)[:500]}); _commit(db)
+        raise HTTPException(502, str(exc)) from exc
+    token = mint_obs_session_token(user)
+    return {"access_token": token, "token_type": "bearer", "display_name": user.display_name, "email": user.email, "sync": stats}
 
 
 @app.get("/api/auth/me")

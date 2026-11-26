@@ -102,26 +102,36 @@ def production_security_issues(cfg: Settings = settings) -> list[str]:
         issues.append("Production ortamında SQLite kullanılamaz")
     if not cfg.auth_required:
         issues.append("Production ortamında AUTH_REQUIRED=true olmalıdır")
-    if cfg.auth_provider != "entra":
-        issues.append("Production ortamında AUTH_PROVIDER=entra olmalıdır")
-    if not cfg.entra_tenant_id:
-        issues.append("ENTRA_TENANT_ID zorunludur")
-    if not cfg.entra_client_id:
-        issues.append("ENTRA_CLIENT_ID zorunludur")
-    if not cfg.entra_audience:
-        issues.append("ENTRA_AUDIENCE zorunludur")
-    if not cfg.entra_allowed_client_ids:
-        issues.append("ENTRA_ALLOWED_CLIENT_IDS ile çağrı yapabilecek istemciler sınırlandırılmalıdır")
-    if not cfg.entra_required_scopes:
-        issues.append("ENTRA_REQUIRED_SCOPES production ortamında zorunludur")
-    if not cfg.entra_login_scopes:
-        issues.append("ENTRA_LOGIN_SCOPES tarayıcı kurumsal giriş akışı için zorunludur")
-    if not cfg.entra_redirect_uri:
-        issues.append("ENTRA_REDIRECT_URI tarayıcı kurumsal giriş akışı için zorunludur")
-    elif not cfg.entra_redirect_uri.lower().startswith("https://"):
-        issues.append("ENTRA_REDIRECT_URI production ortamında HTTPS olmalıdır")
-    if cfg.entra_auto_link_by_email:
-        issues.append("Production ortamında ENTRA_AUTO_LINK_BY_EMAIL=false olmalıdır")
+    if cfg.auth_provider not in {"entra", "obs"}:
+        issues.append("Production ortamında AUTH_PROVIDER=entra veya AUTH_PROVIDER=obs olmalıdır")
+    elif cfg.auth_provider == "entra":
+        if not cfg.entra_tenant_id:
+            issues.append("ENTRA_TENANT_ID zorunludur")
+        if not cfg.entra_client_id:
+            issues.append("ENTRA_CLIENT_ID zorunludur")
+        if not cfg.entra_audience:
+            issues.append("ENTRA_AUDIENCE zorunludur")
+        if not cfg.entra_allowed_client_ids:
+            issues.append("ENTRA_ALLOWED_CLIENT_IDS ile çağrı yapabilecek istemciler sınırlandırılmalıdır")
+        if not cfg.entra_required_scopes:
+            issues.append("ENTRA_REQUIRED_SCOPES production ortamında zorunludur")
+        if not cfg.entra_login_scopes:
+            issues.append("ENTRA_LOGIN_SCOPES tarayıcı kurumsal giriş akışı için zorunludur")
+        if not cfg.entra_redirect_uri:
+            issues.append("ENTRA_REDIRECT_URI tarayıcı kurumsal giriş akışı için zorunludur")
+        elif not cfg.entra_redirect_uri.lower().startswith("https://"):
+            issues.append("ENTRA_REDIRECT_URI production ortamında HTTPS olmalıdır")
+        if cfg.entra_auto_link_by_email:
+            issues.append("Production ortamında ENTRA_AUTO_LINK_BY_EMAIL=false olmalıdır")
+    elif cfg.auth_provider == "obs":
+        if not cfg.obs_jwt_secret or len(cfg.obs_jwt_secret) < 32:
+            issues.append("OBS_JWT_SECRET zorunludur ve en az 32 karakter olmalıdır")
+        if not cfg.obs_proliz_enabled:
+            issues.append("AUTH_PROVIDER=obs iken OBS_PROLIZ_ENABLED=true olmalıdır")
+        if not cfg.obs_proliz_username or not cfg.obs_proliz_password:
+            issues.append("OBS_PROLIZ_USERNAME / OBS_PROLIZ_PASSWORD (servis hesabı) zorunludur")
+        if not cfg.obs_proliz_base_url.lower().startswith("https://"):
+            issues.append("OBS_PROLIZ_BASE_URL production ortamında HTTPS olmalıdır")
     if not cfg.public_hostname:
         issues.append("PUBLIC_HOSTNAME zorunludur")
     if not cfg.require_https:

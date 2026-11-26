@@ -1,18 +1,59 @@
 from __future__ import annotations
 
-"""Read-only client for the Proliz/DogusAPI OBS integration.
+"""Client for the Proliz/DogusAPI OBS integration (Üniversite Öğrenci Bilgi
+Sistemi REST API Dokümanı v3.1, confirmed against the live server).
 
-Real contract (confirmed from the live portalapi.dogus.edu.tr swagger.json,
-2026-11-26): HTTP Basic Auth, GET endpoints under /Obs/Genel and /Obs/Ogrenci.
-Response bodies are undocumented in the swagger (no schema, just "200 OK"),
-so this module intentionally returns raw parsed JSON rather than guessing
-field names. Map the raw payload into DOU Assess models (app/models.py
-Program/Student external_source="proliz"/external_id, matching the existing
-app/services/imports.py pattern) only once a real sample response has been
-inspected via the /api/integrations/obs/proliz/probe endpoint.
+Auth: every call authenticates to Proliz with the DOU Assess service account
+(OBS_PROLIZ_USERNAME/PASSWORD, HTTP Basic). The *UserCheck endpoints also take
+a teacher's/student's own username+password as query parameters — those are
+the credentials being validated, not used for the Basic Auth header itself.
+
+Password hashing for *UserCheck: per the official doc, Pass must be
+UTF-8 -> MD5 -> uppercase hex, never the plaintext password. Use
+`hash_obs_password()`.
+
+Known real response field names (from the v3.1 PDF, 2026-11-26):
+- AkademikDonem (bulk, no params): ID, AD, YIL, TIP, BAS_TARIH, BIT_TARIH,
+  AD_EN, TIP_EN, DURUM
+- Fakulte (bulk, no params): KOD, AD, SURE, TIP, AD_EN, TIP_EN
+- Program (FakulteKod optional -> bulk if empty): ID, KOD, AD, FAK_KOD,
+  KISA_AD, PROG_TIP, PROG_TUR, NORMAL_SURE, AZAMI_SURE, DURUM, AD_EN,
+  PROG_TIP_EN, PROG_TUR_EN
+- Akademisyen (Tck optional -> bulk if empty): TCK, SICIL_NO, AD, SOYAD,
+  FAKULTE_KOD, FAKULTE_AD, BOLUM_ID, BOLUM_AD, PROG_ID, PROG_AD, EPOSTA, GSM,
+  UNVAN_KOD, UNVAN_AD, DEGISIKLIK_TAR, PERSONEL_TIP (+ _EN variants)
+- AkademisyenVerdigiDers (Tck, DonemId): DERS_ID, DERS_KOD, DERS_AD, SUBE_KOD,
+  TEO_SAAT, UYG_SAAT, AKTS, KREDI, SINIF, FAKULTE_KOD, FAKULTE_AD, BOLUM_ID,
+  BOLUM_AD, PROG_ID, PROG_AD (+ _EN variants)
+- AkademisyenVerdigiDersiAlanOgrenci (Tck, DonemId, DersId optional): ID,
+  OGR_NO, DERS_ID, DERS_KOD, SUBE_KOD, DERS_AD, KREDI, AKTS, ALMA_TIP,
+  OGR_KAYIT_TARIH, DAN_ONAY_TARIH, GECME_DURUM (+ _EN variants)
+- AktifOgrenci / AyrilanOgrenci (all filters optional -> bulk if empty):
+  OGR_NO, OGR_NO_ONCK, TCK, AD, SOYAD, FAK_KOD, BOL_ID, PROG_ID, SINIF,
+  KAY_NEDEN, KAY_TAR, OGRENIM_DURUM, OGRENIM_TIP, MUFREDAT_ID (+ many more)
+- Mufredat (bulk, no params): MUFREDAT_ID, MUFREDAT_AD, YIL, DURUM, FAKULTE,
+  BOLUM, PROGRAM_AD, FAK_KOD, BOLUM_ID, PROG_ID
+- MufredatDersler (MufredatId): MUF_DERS_ID, DERS_KOD, DERS_AD, AKTS,
+  FAKULTE_AD, FAKULTE_KOD, BOLUM_AD, BOLUM_ID, PROG_AD, PROG_ID, DONEM_TIP,
+  SINIF
+- AkademikUserCheck / OgrenciUserCheck: {"SonucDurum": "true"|"false",
+  "SonucAciklama": "..."}. userName is the Sicil No (teacher) or Öğrenci No
+  (student) — NOT the Tck/email. No identity fields are returned; resolve
+  identity separately via Akademisyen (by SICIL_NO) or Ogrenci/Kimlik.
+- Ogrenci/Kimlik (OgrenciNo optional -> bulk if empty): KIMLIK_TCNO,
+  KIMLIK_AD, KIMLIK_SOYAD, CINSIYET, DOGUM_TAR, ...
+- Ogrenci/Iletisim (OgrenciNo optional -> bulk if empty): OGR_NO, EPOSTA1,
+  EPOSTA2, GSM1, GSM2, ...
+- Ogrenci/AlinanDersler (OgrenciNo, DonemId): OGR_NO, DERS_ID, DERS_KOD,
+  DERS_AD, ALMA_TIP, GECME_DURUM
+- Ogrenci/SinavNot (OgrenciNo, DonemId, DersId optional): SINAV_AD,
+  SINAV_TIP, SINAV_GIRME_TIP, NOT_DEGER
+- Ogrenci/OgrenciDersProgrami (OgrenciNo, DonemId): DERS_ID, GUN, DERS_KOD,
+  DERS_AD, BAS_SAAT, BIT_SAAT, DERSLIK, OE_TCK
 """
 
 import base64
+import hashlib
 import json
 from urllib import error as urlerror, parse as urlparse, request as urlrequest
 
@@ -21,6 +62,13 @@ from ..config import settings
 
 class ProlizError(RuntimeError):
     pass
+
+
+def hash_obs_password(password: str) -> str:
+    """UTF-8 -> MD5 -> uppercase hex, exactly as the Proliz doc specifies for
+    AkademikUserCheck / OgrenciUserCheck 'Pass'. Never send a plaintext
+    password to those endpoints."""
+    return hashlib.md5(password.encode("utf-8")).hexdigest().upper()
 
 
 def _auth_header() -> str:
@@ -77,8 +125,10 @@ def fetch_mufredat_dersler(mufredat_id: str) -> object:
     return _get("/Obs/Genel/MufredatDersler", {"MufredatId": mufredat_id})
 
 
-def fetch_akademisyen(tck: str) -> object:
-    return _get("/Obs/Genel/Akademisyen", {"Tck": tck})
+def fetch_akademisyen(tck: str | None = None) -> object:
+    """Empty tck returns the full academic staff roster (SICIL_NO + TCK +
+    EPOSTA among the fields) — used to resolve a Sicil No login to a Tck."""
+    return _get("/Obs/Genel/Akademisyen", {"Tck": tck} if tck else None)
 
 
 def fetch_akademisyen_verdigi_ders(tck: str, donem_id: str | None = None) -> object:
@@ -89,15 +139,11 @@ def fetch_akademisyen_verdigi_dersi_alan_ogrenci(tck: str, donem_id: str | None 
     return _get("/Obs/Genel/AkademisyenVerdigiDersiAlanOgrenci", {"Tck": tck, "DonemId": donem_id, "DersId": ders_id})
 
 
-def check_akademik_user(user_name: str, password: str) -> object:
-    """Validates a teacher's own OBS username/password against Proliz. The call
-    itself still authenticates to Proliz with the DOU Assess service account
-    (OBS_PROLIZ_USERNAME/PASSWORD); userName/Pass here are the teacher's own
-    credentials being checked, passed as Proliz's contract requires.
-    NOTE: response shape is unconfirmed (undocumented in swagger) — do not
-    build login/session logic on this until a real sample response has been
-    inspected (see /api/auth/obs-login design note)."""
-    return _get("/Obs/Genel/AkademikUserCheck", {"userName": user_name, "Pass": password})
+def check_akademik_user(user_name: str, password_hash: str) -> dict:
+    """userName = Sicil No. password_hash must already be hash_obs_password()
+    output, not a plaintext password. Returns {"SonucDurum": "true"/"false",
+    "SonucAciklama": "..."}."""
+    return _get("/Obs/Genel/AkademikUserCheck", {"userName": user_name, "Pass": password_hash})
 
 
 def fetch_durumu_degisen_akademisyen(degisiklik_baslangic_tarihi: str) -> object:
@@ -116,8 +162,31 @@ def fetch_aktif_ogrenci(
     })
 
 
+def fetch_kimlik(ogrenci_no: str | None = None) -> object:
+    return _get("/Obs/Ogrenci/Kimlik", {"OgrenciNo": ogrenci_no} if ogrenci_no else None)
+
+
+def fetch_iletisim(ogrenci_no: str | None = None) -> object:
+    return _get("/Obs/Ogrenci/Iletisim", {"OgrenciNo": ogrenci_no} if ogrenci_no else None)
+
+
 def fetch_alinan_dersler(ogrenci_no: str, donem_id: str | None = None) -> object:
     return _get("/Obs/Ogrenci/AlinanDersler", {"OgrenciNo": ogrenci_no, "DonemId": donem_id})
+
+
+def fetch_sinav_not(ogrenci_no: str, donem_id: str | None = None, ders_id: str | None = None) -> object:
+    return _get("/Obs/Ogrenci/SinavNot", {"OgrenciNo": ogrenci_no, "DonemId": donem_id, "DersId": ders_id})
+
+
+def fetch_ogrenci_ders_programi(ogrenci_no: str, donem_id: str | None = None) -> object:
+    return _get("/Obs/Ogrenci/OgrenciDersProgrami", {"OgrenciNo": ogrenci_no, "DonemId": donem_id})
+
+
+def check_ogrenci_user(user_name: str, password_hash: str) -> dict:
+    """userName = Öğrenci No. password_hash must already be
+    hash_obs_password() output. Returns {"SonucDurum": "true"/"false",
+    "SonucAciklama": "..."}."""
+    return _get("/Obs/Ogrenci/OgrenciUserCheck", {"userName": user_name, "Pass": password_hash})
 
 
 def fetch_durumu_degisen_ogrenci(baslangic: str, bitis: str | None = None) -> object:
@@ -129,12 +198,12 @@ PROBE_ENDPOINTS = {
     "fakulte": fetch_fakulte,
     "program": fetch_program,
     "mufredat": fetch_mufredat,
+    "akademisyen_all": fetch_akademisyen,
 }
 
 
 def probe(name: str) -> object:
-    """Call one read-only endpoint and return its raw response, to inspect the
-    real field names before writing the Program/Student mapping logic."""
+    """Call one read-only, no-argument endpoint and return its raw response."""
     fn = PROBE_ENDPOINTS.get(name)
     if not fn:
         raise ProlizError(f"Bilinmeyen probe adı: {name}. Geçerli: {', '.join(PROBE_ENDPOINTS)}")

@@ -38,6 +38,13 @@
           <button id="entraLoginBtn" class="primary login-primary" type="button">Microsoft ile kurumsal giriş <span>→</span></button>
           <small>Doğuş Üniversitesi Microsoft Entra hesabınızla devam edin.</small>
         </div>
+        <form id="obsLoginBox" class="login-mode-box hidden">
+          <label>Sicil No<input id="obsLoginUsername" type="text" autocomplete="username" required></label>
+          <label>Şifre<input id="obsLoginPassword" type="password" autocomplete="current-password" required></label>
+          <div id="obsLoginError" class="login-error hidden"></div>
+          <button id="obsLoginBtn" class="primary login-primary" type="submit">OBS ile giriş yap <span>→</span></button>
+          <small>Kurumsal Öğrenci Bilgi Sistemi (OBS) kullanıcı adı ve şifrenizle giriş yapın; dersleriniz ve öğrencileriniz otomatik senkronize edilir.</small>
+        </form>
         <div class="login-security"><span>✓ Rol bazlı yetkilendirme</span><span>✓ Ders bazlı erişim</span><span>✓ Sınav snapshot & kanıt bütünlüğü</span></div>
       </div>
       <p class="login-footer-note">DOU Assess · Akademik kullanım için geliştirilmiştir.</p>

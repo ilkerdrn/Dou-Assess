@@ -90,6 +90,12 @@ class Settings:
     obs_proliz_password: str = _secret("OBS_PROLIZ_PASSWORD", "")
     obs_proliz_timeout_seconds: int = int(os.getenv("OBS_PROLIZ_TIMEOUT_SECONDS", "20"))
 
+    # AUTH_PROVIDER=obs: teacher/student login with their own Proliz OBS
+    # username/password instead of Microsoft Entra. DOU Assess verifies the
+    # credentials against Proliz, then mints its own short-lived session JWT.
+    obs_jwt_secret: str = _secret("OBS_JWT_SECRET", "")
+    obs_jwt_expires_minutes: int = int(os.getenv("OBS_JWT_EXPIRES_MINUTES", "480"))
+
     rate_limit_enabled: bool = _bool("RATE_LIMIT_ENABLED", _env_is_production())
     api_rate_limit_per_minute: int = int(os.getenv("API_RATE_LIMIT_PER_MINUTE", "600"))
     upload_rate_limit_per_minute: int = int(os.getenv("UPLOAD_RATE_LIMIT_PER_MINUTE", "30"))
