@@ -69,7 +69,14 @@ from .authz import (
 )
 
 enforce_production_security()
-app = FastAPI(title="DOU Assess", version=APP_VERSION)
+_is_production = settings.app_env == "production"
+app = FastAPI(
+    title="DOU Assess",
+    version=APP_VERSION,
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
+)
 app.include_router(quality360_router)
 app.include_router(compliance_router)
 app.include_router(academic_structure_router)
