@@ -683,3 +683,24 @@ def build_exam_pdf(exam, booklet: str = "A", student=None) -> tuple[bytes, dict]
     metadata["pdf_sha256"] = sha256(data).hexdigest()
     metadata["pdf_size_bytes"] = len(data)
     return data, metadata
+
+
+def build_attendance_sheet_pdf(exam, rows: list[dict]) -> bytes:
+    """Yoklama / imza listesi: one line per student with assigned booklet and a signature cell."""
+    from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
+    _register_fonts()
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36, title="Yoklama / İmza Listesi")
+    head = ParagraphStyle("h", fontName="DOU-Bold", fontSize=13, leading=17)
+    small = ParagraphStyle("s", fontName="DOU-Regular", fontSize=9, leading=12)
+    cell = ParagraphStyle("c", fontName="DOU-Regular", fontSize=9, leading=11)
+    date = exam.exam_date.strftime("%d.%m.%Y") if getattr(exam, "exam_date", None) else "—"
+    story = [Paragraph(f"{_esc(exam.course_code_snapshot or '')} {_esc(exam.course_name_snapshot or '')} — {_esc(exam.title)}", head),
+             Paragraph(f"Yoklama / İmza Listesi · Tarih: {date} · Salon: {_esc(exam.location or '—')} · Süre: {exam.duration_minutes} dk · Öğrenci: {len(rows)}", small), Spacer(1, 10)]
+    data = [["#", "Öğrenci No", "Ad Soyad", "Kitapçık", "İmza"]] + [[str(i), r["student_no"], Paragraph(_esc(r["full_name"]), cell), r["booklet"], ""] for i, r in enumerate(rows, 1)]
+    t = Table(data, colWidths=[24, 78, 190, 50, 170], repeatRows=1, rowHeights=[20] + [24] * len(rows))
+    t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), "DOU-Regular"), ("FONTNAME", (0, 0), (-1, 0), "DOU-Bold"), ("FONTSIZE", (0, 0), (-1, -1), 9),
+                           ("GRID", (0, 0), (-1, -1), 0.5, colors.grey), ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#efece4")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    story += [t, Spacer(1, 14), Paragraph("Gözetmen: ______________________   İmza: ______________________   Teslim alınan kâğıt sayısı: ______", small)]
+    doc.build(story)
+    return buf.getvalue()

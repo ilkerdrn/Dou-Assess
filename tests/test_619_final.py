@@ -67,7 +67,7 @@ def test_619_excel_users_roles_import():
 def test_619_usability_frontend_contract():
     root=Path(__file__).resolve().parents[1]
     html=(root/'app/static/index.html').read_text(encoding='utf-8'); js=(root/'app/static/app.js').read_text(encoding='utf-8')
-    assert '? Kılavuz' in html and 'Excel Yükle' in html
+    assert '>Kılavuz<' in html and '? Kılavuz' not in html and 'Excel Yükle' in html  # P0: header buttons are text-only
     assert 'Öğretim Görevlisi' in html and 'Program Başkanı' in html and 'Kalite Müdürü' in html
     assert 'department_head' not in html and 'faculty_admin' not in html
     assert 'GUIDE_PAGES' in js and '/api/excel-center' in js and 'guidePersona' in js

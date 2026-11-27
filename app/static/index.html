@@ -60,20 +60,22 @@
       <div class="nav-group open" id="workspaceNavGroup" data-nav-group="workspace">
         <button class="nav-group-toggle" type="button" aria-expanded="true"><span><b>Ders & Sınav</b><small>Günlük akademik işleriniz</small></span><i>⌄</i></button>
         <div class="nav-submenu">
-          <button id="myCoursesNav" data-page="mycourses" class="active"><span class="nav-icon">D</span><span><b>Derslerim</b><small>Atandığınız dersler</small></span></button>
-          <button data-page="exams"><span class="nav-icon">S</span><span><b>Sınavlar</b><small>Hazırla ve sonuçlandır</small></span></button>
-          <button data-page="bank"><span class="nav-icon">?</span><span><b>Soru Bankası</b><small>Sorularınızı oluşturun</small></span></button>
-          <button data-page="grade"><span class="nav-icon">P</span><span><b>Değerlendirme</b><small>Puanlama ve onay</small></span></button>
+          <button id="myCoursesNav" data-page="mycourses" class="active"><span class="nav-icon">1</span><span><b>Derslerim</b><small>Ders ve öğrenme çıktıları</small></span></button>
+          <button data-page="bank"><span class="nav-icon">2</span><span><b>Soru Bankası</b><small>Sorularınızı oluşturun</small></span></button>
+          <button data-page="exams"><span class="nav-icon">3</span><span><b>Sınav Hazırla</b><small>Sınavı oluşturun ve kontrol edin</small></span></button>
+          <button id="printNav" data-page="print"><span class="nav-icon">4</span><span><b>Basım</b><small>Kâğıtlar, yoklama listesi</small></span></button>
+          <button id="scanNav" data-page="scan"><span class="nav-icon">5</span><span><b>Optik Okuma</b><small>Tarama ve doğrulama</small></span></button>
+          <button data-page="grade"><span class="nav-icon">6</span><span><b>Değerlendirme</b><small>Puanlama ve onay</small></span></button>
         </div>
       </div>
 
       <div class="nav-group" id="analysisNavGroup" data-nav-group="analysis">
         <button class="nav-group-toggle" type="button" aria-expanded="false"><span><b>Sonuçlar</b><small>Başarı ve çıktı analizi</small></span><i>⌄</i></button>
         <div class="nav-submenu">
-          <button data-page="analytics"><span class="nav-icon">S</span><span><b>Sınav Sonuçları</b><small>Soru ve öğrenci başarısı</small></span></button>
-          <button id="courseAnalyticsNav" data-page="courseanalytics"><span class="nav-icon">D</span><span><b>Ders Sonuçları</b><small>Dönem ve çıktı gelişimi</small></span></button>
-          <button id="programAnalyticsNav" data-page="programanalytics"><span class="nav-icon">P</span><span><b>Program Analizi</b><small>Program Çıktıları ve riskler</small></span></button>
-          <button id="studentCardsNav" data-page="studentcards"><span class="nav-icon">K</span><span><b>Öğrenci Karneleri</b><small>ÖÇ · PÇ · gelişim · PDF</small></span></button>
+          <button data-page="analytics"><span class="nav-icon">7</span><span><b>Sınav Sonuçları</b><small>Soru ve öğrenci başarısı</small></span></button>
+          <button id="courseAnalyticsNav" data-page="courseanalytics"><span class="nav-icon">8</span><span><b>Ders Sonuçları</b><small>Dönem ve çıktı gelişimi</small></span></button>
+          <button id="programAnalyticsNav" data-page="programanalytics"><span class="nav-icon">9</span><span><b>Program Analizi</b><small>Program Çıktıları ve riskler</small></span></button>
+          <button id="studentCardsNav" data-page="studentcards"><span class="nav-icon">10</span><span><b>Öğrenci Karneleri</b><small>ÖÇ · PÇ · gelişim · PDF</small></span></button>
         </div>
       </div>
 
@@ -111,7 +113,7 @@
   </aside>
   <button id="mobileNavBackdrop" class="mobile-nav-backdrop" type="button" aria-label="Menüyü kapat"></button>
   <main>
-    <header class="app-header"><button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Menüyü aç" aria-expanded="false"><span></span><span></span><span></span></button><div class="header-title"><div id="pageBreadcrumb" class="page-breadcrumb">DOU Assess / Akademik Yönetim / Program</div><h1 id="pageTitle">Program</h1><p id="pageSub">Akademik programınızı seçin veya yetkiniz varsa oluşturun.</p></div><div class="header-actions"><button id="notificationBtn" class="ghost notification-trigger" type="button" aria-label="Bildirimler">🔔 Bildirimler <span id="notificationBadge" class="notification-badge hidden">0</span></button><button id="guideBtn" class="ghost guide-trigger" type="button">? Kılavuz</button><button id="excelCenterBtn" class="ghost excel-trigger" type="button">⇩ Excel Yükle</button><button id="commandBtn" class="command-trigger ghost" type="button"><span>⌕</span> Ara <kbd>Ctrl K</kbd></button><button id="refreshBtn" class="ghost">Yenile</button></div></header>
+    <header class="app-header"><button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Menüyü aç" aria-expanded="false"><span></span><span></span><span></span></button><div class="header-title"><div id="pageBreadcrumb" class="page-breadcrumb">DOU Assess / Akademik Yönetim / Program</div><h1 id="pageTitle">Program</h1><p id="pageSub">Akademik programınızı seçin veya yetkiniz varsa oluşturun.</p></div><div class="header-actions"><button id="notificationBtn" class="ghost notification-trigger" type="button" aria-label="Bildirimler">Bildirimler <span id="notificationBadge" class="notification-badge hidden">0</span></button><button id="guideBtn" class="ghost guide-trigger" type="button">Kılavuz</button><button id="excelCenterBtn" class="ghost excel-trigger" type="button">Excel Yükle</button><button id="commandBtn" class="command-trigger ghost" type="button">Ara <kbd>Ctrl K</kbd></button><button id="refreshBtn" class="ghost">Yenile</button></div></header>
     <div id="toast" class="toast"></div>
 
     <section id="page-mycourses" class="page">
@@ -628,6 +630,16 @@ Kod doğruluğu | 4
       <div id="examStudentManagerList" class="exam-student-manager-list"></div>
       <div class="exam-student-manager-footer"><div><b id="examStudentSelectedCount">0 öğrenci seçili</b><small>Yalnızca işaretli öğrenciler bu sınavın optik/PDF ve puanlama listesine dahil edilir.</small></div><div class="actions"><button id="cancelExamStudentManager" class="ghost" type="button">Vazgeç</button><button id="saveExamStudentAssignment" class="primary" type="button">Seçimi sınava kaydet</button></div></div>
     </aside>
+
+    <section id="page-print" class="page reference-workspace-page modern-admin-page">
+      <div class="card operation-hero"><div><span class="eyebrow">4 · BASIM</span><h2>Sınav kâğıtlarını basıma hazırlayın</h2><p class="muted">Her öğrenci için özgün kâğıt (ad, numara, kitapçık, QR) üretilir. "Yazdırdım" onayından sonra sorular kilitlenir.</p></div><label class="operation-select">Sınav<select id="printExam"></select></label></div>
+      <div id="printSummary" class="card"><p class="muted">Sınav seçin.</p></div>
+      <div class="card"><div class="section-head"><div><span class="eyebrow">ÇIKTILAR</span><h3>İndir ve yazdır</h3></div></div>
+        <div class="actions"><button id="printBatch" class="primary" type="button" disabled>Tüm öğrenciler için toplu PDF</button><button id="printAttendance" class="ghost" type="button" disabled>Yoklama / imza listesi</button></div>
+        <div class="row"><label>Tek öğrenci / ek kâğıt<select id="printStudent"></select></label><button id="printOne" class="ghost" type="button" disabled>Bu öğrencinin kâğıdını indir</button></div></div>
+      <div class="card"><div class="section-head"><div><span class="eyebrow">ONAY</span><h3>Yazdırdım</h3><p class="muted">Onaylandıktan sonra sorular değiştirilemez; değişiklik gerekirse sınavı kopyalayıp yeni sürüm oluşturursunuz.</p></div><button id="printConfirm" class="primary" type="button" disabled>Yazdırdım, soruları kilitle</button></div></div>
+      <div class="actions"><button id="printNext" class="ghost" type="button">Sonraki adım: Optik Okuma →</button></div>
+    </section>
 
     <section id="page-scan" class="page reference-workspace-page modern-admin-page">
       <div class="card operation-hero scan-hero scan-station-hero">

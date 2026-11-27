@@ -31,6 +31,7 @@ const pageMeta = {
   surveys:['Anket & Dolaylı Ölçüm','Öğrenci, mezun, işveren ve paydaş görüşlerini Program Çıktılarıyla kanıt temelli izleyin.','Akademik Yapı'],
   assessmentassurance:['Ölçme Güvence Planı','Her Program Çıktısını yıllık doğrudan/dolaylı ölçme planı, hedef ve review snapshot ile güvence altına alın.','Kalite'],
   bank:['Soru Havuzu','Ders bazlı, çoklu Öğrenim Çıktısı destekli yeniden kullanılabilir soru kütüphanesi.','Sınav Yönetimi'],
+  print:['Basım','Kâğıtları indirin, yoklama listesini alın ve basımı onaylayın.','Sınav Yönetimi'],
   scan:['Optik & Kontrol','Toplu tarama, otomatik eşleştirme ve şüpheli işaret kontrolü.','Sınav Yönetimi'],
   grade:['Puanlama','Klasik ve öğrenci bazlı değerlendirmeyi tamamlayın.','Sınav Yönetimi'],
   analytics:['Sınav Analizi','Snapshot üzerinden öğrenci, soru, Öğrenim Çıktısı ve Program Çıktısı performansını analiz edin.','Analiz & Akreditasyon'],
@@ -227,6 +228,7 @@ function showPage(name){
   if(name==='acceptance') prepareProductionAcceptance();
   if(name==='exams') loadExams();
   if(name==='bank') prepareBank();
+  if(name==='print') preparePrint();
   if(name==='scan') prepareScan();
   if(name==='grade') prepareGrade();
   if(name==='analytics') prepareAnalytics();
@@ -1315,6 +1317,30 @@ window.editBank=async function(id){
   document.getElementById('bankType').value=x.question_type;document.getElementById('bankPoints').value=x.default_points;document.getElementById('bankAnswerLines').value=x.answer_lines||8;document.getElementById('bankTopic').value=x.topic||'';document.getElementById('bankUnit').value=x.unit||'';document.getElementById('bankDifficulty').value=x.difficulty||'medium';document.getElementById('bankBloom').value=x.bloom_level||'';document.getElementById('bankReviewer').value=x.reviewer||'';document.getElementById('bankRubric').value=formatRubric(x.rubric);document.getElementById('bankImage').value='';setQuestionImagePreview('bankImagePreview',x.image_data||'');document.getElementById('bankText').value=x.text;document.getElementById('bankCorrect').value=x.correct_answer||'A';document.getElementById('bankTags').value=(x.tags||[]).join(', ');fillChoices('bank',x.choices);syncBankTypeUI();document.getElementById('saveBank').textContent='Değişiklikleri kaydet';document.getElementById('cancelBankEdit').classList.remove('hidden');setBankEditorOpen(true);
 };
 window.archiveBank=async function(id){if(!confirm('Soruyu aktif havuzdan arşivlemek istiyor musunuz?'))return;try{await api('DELETE',`/api/question-bank/${id}`);toast('Soru arşivlendi.');await loadBank();}catch(e){toast(e.message,'error');}};
+
+async function preparePrint(){
+  try{await refreshCore();}catch(e){toast(e.message,'error');return}
+  const sel=document.getElementById('printExam'),prev=sel.value;
+  sel.innerHTML=(state.exams||[]).filter(e=>e.status!=='archived').map(e=>`<option value="${e.id}">${esc((e.course_code||e.paper_snapshot?.course_code||'')+' · '+e.title)} (${esc(e.status)})</option>`).join('');
+  if(prev)sel.value=prev;await loadPrintSummary();
+}
+async function loadPrintSummary(){
+  const id=Number(document.getElementById('printExam').value),box=document.getElementById('printSummary');
+  const set=(dis)=>['printBatch','printAttendance','printOne'].forEach(b=>document.getElementById(b).disabled=dis);
+  if(!id){box.innerHTML='<p class="muted">Henüz sınav yok.</p>';set(true);document.getElementById('printConfirm').disabled=true;return}
+  try{
+    const [s,students]=await Promise.all([api('GET',`/api/exams/${id}/print-summary`),api('GET',`/api/exams/${id}/students`)]);
+    const ready=s.student_count>0&&s.pages_per_paper>0;set(!ready);document.getElementById('printConfirm').disabled=!s.can_confirm;
+    document.getElementById('printStudent').innerHTML=students.map(x=>`<option value="${x.id}">${esc(x.student_no+' · '+x.full_name)}</option>`).join('');
+    box.innerHTML=`<div class="readiness-head"><div><b>${s.printed_at?'Basıldı — sorular kilitli':s.ready?'Basıma hazır':'Basımdan önce eksikleri tamamlayın'}</b><small>${s.printed_at?`${esc(s.printed_by)} · ${esc(s.printed_at.slice(0,16).replace('T',' '))}`:`Durum: ${esc(s.status)}`}</small></div></div><div class="readiness-counts"><span>${s.student_count} öğrenci için kâğıt</span><span>${s.pages_per_paper} sayfa / kâğıt</span><span>${s.total_pages} sayfa toplam</span><span>${s.sheets_total} yaprak${s.duplex?' (çift taraflı)':''}</span><span>Kitapçık: ${esc(Object.entries(s.booklets).map(([k,v])=>`${k}=${v}`).join(' · ')||'—')}</span></div>${s.issues.length?`<div class="readiness-issue-list">${s.issues.map(x=>`<div><i>!</i><span>${esc(x)}</span></div>`).join('')}</div>`:''}${s.status==='draft'?'<div class="readiness-warning-list"><div><i>i</i><span>Sınav hâlâ taslak. Önce "Sınav Hazırla" ekranında hazır durumuna alın.</span></div></div>':''}`;
+  }catch(e){box.innerHTML=`<p class="muted">${esc(e.message)}</p>`;set(true)}
+}
+document.getElementById('printExam')?.addEventListener('change',loadPrintSummary);
+document.getElementById('printBatch')?.addEventListener('click',async()=>{const id=document.getElementById('printExam').value;try{await downloadApi(`/api/exams/${id}/papers-batch.pdf`,`sinav-${id}-tum-kagitlar.pdf`,true)}catch(e){toast(e.message,'error')}});
+document.getElementById('printAttendance')?.addEventListener('click',async()=>{const id=document.getElementById('printExam').value;try{await downloadApi(`/api/exams/${id}/attendance-sheet.pdf`,`yoklama-${id}.pdf`,true)}catch(e){toast(e.message,'error')}});
+document.getElementById('printOne')?.addEventListener('click',async()=>{const id=document.getElementById('printExam').value,st=document.getElementById('printStudent').value;if(!st)return;try{await downloadApi(`/api/exams/${id}/students/${st}/paper.pdf`,`sinav-${id}-ogrenci-${st}.pdf`,true)}catch(e){toast(e.message,'error')}});
+document.getElementById('printConfirm')?.addEventListener('click',async()=>{const id=document.getElementById('printExam').value;if(!confirm('Kâğıtlar yazdırıldı olarak işaretlenecek ve sorular kilitlenecek. Değişiklik için sınavın kopyası gerekir. Devam?'))return;try{await api('POST',`/api/exams/${id}/print-confirm`);toast('Basım onaylandı; sorular kilitlendi.');await loadPrintSummary()}catch(e){toast(e.message,'error')}});
+document.getElementById('printNext')?.addEventListener('click',()=>showPage('scan'));
 
 async function prepareScan(){
   try{await refreshCore();await loadScanContext();renderScanFileCount();}catch(e){toast(e.message,'error');}

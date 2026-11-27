@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 from io import BytesIO
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -42,7 +43,7 @@ from .services.imports import ImportValidationError, import_workbook, validate_w
 from .services.question_bank_import import parse_question_bank_workbook
 from .services.excel_center import TEMPLATES as EXCEL_CENTER_TEMPLATES, template_bytes as excel_center_template_bytes, parse_workbook as parse_excel_center_workbook, yes_no as excel_yes_no, rubric_scores as parse_excel_rubric_scores
 from .services.quality360 import QUALITY_EXCEL_KINDS, validate_excel_rows as validate_quality_excel_rows, import_excel_rows as import_quality_excel_rows
-from .services.paper import build_exam_pdf, normalize_choices, normalize_correct_answer, paper_metadata, question_regions
+from .services.paper import build_attendance_sheet_pdf, build_exam_pdf, normalize_choices, normalize_correct_answer, paper_metadata, question_regions
 from .services.pilot_ops import build_pilot_readiness, operational_issues, build_uat_checks
 from .services.scan import ScanError, analyze_page, decode_upload, iter_decode_upload, jpeg_bytes, parse_qr_payload, diagnostic_summary, annotated_review_preview, full_page_fingerprint
 from .services.accreditation import freeze_representatives, freeze_period_representatives, period_dashboard, representative_rows, sync_period_exams
@@ -612,6 +613,7 @@ def _exam_out(e: m.Exam, include_detail: bool = False) -> dict:
         "approval_requested_at": e.approval_requested_at.isoformat() if e.approval_requested_at else None,
         "approved_by": e.approved_by or "", "approved_at": e.approved_at.isoformat() if e.approved_at else None,
         "approval_note": e.approval_note or "",
+        "printed_at": e.printed_at.isoformat() if e.printed_at else None, "printed_by": e.printed_by or "",
         "grade_locked_at": e.grade_locked_at.isoformat() if e.grade_locked_at else None,
         "grade_locked_by": e.grade_locked_by or "", "grade_lock_note": e.grade_lock_note or "",
         "paper_snapshot": {
@@ -2096,6 +2098,62 @@ def batch_exam_papers(exam_id: int, booklet_strategy: str = "rotate", db: Sessio
     return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="DOU_exam_{exam_id}_student_papers.pdf"'})
 
 
+def _print_assignments(db: Session, exam: m.Exam) -> list[dict]:
+    rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam.id).order_by(m.ExamStudent.id)).all()
+    booklets = _allowed_booklets(exam)
+    return [{"student_id": es.student_id, "student_no": es.student.student_no, "full_name": es.student.full_name, "booklet": booklets[i % len(booklets)]} for i, es in enumerate(rows)]
+
+
+@app.get("/api/exams/{exam_id}/print-summary")
+def exam_print_summary(exam_id: int, db: Session = Depends(get_db)):
+    require_exam_access(db, exam_id, write=False)
+    exam = _load_exam_detail_model(db, exam_id)
+    rows = _print_assignments(db, exam)
+    pages = 0
+    if exam.questions:
+        try:
+            pages = len(PdfReader(BytesIO(build_exam_pdf(exam, "A")[0])).pages)
+        except Exception:
+            pages = 0
+    counts: dict[str, int] = {}
+    for r in rows: counts[r["booklet"]] = counts.get(r["booklet"], 0) + 1
+    readiness = _exam_readiness(db, exam)
+    return {"exam_id": exam.id, "status": exam.status, "title": exam.title, "student_count": len(rows), "pages_per_paper": pages,
+            "total_pages": pages * len(rows), "duplex": bool(exam.duplex_print), "sheets_total": (math.ceil(pages / 2) if exam.duplex_print else pages) * len(rows),
+            "booklets": counts, "printed_at": exam.printed_at.isoformat() if exam.printed_at else None, "printed_by": exam.printed_by or "",
+            "ready": readiness["ready"], "issues": readiness["issues"], "can_confirm": bool(exam.status == "ready" and readiness["ready"] and rows and not exam.printed_at)}
+
+
+@app.post("/api/exams/{exam_id}/print-confirm")
+def exam_print_confirm(exam_id: int, db: Session = Depends(get_db)):
+    """'Yazdırdım': from here on the questions are frozen; changes need a new version (copy)."""
+    require_exam_access(db, exam_id, write=True)
+    exam = _load_exam_detail_model(db, exam_id)
+    if exam.status != "ready":
+        raise HTTPException(409, "Basım onayı yalnız 'hazır' durumundaki sınavda verilebilir")
+    readiness = _exam_readiness(db, exam)
+    if not readiness["ready"]:
+        raise HTTPException(409, {"message": "Sınav hazır değil", "issues": readiness["issues"]})
+    if not db.scalar(select(func.count()).select_from(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id)):
+        raise HTTPException(409, "Sınava atanmış öğrenci yok")
+    if not exam.printed_at:
+        actor = current_user(); exam.printed_at = datetime.now(timezone.utc); exam.printed_by = actor.get("email") or "system"
+        audit(db, "exam_print_confirm", "exam", exam_id, {"revision_no": exam.revision_no}); _commit(db)
+    return {"printed_at": exam.printed_at.isoformat(), "printed_by": exam.printed_by}
+
+
+@app.get("/api/exams/{exam_id}/attendance-sheet.pdf")
+def exam_attendance_sheet(exam_id: int, db: Session = Depends(get_db)):
+    require_exam_access(db, exam_id, write=False)
+    exam = _load_exam_detail_model(db, exam_id)
+    rows = _print_assignments(db, exam)
+    if not rows:
+        raise HTTPException(409, "Sınava atanmış öğrenci yok")
+    data = build_attendance_sheet_pdf(exam, rows)
+    audit(db, "attendance_sheet_generate", "exam", exam_id, {"students": len(rows)}); _commit(db)
+    return StreamingResponse(BytesIO(data), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="yoklama_{exam_id}.pdf"'})
+
+
 @app.get("/api/exams/{exam_id}/paper-metadata")
 def exam_paper_metadata(exam_id: int, booklet: str = "A", db: Session = Depends(get_db)):
     require_exam_access(db, exam_id, write=False)
@@ -2219,6 +2277,8 @@ def change_exam_status(exam_id: int, data: ExamStatusUpdate, db: Session = Depen
         if not readiness["ready"]:
             raise HTTPException(409, {"message": "Sınav hazır durumuna alınamaz", "issues": readiness["issues"], "total_points": readiness["total_points"]})
     if exam.status == "ready" and data.status == "draft":
+        if exam.printed_at:
+            raise HTTPException(409, "Kâğıtlar basıldı olarak işaretlendi; sorular değiştirilemez. Değişiklik için sınavı kopyalayarak yeni sürüm oluşturun")
         exam.revision_no = int(exam.revision_no or 1) + 1
         exam.approval_requested_by = ""
         exam.approval_requested_at = None

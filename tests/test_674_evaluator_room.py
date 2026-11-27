@@ -245,3 +245,20 @@ def test_outcome_source_label_and_deactivate_instead_of_delete():
     assert out[0]["is_active"] is False
     exam2 = _post("/api/exams", {"course_id": cid, "title": "Final", "exam_type": "Final", "exam_date": "2026-12-01", "duration_minutes": 50, "instructions": "", "sync_students": True})
     assert exam2["learning_outcomes"] == []
+
+
+def test_print_screen_summary_confirm_lock_and_attendance_sheet():
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    s0 = client.get(f"/api/exams/{eid}/print-summary").json()
+    assert s0["can_confirm"] is False and s0["student_count"] == 2
+    assert client.post(f"/api/exams/{eid}/print-confirm").status_code == 409  # still draft
+    assert client.post(f"/api/exams/{eid}/status", json={"status": "ready"}).status_code == 200
+    s1 = client.get(f"/api/exams/{eid}/print-summary").json()
+    assert s1["can_confirm"] is True and s1["pages_per_paper"] >= 1 and s1["total_pages"] == s1["pages_per_paper"] * 2
+    sheet = client.get(f"/api/exams/{eid}/attendance-sheet.pdf"); assert sheet.status_code == 200 and sheet.content.startswith(b"%PDF")
+    ok = client.post(f"/api/exams/{eid}/print-confirm"); assert ok.status_code == 200, ok.text
+    assert client.get(f"/api/exams/{eid}").json()["printed_at"]
+    back = client.post(f"/api/exams/{eid}/status", json={"status": "draft"})
+    assert back.status_code == 409 and "kopyal" in back.text
+    assert client.get(f"/api/exams/{eid}/print-summary").json()["can_confirm"] is False
