@@ -30,6 +30,8 @@ if [[ -f "$ENV_FILE" ]]; then
     value="$(grep -E "^${key}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
     [[ -n "$value" ]] && pass "$key tanımlı" || err "$key eksik"
   done
+  sl="$(grep -E '^STUDENT_LINK_SECRET=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
+  if [[ -z "$sl" ]]; then err 'STUDENT_LINK_SECRET eksik; öğrenci itiraz bağlantıları çalışmaz (openssl rand -base64 48)'; elif (( ${#sl} < 32 )); then warn 'STUDENT_LINK_SECRET kısa; en az 32 karakter önerilir'; else pass 'STUDENT_LINK_SECRET tanımlı'; fi
   grep -Eq '^APP_ENV=production$' "$ENV_FILE" && pass 'APP_ENV=production' || err 'APP_ENV=production olmalı'
   grep -Eq '^AUTH_REQUIRED=(true|1|yes|on)$' "$ENV_FILE" && pass 'AUTH_REQUIRED açık' || err 'AUTH_REQUIRED=true olmalı'
   grep -Eq '^AUTH_PROVIDER=entra$' "$ENV_FILE" && pass 'AUTH_PROVIDER=entra' || err 'AUTH_PROVIDER=entra olmalı'
