@@ -14,7 +14,7 @@ client = TestClient(app)
 
 def test_665_release_ui_and_source_controlled_catalog():
     assert APP_VERSION == '6.70-production-hardening'
-    assert EXPECTED_SCHEMA_REVISION == '0043_response_grade_revisions'
+    assert EXPECTED_SCHEMA_REVISION == '0047_institution_settings_outcome_approval'
     root=Path(__file__).resolve().parents[1]
     html=(root/'app/static/index.html').read_text(encoding='utf-8')
     js=(root/'app/static/app.js').read_text(encoding='utf-8')

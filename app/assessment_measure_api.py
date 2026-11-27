@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from io import BytesIO
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -308,3 +311,86 @@ def measure_summary(measure_id: int, db: Session = Depends(get_db)):
         "outcome_count": len(links),
         "ready_for_outcome_analysis": bool(rows and links),
     }
+
+
+# ---------------------------------------------------------------- Excel template + import (assignments / projects / labs ...)
+def _measure_columns(db: Session, obj: m.AssessmentMeasure) -> list[tuple[str, float, str | None]]:
+    """(column key, max, rubric criterion id) - one column per rubric criterion, else a single total-score column."""
+    if obj.rubric_template_id:
+        crit = db.scalars(select(m.RubricCriterion).where(m.RubricCriterion.rubric_template_id == obj.rubric_template_id).order_by(m.RubricCriterion.order_no)).all()
+        if crit:
+            return [(c.code, float(c.max_points), str(c.id)) for c in crit]
+    return [("puan", float(obj.max_points), None)]
+
+
+@router.get("/assessment-measures/{measure_id}/results-template.xlsx")
+def measure_results_template(measure_id: int, db: Session = Depends(get_db)):
+    from openpyxl import Workbook
+    obj = db.get(m.AssessmentMeasure, measure_id)
+    if not obj: raise HTTPException(404, "Ölçme aracı bulunamadı")
+    require_course_access(db, obj.course_id, write=True)
+    cols = _measure_columns(db, obj)
+    wb = Workbook(); ws = wb.active; ws.title = "Puanlar"
+    ws.append(["ogrenci_no", "ad_soyad (bilgi)"] + [f"{k} (0-{mx:g})" for k, mx, _ in cols] + ["geri_bildirim"])
+    for st in db.scalars(select(m.Student).join(m.Enrollment, m.Enrollment.student_id == m.Student.id).where(m.Enrollment.course_id == obj.course_id).order_by(m.Student.student_no)).all():
+        ws.append([st.student_no, st.full_name] + [None] * len(cols) + [""])
+    info = wb.create_sheet("Yonerge")
+    info.append(["Her satır bir öğrencidir. Boş bırakılan satırlar atlanır. Puanlar 0 ile parantezdeki üst sınır arasında olmalıdır."])
+    buf = BytesIO(); wb.save(buf); buf.seek(0)
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="puan-sablonu-{obj.code}.xlsx"'})
+
+
+@router.post("/assessment-measures/{measure_id}/results-import")
+async def import_measure_results(measure_id: int, validate_only: bool = False, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    from openpyxl import load_workbook
+    from .security import read_upload_limited
+    obj = db.get(m.AssessmentMeasure, measure_id)
+    if not obj: raise HTTPException(404, "Ölçme aracı bulunamadı")
+    require_course_management(db, obj.course_id)
+    data = await read_upload_limited(file)
+    try:
+        ws = load_workbook(BytesIO(data), read_only=True, data_only=True)["Puanlar"]
+    except Exception:
+        raise HTTPException(422, "Geçerli bir şablon yüklenmedi ('Puanlar' sayfası bulunamadı)")
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows: raise HTTPException(422, "Dosya boş")
+    header = [str(h or "").strip() for h in rows[0]]
+    cols = _measure_columns(db, obj)
+    idx = {}
+    for key, mx, cid in cols:
+        pos = next((i for i, h in enumerate(header) if h.split(" ")[0].lower() == key.lower()), None)
+        if pos is None: raise HTTPException(422, f"Şablonda '{key}' sütunu yok")
+        idx[key] = pos
+    no_pos = next((i for i, h in enumerate(header) if h.lower().startswith("ogrenci_no")), 0)
+    fb_pos = next((i for i, h in enumerate(header) if h.lower().startswith("geri_bildirim")), None)
+    enrolled = {st.student_no: st for st in db.scalars(select(m.Student).join(m.Enrollment, m.Enrollment.student_id == m.Student.id).where(m.Enrollment.course_id == obj.course_id)).all()}
+    errors, ready = [], []
+    for n, row in enumerate(rows[1:], start=2):
+        sno = str(row[no_pos] or "").strip()
+        vals = {k: row[i] for k, i in idx.items()}
+        if not sno or all(v in (None, "") for v in vals.values()): continue
+        st = enrolled.get(sno)
+        if not st: errors.append({"row": n, "student_no": sno, "message": "Öğrenci bu derse kayıtlı değil"}); continue
+        parsed, bad = {}, False
+        for key, mx, cid in cols:
+            v = vals[key]
+            try: f = float(str(v).replace(",", ".")) if v not in (None, "") else None
+            except ValueError: f = None
+            if f is None: errors.append({"row": n, "student_no": sno, "message": f"'{key}' sayı olmalı"}); bad = True; break
+            if f < 0 or f > mx + 1e-9: errors.append({"row": n, "student_no": sno, "message": f"'{key}' 0-{mx:g} arasında olmalı"}); bad = True; break
+            parsed[key] = f
+        if not bad: ready.append((st, parsed, str(row[fb_pos] or "") if fb_pos is not None else ""))
+    if errors: raise HTTPException(422, {"message": "Dosya doğrulanamadı; hiçbir puan kaydedilmedi", "errors": errors[:100], "error_count": len(errors)})
+    if validate_only: return {"valid": True, "rows": len(ready)}
+    actor = current_user().get("email") or "system"; now = datetime.now(timezone.utc)
+    for st, parsed, fb in ready:
+        res = db.scalar(select(m.AssessmentMeasureResult).where(m.AssessmentMeasureResult.assessment_measure_id == measure_id, m.AssessmentMeasureResult.student_id == st.id))
+        if not res:
+            res = m.AssessmentMeasureResult(assessment_measure_id=measure_id, student_id=st.id); db.add(res)
+        if cols[0][2] is None:
+            res.raw_score = parsed["puan"]; res.rubric_scores = {}
+        else:
+            res.rubric_scores = {cid: parsed[key] for key, _, cid in cols}; res.raw_score = round(sum(parsed.values()), 4)
+        res.feedback = fb; res.status = "final"; res.graded_by = actor; res.graded_at = now
+    _audit(db, "grade_import", "assessment_measure", measure_id, {"rows": len(ready)}); _commit(db)
+    return {"valid": True, "imported": len(ready)}

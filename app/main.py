@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 from io import BytesIO
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -11,6 +12,7 @@ import uuid
 import zipfile
 from urllib import error as urlerror, request as urlrequest
 
+from pydantic import BaseModel, Field
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, Request, Query
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,7 +25,7 @@ from .config import settings
 from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 # Historical release-contract tests search source text; runtime truth remains RELEASE.env.
 # APP_VERSION = "6.70-production-hardening"
-# EXPECTED_SCHEMA_REVISION = "0043_response_grade_revisions"
+# EXPECTED_SCHEMA_REVISION = "0047_institution_settings_outcome_approval"
 # EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"
 # EXPECTED_SCHEMA_REVISION = "0039_evidence_integrity_security"
 from .db import engine, get_db, SessionLocal
@@ -31,7 +33,7 @@ from . import models as m
 from .schemas import (
     ObsLoginRequest, AddBankQuestionRequest, AddBankQuestionsBatchRequest, QuestionReorderRequest, NormalizeQuestionPointsRequest, BulkEnrollRequest, CourseCreate, CourseUpdate, ExamCreate, ExamDuplicateRequest, ExamStatusUpdate, ExamUpdate, ImprovementCreate,
     LearningOutcomeCreate, LearningOutcomeUpdate, OutcomeMappingCreate, ProgramCreate, ProgramUpdate,
-    ProgramOutcomeCreate, ProgramOutcomeUpdate, QuestionBankCreate, QuestionBankUpdate, QuestionReviewRequest, BlueprintCreate, BlueprintStatusRequest, QuestionCreate, QuestionUpdate, ResponsesSubmit, StudentCreate, StudentUpdate, ScanReviewOut, ScanReviewResolve, AnswerKeyRegradeRequest,
+    ProgramOutcomeCreate, ProgramOutcomeUpdate, QuestionBankCreate, QuestionBankUpdate, QuestionReviewRequest, BlueprintCreate, BlueprintStatusRequest, QuestionCreate, QuestionUpdate, ResponsesSubmit, StudentCreate, StudentUpdate, ScanReviewOut, ScanReviewResolve, AnswerKeyRegradeRequest, QuestionKeyException, ClassicGridSave,
     AccreditationProfileCreate, AccreditationPeriodCreate, AccreditationPeriodStatusUpdate, ImprovementUpdate,
     AppUserCreate, AppUserUpdate, UserRoleCreate, AcademicPeriodCreate, AcademicPeriodStatusUpdate, PilotFeedbackCreate, PilotFeedbackUpdate, ExamApprovalRequest, EvidenceUpdate, StudentAnonymizeRequest,
     AttendanceUpdate, GradeLockRequest, ExamIncidentCreate, ExamIncidentResolve, GradeAppealCreate, GradeAppealResolve,
@@ -42,7 +44,7 @@ from .services.imports import ImportValidationError, import_workbook, validate_w
 from .services.question_bank_import import parse_question_bank_workbook
 from .services.excel_center import TEMPLATES as EXCEL_CENTER_TEMPLATES, template_bytes as excel_center_template_bytes, parse_workbook as parse_excel_center_workbook, yes_no as excel_yes_no, rubric_scores as parse_excel_rubric_scores
 from .services.quality360 import QUALITY_EXCEL_KINDS, validate_excel_rows as validate_quality_excel_rows, import_excel_rows as import_quality_excel_rows
-from .services.paper import build_exam_pdf, normalize_choices, normalize_correct_answer, paper_metadata, question_regions
+from .services.paper import effective_omr_mode, build_attendance_sheet_pdf, build_exam_pdf, normalize_choices, normalize_correct_answer, paper_metadata, question_regions
 from .services.pilot_ops import build_pilot_readiness, operational_issues, build_uat_checks
 from .services.scan import ScanError, analyze_page, decode_upload, iter_decode_upload, jpeg_bytes, parse_qr_payload, diagnostic_summary, annotated_review_preview, full_page_fingerprint
 from .services.accreditation import freeze_representatives, freeze_period_representatives, period_dashboard, representative_rows, sync_period_exams
@@ -59,6 +61,14 @@ from .assessment_plan_api import router as assessment_plan_router
 from .production_acceptance_api import router as production_acceptance_router
 from .operations_api import router as operations_router
 from .program_review_api import router as program_review_router
+from .evaluator_room_api import router as evaluator_room_router
+from .student_portal_api import router as student_portal_router
+from .thresholds_api import router as thresholds_router
+from .governance_api import router as governance_router, approval_gate, lo_create_core, lo_delete_core, lo_out, lo_update_core, question_review_gate
+from .archive_api import router as archive_router
+from .p1_exports_api import router as p1_exports_router
+from .ai_scoring_api import router as ai_scoring_router
+from .services.thresholds import active_threshold
 from .security import (
     add_security_event, allowed_host, enforce_production_security, production_security_issues, production_security_warnings,
     rate_limit_check, read_upload_limited, request_id_for, request_is_https, security_error, security_headers,
@@ -89,6 +99,13 @@ app.include_router(assessment_plan_router)
 app.include_router(production_acceptance_router)
 app.include_router(operations_router)
 app.include_router(program_review_router)
+app.include_router(evaluator_room_router)
+app.include_router(student_portal_router)
+app.include_router(thresholds_router)
+app.include_router(governance_router)
+app.include_router(archive_router)
+app.include_router(p1_exports_router)
+app.include_router(ai_scoring_router)
 
 
 @app.exception_handler(HTTPException)
@@ -177,7 +194,7 @@ def _auth_error_payload(exc: HTTPException) -> JSONResponse:
 @app.middleware("http")
 async def identity_context_middleware(request: Request, call_next):
     path = request.url.path
-    if not path.startswith("/api/") or path in _PUBLIC_API or path.startswith("/api/public/surveys/") or path.startswith("/api/public/evaluator-workspaces/"):
+    if not path.startswith("/api/") or path in _PUBLIC_API or path.startswith("/api/public/surveys/") or path.startswith("/api/public/evaluator-workspaces/") or path.startswith("/api/public/student-exam/"):
         return await call_next(request)
     try:
         with SessionLocal() as db:
@@ -474,6 +491,29 @@ def _exam_readiness(db: Session, exam: m.Exam) -> dict:
                             issues.append(f"{q.order_no}. soru / {criterion.get('label')}: rubrik ölçütü en az bir ÖÇ ile eşleştirilmelidir")
                         elif any(code.casefold() not in q_codes for code in c_codes):
                             issues.append(f"{q.order_no}. soru / {criterion.get('label')}: rubrik ÖÇ eşleşmesi sorunun ÖÇ listesinde bulunmalıdır")
+    if (exam.duration_minutes or 0) <= 0:
+        issues.append("Sınav süresi pozitif olmalıdır")
+    if questions:
+        # Coverage: every learning outcome snapshotted on the exam should be measured by at least one question.
+        covered = {c.casefold() for q in questions for c in _question_outcome_codes(q)}
+        exam_los = db.scalars(select(m.ExamLearningOutcome).where(m.ExamLearningOutcome.exam_id == exam.id)).all()
+        missing = sorted(lo.code for lo in exam_los if lo.code.casefold() not in covered)
+        if missing:
+            warnings.append(f"Şu Öğrenim Çıktıları hiçbir soruyla ölçülmüyor: {', '.join(missing)}")
+        seen: dict[str, int] = {}
+        for q in questions:
+            key = re.sub(r"\s+", " ", (q.text or "").strip().casefold())
+            if key and key in seen:
+                warnings.append(f"{q.order_no}. soru, {seen[key]}. soru ile aynı metne sahip")
+            seen.setdefault(key, q.order_no)
+        for q in questions:
+            if q.question_type == "classic" and q.rubric and q.rubric.get("criteria"):
+                rubric_total = round(sum(float(c.get("max_points") or 0) for c in q.rubric["criteria"]), 4)
+                if abs(rubric_total - float(q.points)) > 0.01:
+                    issues.append(f"{q.order_no}. soru rubrik toplamı ({rubric_total:g}) soru puanına ({float(q.points):g}) eşit olmalıdır")
+        keys = [str(q.correct_answer or "").upper() for q in questions if q.question_type == "mcq" and q.correct_answer]
+        if len(keys) >= 5 and len(set(keys)) == 1:
+            warnings.append(f"Tüm test sorularının doğru cevabı aynı şık ({keys[0]}); cevap anahtarı dağılımını gözden geçirin")
     exam_student_count = db.scalar(select(func.count()).select_from(m.ExamStudent).where(m.ExamStudent.exam_id == exam.id)) or 0
     course_enrollment_count = db.scalar(select(func.count()).select_from(m.Enrollment).where(m.Enrollment.course_id == exam.course_id)) or 0
     if not exam_student_count:
@@ -585,6 +625,7 @@ def _exam_out(e: m.Exam, include_detail: bool = False) -> dict:
         "approval_requested_at": e.approval_requested_at.isoformat() if e.approval_requested_at else None,
         "approved_by": e.approved_by or "", "approved_at": e.approved_at.isoformat() if e.approved_at else None,
         "approval_note": e.approval_note or "",
+        "printed_at": e.printed_at.isoformat() if e.printed_at else None, "printed_by": e.printed_by or "",
         "grade_locked_at": e.grade_locked_at.isoformat() if e.grade_locked_at else None,
         "grade_locked_by": e.grade_locked_by or "", "grade_lock_note": e.grade_lock_note or "",
         "paper_snapshot": {
@@ -721,7 +762,7 @@ def obs_login(payload: ObsLoginRequest, db: Session = Depends(get_db)):
         with db.begin():
             user, stats = teacher_login_and_sync(db, username, payload.password, payload.donem_id)
             audit(db, "obs_login", "app_user", user.id, {"username": username, **{k: v for k, v in stats.items() if k != "donem_id"}, "donem_id": stats.get("donem_id")})
-            run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="success", summary=stats)
+            run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="success", summary={**stats, "user_email": user.email})
             db.add(run)
     except ObsLoginError as exc:
         db.rollback()
@@ -735,6 +776,44 @@ def obs_login(payload: ObsLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(502, str(exc)) from exc
     token = mint_obs_session_token(user)
     return {"access_token": token, "token_type": "bearer", "display_name": user.display_name, "email": user.email, "sync": stats}
+
+
+@app.get("/api/auth/obs-sync-status")
+def obs_sync_status(db: Session = Depends(get_db)):
+    """Last successful OBS sync of the signed-in user (login or manual re-sync) + whether re-sync is available."""
+    email = str(current_user().get("email") or "").lower()
+    last = None
+    for run in db.scalars(select(m.IntegrationSyncRun).where(m.IntegrationSyncRun.provider == "obs-proliz", m.IntegrationSyncRun.status == "success", m.IntegrationSyncRun.mode.in_(["login", "resync"])).order_by(m.IntegrationSyncRun.id.desc()).limit(200)).all():
+        if str((run.summary or {}).get("user_email") or "").lower() == email:
+            last = run; break
+    return {"enabled": bool(settings.obs_proliz_enabled), "last_sync_at": last.created_at.isoformat() if last and last.created_at else None,
+            "summary": ({k: v for k, v in (last.summary or {}).items() if k in ("courses", "students", "enrollments", "donem_id")} if last else None)}
+
+
+@app.post("/api/integrations/obs/resync")
+def obs_resync(payload: ObsLoginRequest, db: Session = Depends(get_db)):
+    """'OBS'den getir': re-pull the signed-in teacher's courses/rosters. Needs the OBS password again (never stored)."""
+    if not settings.obs_proliz_enabled:
+        raise HTTPException(503, "OBS_PROLIZ_ENABLED=false; Proliz entegrasyonu kapalı")
+    me = str(current_user().get("email") or "").lower()
+    if not me:
+        raise HTTPException(401, "Oturum bulunamadı")
+    username = payload.username.strip()
+    try:
+        db.rollback()
+        with db.begin():
+            user, stats = teacher_login_and_sync(db, username, payload.password, payload.donem_id)
+            if user.email.lower() != me:
+                raise ObsLoginError("Bu OBS hesabı oturum açmış kullanıcıya ait değil", status_code=403)
+            audit(db, "obs_resync", "app_user", user.id, {"username": username, **stats})
+            db.add(m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-resync-{username}", mode="resync", source_sha256="n/a", status="success", summary={**stats, "user_email": user.email}))
+    except ObsLoginError as exc:
+        db.rollback()
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    except obs_proliz.ProlizError as exc:
+        db.rollback()
+        raise HTTPException(502, str(exc)) from exc
+    return {"sync": stats}
 
 
 @app.get("/api/auth/me")
@@ -1516,18 +1595,24 @@ def course_outcomes(course_id: int, db: Session = Depends(get_db)):
     pos = db.scalars(select(m.ProgramOutcome).where(m.ProgramOutcome.program_id == course.program_id, m.ProgramOutcome.academic_year == course.academic_year).order_by(m.ProgramOutcome.code)).all()
     mappings = db.scalars(select(m.OutcomeMapping).join(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id, m.OutcomeMapping.contribution >= 1)).all()
     return {
-        "learning_outcomes": [{"id": x.id, "code": x.code, "description": x.description, "target_percent": x.target_percent} for x in los],
+        "learning_outcomes": [{"id": x.id, "code": x.code, "description": x.description, "target_percent": x.target_percent, "source": x.source, "is_active": x.is_active} for x in los],
         "program_outcomes": [{"id": x.id, "academic_year": x.academic_year, "code": x.code, "description": x.description} for x in pos],
         "mappings": [{"id": x.id, "learning_outcome_id": x.learning_outcome_id, "program_outcome_id": x.program_outcome_id, "contribution": x.contribution} for x in mappings],
     }
 
 
+def _lo_out(x: m.LearningOutcome) -> dict:
+    return lo_out(x)
+
+
 @app.post("/api/courses/{course_id}/learning-outcomes", status_code=201)
 def create_lo(course_id: int, data: LearningOutcomeCreate, db: Session = Depends(get_db)):
-    require_course_management(db, course_id)
+    require_course_access(db, course_id, write=True)  # instructors manage the outcomes of their own course
     if not db.get(m.Course, course_id): raise HTTPException(404, "Ders bulunamadı")
-    obj = m.LearningOutcome(course_id=course_id, **data.model_dump()); db.add(obj); db.flush(); _commit(db)
-    return {"id": obj.id, "course_id": obj.course_id, "code": obj.code, "description": obj.description, "target_percent": obj.target_percent}
+    gate = approval_gate(db, course_id, "create", data.model_dump(exclude_unset=True))
+    if gate: return gate
+    obj = lo_create_core(db, course_id, data.model_dump(), "target_percent" in data.model_fields_set); _commit(db)
+    return _lo_out(obj)
 
 
 @app.post("/api/programs/{program_id}/program-outcomes", status_code=201)
@@ -1544,7 +1629,7 @@ def course_outcome_summary(course_id: int, db: Session = Depends(get_db)):
     course = db.get(m.Course, course_id)
     if not course:
         raise HTTPException(404, "Ders bulunamadı")
-    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id)).all()
+    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id, m.LearningOutcome.is_active.is_(True))).all()
     pos = db.scalars(select(m.ProgramOutcome).where(m.ProgramOutcome.program_id == course.program_id, m.ProgramOutcome.academic_year == course.academic_year)).all()
     mappings = db.scalars(select(m.OutcomeMapping).join(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id, m.OutcomeMapping.contribution > 0)).all()
     mapped_lo_ids = {x.learning_outcome_id for x in mappings}
@@ -1586,11 +1671,35 @@ def update_learning_outcome(outcome_id: int, data: LearningOutcomeUpdate, db: Se
     obj = db.get(m.LearningOutcome, outcome_id)
     if not obj:
         raise HTTPException(404, "ÖÇ bulunamadı")
-    require_course_management(db, obj.course_id)
-    changes = _apply_patch(obj, data)
-    audit(db, "update", "learning_outcome", obj.id, changes)
-    _commit(db)
-    return {"id": obj.id, "course_id": obj.course_id, "code": obj.code, "description": obj.description, "target_percent": obj.target_percent}
+    require_course_access(db, obj.course_id, write=True)
+    changes = data.model_dump(exclude_unset=True)
+    gate = approval_gate(db, obj.course_id, "update", changes, obj)
+    if gate: return gate
+    lo_update_core(db, obj, changes); _commit(db)
+    return _lo_out(obj)
+
+
+@app.get("/api/courses/{course_id}/outcome-diff")
+def course_outcome_diff(course_id: int, db: Session = Depends(get_db)):
+    """OBS vs Assess difference report: what was added/edited/deactivated here, so it can be mirrored to OBS by hand."""
+    require_course_access(db, course_id, write=False)
+    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id).order_by(m.LearningOutcome.code)).all()
+    ids = [x.id for x in los]
+    first_before: dict[int, dict] = {}
+    if ids:
+        for log in db.scalars(select(m.AuditLog).where(m.AuditLog.entity_type == "learning_outcome", m.AuditLog.entity_id.in_(ids), m.AuditLog.action == "update").order_by(m.AuditLog.id)).all():
+            b = (log.payload or {}).get("before")
+            if isinstance(b, dict) and log.entity_id not in first_before:
+                first_before[log.entity_id] = b
+    rows = []
+    for x in los:
+        kind = "inactive" if not x.is_active else {"assess": "added_in_assess", "obs_modified": "modified"}.get(x.source)
+        if not kind:
+            continue
+        orig = first_before.get(x.id) if x.source == "obs_modified" else None
+        rows.append({"id": x.id, "code": x.code, "kind": kind, "current": {"code": x.code, "description": x.description, "target_percent": x.target_percent},
+                     "obs_original": orig, "is_active": x.is_active})
+    return {"course_id": course_id, "difference_count": len(rows), "items": rows}
 
 
 @app.delete("/api/learning-outcomes/{outcome_id}")
@@ -1598,16 +1707,11 @@ def delete_learning_outcome(outcome_id: int, db: Session = Depends(get_db)):
     obj = db.get(m.LearningOutcome, outcome_id)
     if not obj:
         raise HTTPException(404, "ÖÇ bulunamadı")
-    require_course_management(db, obj.course_id)
-    bank_links = db.scalar(select(func.count()).select_from(m.QuestionBankOutcome).where(m.QuestionBankOutcome.learning_outcome_id == outcome_id)) or 0
-    exam_snapshot_links = db.scalar(select(func.count()).select_from(m.ExamLearningOutcome).where(m.ExamLearningOutcome.source_learning_outcome_id == outcome_id)) or 0
-    if bank_links:
-        raise HTTPException(409, f"ÖÇ silinemez. Soru havuzunda {bank_links} ilişki var; önce sorulardaki ÖÇ eşleşmesini değiştirin.")
-    if exam_snapshot_links:
-        raise HTTPException(409, f"ÖÇ silinemez. {exam_snapshot_links} sınav snapshot'ı bu çıktıyı referanslıyor. Tarihsel kanıt bütünlüğü korunmalıdır.")
-    audit(db, "delete", "learning_outcome", obj.id, {"code": obj.code})
-    db.delete(obj); _commit(db)
-    return {"deleted": True}
+    require_course_access(db, obj.course_id, write=True)
+    gate = approval_gate(db, obj.course_id, "delete", {}, obj)
+    if gate: return gate
+    result = lo_delete_core(db, obj); _commit(db)
+    return result
 
 
 @app.patch("/api/program-outcomes/{outcome_id}")
@@ -1682,7 +1786,7 @@ def upsert_mapping(data: OutcomeMappingCreate, db: Session = Depends(get_db)):
 
 def _snapshot_exam(db: Session, exam: m.Exam) -> None:
     course = db.get(m.Course, exam.course_id)
-    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course.id)).all()
+    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course.id, m.LearningOutcome.is_active.is_(True))).all()
     pos = db.scalars(select(m.ProgramOutcome).where(m.ProgramOutcome.program_id == course.program_id, m.ProgramOutcome.academic_year == course.academic_year)).all()
     lo_map: dict[int, m.ExamLearningOutcome] = {}
     po_map: dict[int, m.ExamProgramOutcome] = {}
@@ -1748,7 +1852,13 @@ def create_demo_scenario(db: Session = Depends(get_db)):
         year, term = active.academic_year, active.term
     else:
         # Demo data must never mutate or collide with a real locked/planned academic period.
-        year, term = "2099-2100", "Demo"
+        # Prefer the real current term (no 2099 placeholder in front of reviewers) when that period is free.
+        today = date.today()
+        start = today.year if today.month >= 8 else today.year - 1
+        cur_term = "Güz" if today.month >= 8 or today.month == 1 else "Bahar" if today.month <= 6 else "Yaz"
+        cur_year = f"{start}-{start + 1}"
+        taken = db.scalar(select(m.AcademicPeriod).where(m.AcademicPeriod.academic_year == cur_year, m.AcademicPeriod.term == cur_term))
+        year, term = (cur_year, cur_term) if not taken else ("2099-2100", "Demo")
         active = db.scalar(select(m.AcademicPeriod).where(m.AcademicPeriod.academic_year == year, m.AcademicPeriod.term == term))
         if not active:
             active=m.AcademicPeriod(academic_year=year, term=term, title="DOU Assess · Demo Dönemi", status="active"); db.add(active); db.flush()
@@ -2028,7 +2138,7 @@ def personalized_exam_paper(exam_id: int, student_id: int, booklet: str = "A", d
         raise HTTPException(404, "Öğrenci bu sınava kayıtlı değil")
     booklet = _require_allowed_booklet(exam, booklet)
     try:
-        data, meta = build_exam_pdf(exam, booklet, student=student)
+        data, meta = build_exam_pdf(exam, booklet, student=student, extra_time_percent=es.extra_time_percent or 0)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     safe = re.sub(r"[^A-Za-z0-9_-]+", "_", student.student_no)
@@ -2049,13 +2159,69 @@ def batch_exam_papers(exam_id: int, booklet_strategy: str = "rotate", db: Sessio
     booklets = _allowed_booklets(exam)
     for i, es in enumerate(rows):
         booklet = booklets[i % len(booklets)] if strategy == "rotate" else "A"
-        data, _ = build_exam_pdf(exam, booklet, student=es.student)
+        data, _ = build_exam_pdf(exam, booklet, student=es.student, extra_time_percent=es.extra_time_percent or 0)
         reader = PdfReader(BytesIO(data))
         for page in reader.pages:
             writer.add_page(page)
     buf = BytesIO(); writer.write(buf); buf.seek(0)
     audit(db, "paper_batch_generate", "exam", exam_id, {"students": len(rows), "strategy": strategy}); _commit(db)
     return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="DOU_exam_{exam_id}_student_papers.pdf"'})
+
+
+def _print_assignments(db: Session, exam: m.Exam) -> list[dict]:
+    rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam.id).order_by(m.ExamStudent.id)).all()
+    booklets = _allowed_booklets(exam)
+    return [{"student_id": es.student_id, "student_no": es.student.student_no, "full_name": es.student.full_name, "booklet": booklets[i % len(booklets)], "extra_time_percent": es.extra_time_percent or 0} for i, es in enumerate(rows)]
+
+
+@app.get("/api/exams/{exam_id}/print-summary")
+def exam_print_summary(exam_id: int, db: Session = Depends(get_db)):
+    require_exam_access(db, exam_id, write=False)
+    exam = _load_exam_detail_model(db, exam_id)
+    rows = _print_assignments(db, exam)
+    pages = 0
+    if exam.questions:
+        try:
+            pages = len(PdfReader(BytesIO(build_exam_pdf(exam, "A")[0])).pages)
+        except Exception:
+            pages = 0
+    counts: dict[str, int] = {}
+    for r in rows: counts[r["booklet"]] = counts.get(r["booklet"], 0) + 1
+    readiness = _exam_readiness(db, exam)
+    return {"exam_id": exam.id, "status": exam.status, "title": exam.title, "student_count": len(rows), "pages_per_paper": pages,
+            "total_pages": pages * len(rows), "duplex": bool(exam.duplex_print), "sheets_total": (math.ceil(pages / 2) if exam.duplex_print else pages) * len(rows),
+            "booklets": counts, "printed_at": exam.printed_at.isoformat() if exam.printed_at else None, "printed_by": exam.printed_by or "",
+            "ready": readiness["ready"], "issues": readiness["issues"], "can_confirm": bool(exam.status == "ready" and readiness["ready"] and rows and not exam.printed_at)}
+
+
+@app.post("/api/exams/{exam_id}/print-confirm")
+def exam_print_confirm(exam_id: int, db: Session = Depends(get_db)):
+    """'Yazdırdım': from here on the questions are frozen; changes need a new version (copy)."""
+    require_exam_access(db, exam_id, write=True)
+    exam = _load_exam_detail_model(db, exam_id)
+    if exam.status != "ready":
+        raise HTTPException(409, "Basım onayı yalnız 'hazır' durumundaki sınavda verilebilir")
+    readiness = _exam_readiness(db, exam)
+    if not readiness["ready"]:
+        raise HTTPException(409, {"message": "Sınav hazır değil", "issues": readiness["issues"]})
+    if not db.scalar(select(func.count()).select_from(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id)):
+        raise HTTPException(409, "Sınava atanmış öğrenci yok")
+    if not exam.printed_at:
+        actor = current_user(); exam.printed_at = datetime.now(timezone.utc); exam.printed_by = actor.get("email") or "system"
+        audit(db, "exam_print_confirm", "exam", exam_id, {"revision_no": exam.revision_no}); _commit(db)
+    return {"printed_at": exam.printed_at.isoformat(), "printed_by": exam.printed_by}
+
+
+@app.get("/api/exams/{exam_id}/attendance-sheet.pdf")
+def exam_attendance_sheet(exam_id: int, db: Session = Depends(get_db)):
+    require_exam_access(db, exam_id, write=False)
+    exam = _load_exam_detail_model(db, exam_id)
+    rows = _print_assignments(db, exam)
+    if not rows:
+        raise HTTPException(409, "Sınava atanmış öğrenci yok")
+    data = build_attendance_sheet_pdf(exam, rows)
+    audit(db, "attendance_sheet_generate", "exam", exam_id, {"students": len(rows)}); _commit(db)
+    return StreamingResponse(BytesIO(data), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="yoklama_{exam_id}.pdf"'})
 
 
 @app.get("/api/exams/{exam_id}/paper-metadata")
@@ -2181,6 +2347,8 @@ def change_exam_status(exam_id: int, data: ExamStatusUpdate, db: Session = Depen
         if not readiness["ready"]:
             raise HTTPException(409, {"message": "Sınav hazır durumuna alınamaz", "issues": readiness["issues"], "total_points": readiness["total_points"]})
     if exam.status == "ready" and data.status == "draft":
+        if exam.printed_at:
+            raise HTTPException(409, "Kâğıtlar basıldı olarak işaretlendi; sorular değiştirilemez. Değişiklik için sınavı kopyalayarak yeni sürüm oluşturun")
         exam.revision_no = int(exam.revision_no or 1) + 1
         exam.approval_requested_by = ""
         exam.approval_requested_at = None
@@ -2712,6 +2880,7 @@ def review_bank_question(question_id: int, data: QuestionReviewRequest, db: Sess
     current = obj.review_status or "draft"
     if data.status != current and data.status not in allowed.get(current, set()):
         raise HTTPException(400, f"Geçersiz soru yaşam döngüsü geçişi: {current} -> {data.status}")
+    if data.status != current: question_review_gate(db, obj, data.status)
     obj.review_status = data.status; obj.review_note = data.note or ""
     if data.reviewer: obj.reviewer = data.reviewer
     if data.status in {"approved", "institutional"}: obj.reviewed_at = datetime.now(timezone.utc)
@@ -2963,7 +3132,7 @@ def exam_students(exam_id: int, db: Session = Depends(get_db)):
     require_exam_access(db, exam_id, write=False)
     if not db.get(m.Exam, exam_id): raise HTTPException(404, "Sınav bulunamadı")
     rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id)).all()
-    return [{"exam_student_id": x.id, "attendance_status": x.attendance_status or "attended", "attendance_note": x.attendance_note or "", "attendance_updated_at": x.attendance_updated_at.isoformat() if x.attendance_updated_at else None, **_student_out(x.student)} for x in rows]
+    return [{"exam_student_id": x.id, "attendance_status": x.attendance_status or "attended", "extra_time_percent": x.extra_time_percent or 0, "attendance_note": x.attendance_note or "", "attendance_updated_at": x.attendance_updated_at.isoformat() if x.attendance_updated_at else None, **_student_out(x.student)} for x in rows]
 
 
 @app.get("/api/exams/{exam_id}/students/{student_id}/responses")
@@ -2985,14 +3154,14 @@ def submit_responses(exam_id: int, student_id: int, data: ResponsesSubmit, db: S
     es = db.scalar(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.student_id == student_id))
     if not es: raise HTTPException(404, "Öğrenci bu sınava kayıtlı değil")
     saved = 0
+    policy = _key_policy(db, exam_id)
     for item in data.responses:
         q = db.get(m.Question, item.question_id)
         if not q or q.exam_id != exam_id: raise HTTPException(400, f"Soru bu sınava ait değil: {item.question_id}")
         existing = db.scalar(select(m.Response).where(m.Response.exam_student_id == es.id, m.Response.question_id == q.id))
         if q.question_type == "mcq":
             answer = normalize_correct_answer(item.answer_text, q.choices)
-            expected_answer = normalize_correct_answer(q.correct_answer, q.choices)
-            correct = bool(answer) and answer == expected_answer
+            correct = _mcq_is_correct(q, answer, policy)
             awarded = float(q.points) if correct else 0.0
             is_correct = correct
         else:
@@ -3014,6 +3183,8 @@ def submit_responses(exam_id: int, student_id: int, data: ResponsesSubmit, db: S
                 raise HTTPException(400, f"Klasik soru {q.order_no} rubriksiz puanlanamaz")
             if awarded < 0 or awarded > float(q.points): raise HTTPException(400, f"Klasik soru {q.order_no} puanı 0-{q.points} arasında olmalıdır")
             is_correct = None
+            if q.id in policy[0]:  # annulled classic question: everyone keeps full marks
+                awarded = float(q.points); rubric_scores = {str(c.get("id")): float(c.get("max_points") or 0) for c in (q.rubric or {}).get("criteria") or []}
         if q.question_type == "mcq":
             rubric_scores = {}
         actor = current_user(); grader = actor.get("email") or "system"; now = datetime.now(timezone.utc)
@@ -3170,6 +3341,28 @@ def _scan_review_out(item: m.ScanItem, review: m.ScanReview | None = None) -> di
     }
 
 
+def _key_policy(db: Session, exam_id: int) -> tuple[set[int], dict[int, set[str]]]:
+    """Annulled questions (everyone gets full credit) and accepted alternative answers, replayed from key revisions."""
+    annulled: set[int] = set(); alts: dict[int, set[str]] = {}
+    for rev in db.scalars(select(m.AnswerKeyRevision).where(m.AnswerKeyRevision.exam_id == exam_id).order_by(m.AnswerKeyRevision.id)).all():
+        c = rev.corrections or {}
+        for qid in c.get("__annulled__", []) or []:
+            annulled.add(int(qid))
+        for qid, letters in (c.get("__accepted__", {}) or {}).items():
+            alts.setdefault(int(qid), set()).update(str(x).upper() for x in letters)
+    return annulled, alts
+
+
+def _mcq_is_correct(q: "m.Question", normalized: str | None, policy: tuple[set[int], dict[int, set[str]]]) -> bool:
+    annulled, alts = policy
+    if q.id in annulled:
+        return True
+    expected = normalize_correct_answer(q.correct_answer, q.choices)
+    if not normalized:
+        return False
+    return normalized == expected or normalized.upper() in alts.get(q.id, set())
+
+
 def _apply_scan_answers(db: Session, exam: m.Exam, student: m.Student, booklet: str, answers: dict) -> int:
     if exam.status != "grading":
         raise HTTPException(409, "Optik cevapların otomatik uygulanması için sınav değerlendirme (grading) durumunda olmalıdır")
@@ -3181,6 +3374,7 @@ def _apply_scan_answers(db: Session, exam: m.Exam, student: m.Student, booklet: 
     meta = paper_metadata(exam, booklet, student=student)
     display_to_qid = {str(x["display_no"]): x["question_id"] for x in meta["question_order"] if x["question_type"] == "mcq"}
     saved = 0
+    policy = _key_policy(db, exam.id)
     for no, answer in answers.items():
         qid = display_to_qid.get(str(no))
         if not qid:
@@ -3188,8 +3382,7 @@ def _apply_scan_answers(db: Session, exam: m.Exam, student: m.Student, booklet: 
         q = db.get(m.Question, qid)
         existing = db.scalar(select(m.Response).where(m.Response.exam_student_id == es.id, m.Response.question_id == q.id))
         normalized = normalize_correct_answer(answer, q.choices) if answer else None
-        expected = normalize_correct_answer(q.correct_answer, q.choices)
-        correct = bool(normalized) and normalized == expected
+        correct = _mcq_is_correct(q, normalized, policy)
         now = datetime.now(timezone.utc)
         if existing:
             old_points, old_rubric = existing.awarded_points, dict(existing.rubric_scores or {})
@@ -3302,7 +3495,7 @@ def _process_scan_bytes(db: Session, exam: m.Exam, data: bytes, source_name: str
         expected = paper_metadata(exam, booklet, student=student if student else None)
         token_mismatch = qr.get("token") != expected.get("token")
         result = analyze_page(page, expected)
-        omr_logical_page = 2 if str(getattr(exam, "omr_mode", "embedded") or "embedded") == "separate" else 1
+        omr_logical_page = 2 if effective_omr_mode(exam) == "separate" else 1
         if result.get("kind") != "omr":
             status = "review" if token_mismatch else "skipped"
             issues = [{"code":"TOKEN_MISMATCH", "message":"Sınav/kitapçık doğrulama tokenı eşleşmedi"}] if token_mismatch else []
@@ -3447,6 +3640,129 @@ def scan_reviews(exam_id: int, db: Session = Depends(get_db)):
     return out
 
 
+def _grid_question(db: Session, exam_id: int, question_id: int) -> tuple[m.Exam, m.Question]:
+    exam = db.get(m.Exam, exam_id)
+    q = db.get(m.Question, question_id)
+    if not exam or not q or q.exam_id != exam_id:
+        raise HTTPException(404, "Soru bulunamadı")
+    if q.question_type != "classic" or not ((q.rubric or {}).get("criteria") or []):
+        raise HTTPException(409, "Hızlı giriş yalnız rubrikli klasik sorular içindir")
+    return exam, q
+
+
+@app.get("/api/exams/{exam_id}/questions/{question_id}/grid")
+def classic_grid(exam_id: int, question_id: int, db: Session = Depends(get_db)):
+    """Student x rubric-criterion grid for one classic question ('girilmedi' = no row)."""
+    require_exam_access(db, exam_id, write=False)
+    exam, q = _grid_question(db, exam_id, question_id)
+    annulled, _ = _key_policy(db, exam_id)
+    rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.attendance_status == "attended")).all()
+    resp = {r.exam_student_id: r for r in db.scalars(select(m.Response).where(m.Response.question_id == q.id)).all()}
+    return {"question": {"id": q.id, "order_no": q.order_no, "text": q.text, "points": q.points, "criteria": [{"id": str(c.get("id")), "label": c.get("label"), "max_points": c.get("max_points")} for c in q.rubric["criteria"]]},
+            "annulled": q.id in annulled, "editable": exam.status == "grading" and not exam.grade_locked_at and q.id not in annulled,
+            "rows": [{"student_id": es.student_id, "student_no": es.student.student_no, "name": es.student.full_name, "entered": es.id in resp,
+                      "rubric_scores": (resp[es.id].rubric_scores if es.id in resp else {}), "awarded": (resp[es.id].awarded_points if es.id in resp else None)} for es in sorted(rows, key=lambda x: x.student.student_no)]}
+
+
+@app.post("/api/exams/{exam_id}/questions/{question_id}/grid")
+def classic_grid_save(exam_id: int, question_id: int, data: ClassicGridSave, db: Session = Depends(get_db)):
+    require_exam_access(db, exam_id, write=True)
+    exam, q = _grid_question(db, exam_id, question_id)
+    if exam.status != "grading": raise HTTPException(409, "Puan girişi yalnızca değerlendirme (grading) durumunda yapılabilir")
+    if exam.grade_locked_at: raise HTTPException(409, "Puanlar kilitli")
+    if q.id in _key_policy(db, exam_id)[0]: raise HTTPException(409, "Bu soru iptal edildi; herkese tam puan verilmiştir")
+    criteria = {str(c.get("id")): (c.get("label"), float(c.get("max_points") or 0)) for c in q.rubric["criteria"]}
+    ess = {es.student_id: es for es in db.scalars(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id)).all()}
+    errors, prepared = [], []
+    for row in data.rows:  # validate everything first: all-or-nothing
+        es = ess.get(row.student_id)
+        if not es: errors.append(f"Öğrenci {row.student_id} bu sınava kayıtlı değil"); continue
+        scores = {}
+        for cid, (label, mx) in criteria.items():
+            raw = row.rubric_scores.get(cid)
+            if raw is None: errors.append(f"Öğrenci {row.student_id}: '{label}' puanı eksik"); break
+            if raw < 0 or raw > mx: errors.append(f"Öğrenci {row.student_id}: '{label}' 0-{mx:g} arasında olmalı"); break
+            scores[cid] = round(float(raw), 4)
+        else:
+            prepared.append((es, scores))
+    if errors: raise HTTPException(422, {"message": "Puanlar kaydedilmedi", "errors": errors[:50]})
+    actor = current_user().get("email") or "system"; now = datetime.now(timezone.utc); saved = 0
+    existing = {r.exam_student_id: r for r in db.scalars(select(m.Response).where(m.Response.question_id == q.id)).all()}
+    for es, scores in prepared:
+        total = round(sum(scores.values()), 4); r = existing.get(es.id)
+        if r:
+            old, old_rub = r.awarded_points, dict(r.rubric_scores or {})
+            if old == total and old_rub == scores: continue
+            r.awarded_points = total; r.rubric_scores = scores; r.graded_by = actor; r.graded_at = now; r.revision_no = int(r.revision_no or 1) + 1
+            _log_grade_revision(db, r, old, old_rub, "grid", actor)
+        else:
+            db.add(m.Response(exam_student_id=es.id, question_id=q.id, answer_text=None, awarded_points=total, is_correct=None, rubric_scores=scores, graded_by=actor, graded_at=now, revision_no=1))
+        saved += 1
+    audit(db, "grade_grid", "question", q.id, {"saved": saved, "exam_id": exam_id}); _commit(db)
+    return {"saved": saved}
+
+
+@app.get("/api/exams/{exam_id}/grading-progress")
+def grading_progress(exam_id: int, db: Session = Depends(get_db)):
+    """'Girilmedi' (no response row) vs a real 0: per question and per student, for attending students."""
+    require_exam_access(db, exam_id, write=False)
+    exam = db.get(m.Exam, exam_id)
+    if not exam: raise HTTPException(404, "Sınav bulunamadı")
+    qs = db.scalars(select(m.Question).where(m.Question.exam_id == exam_id).order_by(m.Question.order_no)).all()
+    attended = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.attendance_status == "attended")).all()
+    entered = {(r.exam_student_id, r.question_id) for r in db.scalars(select(m.Response).join(m.ExamStudent, m.ExamStudent.id == m.Response.exam_student_id).where(m.ExamStudent.exam_id == exam_id)).all()}
+    per_q = [{"question_id": q.id, "order_no": q.order_no, "type": q.question_type, "entered": sum(1 for es in attended if (es.id, q.id) in entered),
+              "missing": sum(1 for es in attended if (es.id, q.id) not in entered)} for q in qs]
+    missing_students = [{"student_id": es.student_id, "student_no": es.student.student_no, "missing_questions": [q.order_no for q in qs if (es.id, q.id) not in entered]}
+                        for es in attended if any((es.id, q.id) not in entered for q in qs)]
+    total = len(attended) * len(qs); done = sum(x["entered"] for x in per_q)
+    return {"exam_id": exam_id, "attended": len(attended), "expected": total, "entered": done, "missing": total - done,
+            "percent": round(done / total * 100, 1) if total else 0.0, "complete": bool(total) and done == total,
+            "questions": per_q, "students_with_missing": missing_students}
+
+
+@app.get("/api/exams/{exam_id}/scan-coverage")
+def scan_coverage(exam_id: int, db: Session = Depends(get_db)):
+    """Which attending students have no usable scanned page yet (missing papers) and which have pending reviews."""
+    require_exam_access(db, exam_id, write=False)
+    if not db.get(m.Exam, exam_id): raise HTTPException(404, "Sınav bulunamadı")
+    rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id).order_by(m.ExamStudent.id)).all()
+    by_student: dict[int, set[str]] = {}
+    pages_seen: dict[tuple[int, str], set[int]] = {}
+    for sid, st, bk, kind, lp in db.execute(select(m.ScanItem.student_id, m.ScanItem.status, m.ScanItem.booklet, m.ScanItem.page_kind, m.ScanItem.logical_page_no).where(m.ScanItem.exam_id == exam_id, m.ScanItem.student_id.is_not(None))).all():
+        by_student.setdefault(int(sid), set()).add(st)
+        if kind == "question" and st == "support" and lp:
+            pages_seen.setdefault((int(sid), (bk or "A").upper()), set()).add(int(lp))
+    exam_full = _load_exam_detail_model(db, exam_id)
+    expected_pages: dict[str, set[int]] = {}
+    for bk in _allowed_booklets(exam_full):
+        try:
+            expected_pages[bk] = {int(r["page_no"]) for r in question_regions(exam_full, bk).values() if r.get("page_no")}
+        except Exception:
+            expected_pages[bk] = set()
+    incomplete = []
+    unmatched = db.scalar(select(func.count()).select_from(m.ScanItem).where(m.ScanItem.exam_id == exam_id, m.ScanItem.status == "review", m.ScanItem.student_id.is_(None))) or 0
+    missing, pending, scanned, absent = [], [], 0, 0
+    for es in rows:
+        if es.attendance_status != "attended":
+            absent += 1; continue
+        states = by_student.get(es.student_id, set())
+        row = {"student_id": es.student_id, "student_no": es.student.student_no, "full_name": es.student.full_name}
+        if states & {"accepted", "support"}:
+            scanned += 1
+        else:
+            missing.append(row)
+        if "review" in states:
+            pending.append(row)
+        for (psid, bk), seen in pages_seen.items():
+            if psid == es.student_id and expected_pages.get(bk):
+                gap = sorted(expected_pages[bk] - seen)
+                if gap:
+                    incomplete.append({**row, "booklet": bk, "missing_pages": gap})
+    return {"incomplete_papers": incomplete, "exam_id": exam_id, "attended": scanned + len(missing), "absent": absent, "scanned": scanned,
+            "missing_count": len(missing), "missing": missing, "pending_review": pending, "unmatched_review_pages": int(unmatched)}
+
+
 @app.get("/api/scan-items/{item_id}/preview")
 def scan_item_preview(item_id: int, db: Session = Depends(get_db)):
     item = db.get(m.ScanItem, item_id)
@@ -3558,18 +3874,79 @@ def answer_key_regrade(exam_id: int, data: AnswerKeyRegradeRequest, db: Session 
         if not normalized or normalized not in (q.choices or {}): raise HTTPException(400,f"Geçersiz doğru cevap: {qid}")
         corrections[str(q.id)]={"old":q.correct_answer,"new":normalized}; q.correct_answer=normalized
     affected=0
+    policy=_key_policy(db,exam_id)
     rows=db.scalars(select(m.Response).join(m.ExamStudent,m.Response.exam_student_id==m.ExamStudent.id).where(m.ExamStudent.exam_id==exam_id)).all()
     for r in rows:
         q=db.get(m.Question,r.question_id)
         if q and q.question_type=="mcq" and str(q.id) in corrections:
             ans=normalize_correct_answer(r.answer_text,q.choices) if r.answer_text else None
-            expected=normalize_correct_answer(q.correct_answer,q.choices)
             old_points=r.awarded_points
-            r.is_correct=bool(ans) and ans==expected; r.awarded_points=float(q.points) if r.is_correct else 0.0; affected+=1
+            r.is_correct=_mcq_is_correct(q,ans,policy); r.awarded_points=float(q.points) if r.is_correct else 0.0; affected+=1
             _log_grade_revision(db, r, old_points, dict(r.rubric_scores or {}), "answer_key_regrade")
     rev=m.AnswerKeyRevision(exam_id=exam_id,corrections=corrections,reason=data.reason,affected_responses=affected); db.add(rev); db.flush()
     audit(db,"answer_key_regrade","exam",exam_id,{"revision_id":rev.id,"affected":affected,"corrections":corrections}); _commit(db)
     return {"revision_id":rev.id,"affected_responses":affected,"corrections":corrections}
+
+
+@app.post("/api/exams/{exam_id}/questions/{question_id}/key-exception")
+def question_key_exception(exam_id: int, question_id: int, data: QuestionKeyException, db: Session = Depends(get_db)):
+    """Annul a multiple-choice question (full credit to every attending student) or accept an
+    additional correct choice. Persisted as an answer-key revision so later scans/entries follow it."""
+    require_exam_access(db, exam_id, write=True)
+    exam = _load_exam_detail_model(db, exam_id)
+    if exam.status != "grading":
+        raise HTTPException(409, "Soru iptali / alternatif cevap yalnızca değerlendirme (grading) durumunda yapılabilir")
+    if exam.grade_locked_at:
+        raise HTTPException(409, "Puanlar kilitli. Önce kontrollü kilit açma gerekir")
+    if not (data.reason or "").strip():
+        raise HTTPException(400, "Gerekçe zorunludur")
+    q = db.get(m.Question, question_id)
+    if not q or q.exam_id != exam_id:
+        raise HTTPException(400, "Soru bu sınava ait değil")
+    if q.question_type != "mcq" and data.action != "annul":
+        raise HTTPException(400, "Alternatif cevap yalnız çoktan seçmeli sorular için geçerlidir")
+    if q.question_type == "classic" and not ((q.rubric or {}).get("criteria") or []):
+        raise HTTPException(409, "Rubriksiz klasik soru iptal edilemez")
+    if data.action == "accept_alternative":
+        alt = normalize_correct_answer(data.alternative, q.choices)
+        if not alt or alt not in (q.choices or {}):
+            raise HTTPException(400, "Geçersiz alternatif şık")
+        corrections = {"__accepted__": {str(q.id): [alt]}}
+    else:
+        corrections = {"__annulled__": [q.id]}
+    rev = m.AnswerKeyRevision(exam_id=exam_id, corrections=corrections, reason=data.reason.strip(), affected_responses=0)
+    db.add(rev); db.flush()
+    policy = _key_policy(db, exam_id)
+    attended = db.scalars(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.attendance_status == "attended")).all()
+    existing = {r.exam_student_id: r for r in db.scalars(select(m.Response).where(m.Response.question_id == q.id)).all()}
+    affected = 0; now = datetime.now(timezone.utc)
+    actor = current_user().get("email") or "system"
+    full_rubric = {str(c.get("id")): float(c.get("max_points") or 0) for c in ((q.rubric or {}).get("criteria") or [])} if q.question_type == "classic" else {}
+    for es in attended:
+        r = existing.get(es.id)
+        if q.question_type == "classic":  # annulment: full marks on every criterion
+            if r:
+                if r.awarded_points != float(q.points) or (r.rubric_scores or {}) != full_rubric:
+                    old, old_rub = r.awarded_points, dict(r.rubric_scores or {})
+                    r.awarded_points = float(q.points); r.rubric_scores = dict(full_rubric); r.graded_by = actor; r.graded_at = now; r.revision_no = int(r.revision_no or 1) + 1
+                    _log_grade_revision(db, r, old, old_rub, "question_annulled", actor); affected += 1
+            else:
+                db.add(m.Response(exam_student_id=es.id, question_id=q.id, answer_text=None, awarded_points=float(q.points), is_correct=None, rubric_scores=dict(full_rubric), graded_by=actor, graded_at=now, revision_no=1)); affected += 1
+            continue
+        ans = normalize_correct_answer(r.answer_text, q.choices) if (r and r.answer_text) else None
+        ok = _mcq_is_correct(q, ans, policy)
+        pts = float(q.points) if ok else 0.0
+        if r:
+            if r.awarded_points != pts or r.is_correct != ok:
+                old = r.awarded_points
+                r.awarded_points = pts; r.is_correct = ok; r.graded_by = actor; r.graded_at = now; r.revision_no = int(r.revision_no or 1) + 1
+                _log_grade_revision(db, r, old, dict(r.rubric_scores or {}), "question_annulled" if data.action == "annul" else "alternative_accepted", actor)
+                affected += 1
+        elif ok:
+            db.add(m.Response(exam_student_id=es.id, question_id=q.id, answer_text=None, awarded_points=pts, is_correct=True, graded_by=actor, graded_at=now, revision_no=1)); affected += 1
+    rev.affected_responses = affected
+    audit(db, "question_key_exception", "question", q.id, {"action": data.action, "alternative": data.alternative, "affected": affected, "reason": data.reason}); _commit(db)
+    return {"revision_id": rev.id, "action": data.action, "affected_responses": affected}
 
 
 @app.get("/api/exams/{exam_id}/answer-key/revisions")
@@ -4436,6 +4813,24 @@ def _grade_lock_blockers(db: Session, exam_id: int) -> dict:
     incidents = db.scalar(select(func.count()).select_from(m.ExamIncident).where(m.ExamIncident.exam_id == exam_id, m.ExamIncident.status == "open", m.ExamIncident.severity == "critical")) or 0
     appeals = db.scalar(select(func.count()).select_from(m.GradeAppeal).where(m.GradeAppeal.exam_id == exam_id, m.GradeAppeal.status == "open")) or 0
     return {"question_count": int(q_count), "active_student_count": int(active), "expected_responses": int(expected), "response_count": int(responses), "missing_responses": max(0, int(expected-responses)), "open_scan_reviews": int(reviews), "open_critical_incidents": int(incidents), "open_appeals": int(appeals), "ready": (responses >= expected and reviews == 0 and incidents == 0 and appeals == 0)}
+
+
+class AccommodationUpdate(BaseModel):
+    extra_time_percent: int = Field(ge=0, le=100)
+
+
+@app.patch("/api/exams/{exam_id}/students/{student_id}/accommodation")
+def update_exam_accommodation(exam_id: int, student_id: int, data: AccommodationUpdate, db: Session = Depends(get_db)):
+    """Per-student extra time (printed on that student's paper and on the attendance sheet). Locked once papers are printed."""
+    require_exam_access(db, exam_id, write=True)
+    exam = db.get(m.Exam, exam_id)
+    if not exam: raise HTTPException(404, "Sınav bulunamadı")
+    if exam.printed_at: raise HTTPException(409, "Kâğıtlar basıldı; ek süre değiştirilemez (ek kâğıt için kopya sınav kullanın)")
+    es = db.scalar(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.student_id == student_id))
+    if not es: raise HTTPException(404, "Öğrenci bu sınava kayıtlı değil")
+    es.extra_time_percent = data.extra_time_percent
+    audit(db, "exam_accommodation", "exam_student", es.id, {"extra_time_percent": data.extra_time_percent}); _commit(db)
+    return {"student_id": student_id, "extra_time_percent": es.extra_time_percent}
 
 
 @app.patch("/api/exams/{exam_id}/students/{student_id}/attendance")

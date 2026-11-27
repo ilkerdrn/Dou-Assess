@@ -76,11 +76,20 @@ class Settings:
     max_xlsx_uncompressed_mb: int = int(os.getenv("MAX_XLSX_UNCOMPRESSED_MB", "80"))
     max_xlsx_members: int = int(os.getenv("MAX_XLSX_MEMBERS", "5000"))
     evidence_retention_days: int = int(os.getenv("EVIDENCE_RETENTION_DAYS", "1825"))
+    scan_retention_days: int = int(os.getenv("SCAN_RETENTION_DAYS", "1460"))  # scanned papers: confirm against the university archive directive
+    scan_target_error_percent: float = float(os.getenv("SCAN_TARGET_ERROR_PERCENT", "1.0"))
     student_data_retention_days: int = int(os.getenv("STUDENT_DATA_RETENTION_DAYS", "2555"))
     privacy_contact: str = os.getenv("PRIVACY_CONTACT", "").strip()
     obs_writeback_enabled: bool = _bool("OBS_WRITEBACK_ENABLED", False)
     obs_results_endpoint: str = os.getenv("OBS_RESULTS_ENDPOINT", "").strip()
     obs_results_token: str = _secret("OBS_RESULTS_TOKEN", "")
+    outcome_term: str = os.getenv("OUTCOME_TERM", "Öğrenim").strip() or "Öğrenim"  # Öğrenim | Öğrenme | Kazanım (institution wording)
+    ai_scoring_enabled: bool = os.getenv("AI_SCORING_ENABLED", "false").lower() in {"1", "true", "yes"}  # also needs the institution setting + KVKK sign-off
+    ai_scoring_api_url: str = os.getenv("AI_SCORING_API_URL", "https://api.anthropic.com/v1/messages")
+    ai_scoring_model: str = os.getenv("AI_SCORING_MODEL", "")
+    ai_scoring_api_key: str = _secret("AI_SCORING_API_KEY", "")
+    student_link_secret: str = _secret("STUDENT_LINK_SECRET", "")
+    student_appeal_days: int = int(os.getenv("STUDENT_APPEAL_DAYS", "7"))
     obs_results_timeout_seconds: int = int(os.getenv("OBS_RESULTS_TIMEOUT_SECONDS", "15"))
 
     # Proliz OBS read-only academic data pull (DogusAPI, HTTP Basic Auth).

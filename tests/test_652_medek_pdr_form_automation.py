@@ -3,7 +3,7 @@ from app import models as m
 
 def test_652_release_contract():
     assert APP_VERSION == '6.70-production-hardening'
-    assert EXPECTED_SCHEMA_REVISION == '0043_response_grade_revisions'
+    assert EXPECTED_SCHEMA_REVISION == '0047_institution_settings_outcome_approval'
     assert m.MedekPdrFormAnalysis.__tablename__ == 'quality_medek_pdr_form_analyses'
 
 def test_652_api_contract_text():

@@ -27,9 +27,19 @@
         <section class="panel"><div class="section-title"><h2>Bulgular</h2><span id="findingCount">0</span></div><div id="findings" class="record-list"></div></section>
       </div>
       <section class="panel"><div class="section-title"><h2>Ziyaret notları</h2><span id="noteCount">0</span></div><div id="visitNotes" class="record-list"></div></section>
-      <footer>Bu ekran veri değiştirme yetkisi vermez. Tüm erişimler DOU Assess güvenlik günlüğüne kaydedilir.</footer>
+      <section class="panel" id="roomPanel">
+        <div class="section-title"><div><span class="eyebrow">KANIT ODASI</span><h2>Program, ders, çıktı, öğrenci ve sınav kâğıtları</h2></div><span class="readonly">SALT OKUNUR</span></div>
+        <div class="tabs" id="roomTabs">
+          <button data-tab="overview" class="on">Genel</button><button data-tab="matrix">Çıktı matrisi</button><button data-tab="students">Öğrenciler</button><button data-tab="comments">Yorumlarım</button>
+        </div>
+        <div class="crumbs" id="roomCrumbs"></div>
+        <div id="roomBody" class="room-body"><div class="empty">Yükleniyor…</div></div>
+        <p class="note">Öğrenci adları KVKK gereği maskelidir; numaralar örnekleme içindir. Her görüntüleme denetim kaydına yazılır.</p>
+      </section>
+      <footer>Bu ekran, kuruma soru/yorum bırakma dışında veri değiştirme yetkisi vermez. Tüm erişimler DOU Assess güvenlik günlüğüne kaydedilir.</footer>
     </section>
   </main>
+  <script src="/evaluator-room.js?v=6.70-production-hardening"></script>
   <script src="/evaluator.js?v=6.70-production-hardening"></script>
 </body>
 </html>

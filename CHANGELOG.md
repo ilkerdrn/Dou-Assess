@@ -1,3 +1,18 @@
+## 6.71 (unreleased) — Demo/pilot P0 closure (migration 0044)
+- Learning outcomes: instructors manage their own course's outcomes; each carries a source label (OBS / added in Assess / OBS-modified); linked outcomes are deactivated instead of deleted and skipped by new exam snapshots; create/update/deactivate audit-logged with before/after.
+- New "Basım" screen: per-exam print summary (pages, sheets, booklet split), bulk and per-student PDFs, attendance/signature list PDF, "Yazdırdım" confirmation that freezes the questions (changes need a copied version).
+- Answer sheet: bubbles follow each question's real choice count (2–5); marking instruction added to the exam rules (TR/EN).
+- Menu follows the working order (1 Derslerim, 2 Soru Bankası, 3 Sınav Hazırla, 4 Basım, 5 Optik Okuma, 6 Değerlendirme) with numbered badges; header buttons are text-only.
+- OBS: "OBS'den getir" re-sync (password not stored, ownership-checked) and last-sync status on Derslerim.
+- Mobile: 44px touch targets, checkbox/label alignment; no horizontal scroll at 360/390/414/768/1024 (verified in Chromium).
+- P1: persistent exam state bar (Taslak → Hazır → Basıldı → Puanlama → Onaylı, with what is locked); OBS vs Assess outcome diff report (`GET /api/courses/{id}/outcome-diff`, original OBS text recovered from the audit trail); grading completeness (`GET /api/exams/{id}/grading-progress`) separating "girilmedi" from a real 0.
+- Fast grading grid for rubric-based classic questions (student x criterion, all-or-nothing validation, blind-mode aware, unchanged rows skipped, revisions logged). Institution wording for "learning outcome" via `OUTCOME_TERM` (Öğrenim | Öğrenme | Kazanım).
+- P1: versioned success thresholds (migration 0045: LO default target + PO threshold per institution/program/year, history kept, applied to new outcomes and analytics); random sampling of auto-accepted OMR pages with error-rate vs `SCAN_TARGET_ERROR_PERCENT`; hash-sealed semester closure package per exam; scan retention overview and recorded purge (`SCAN_RETENTION_DAYS`, default 1460, admin only).
+- P1: OBS bulk-entry grade export (`GET /api/courses/{id}/obs-grades.xlsx`, layout must be confirmed against the OBS template), PÇ calculation formula document (`GET /api/programs/{id}/po-formula.md`), Excel template + validated all-or-nothing import for assignment/project/lab scores, `docs/KVKK-AI-OCR-DEGERLENDIRME.md` assessment template.
+- P1: exams with more than 40 test questions automatically use a separate answer page (embedded bubbles overlapped at 100 questions); the score grid now lists every question (was capped at 40); per-student extra time (migration 0046) printed on the student's paper and attendance sheet, locked after print.
+- P2: institution settings (migration 0047: ÖÇ term, ÖÇ change approval, question self-approval switch, AI scoring switch); ÖÇ change approval queue (maker-checker, reviewer roles); question maker-checker + shared institutional pool (same program, copy as draft with outcome mapping by code); connector interface + canonical sync (`app/services/connectors.py`, Proliz adapter, tested with a fake second institution); flag-gated AI scoring *suggestion* (off by default, no student identity sent, never writes grades); docs/commercial/* (ADR multi-tenant, second-university pilot checklist, commercial pack template, security test plan, KVKK dossier).
+- Demo scenario uses the real current term instead of 2099-2100 when that period is free.
+
 # 6.70 — Performance & Production Hardening
 
 - Replaced Python/N+1 academic scope filtering with SQL-scoped program/course selectors.
@@ -21,6 +36,17 @@
 - Full regression 247/247 PASS; fresh and 0040→0041 migrations PASS.
 
 # Changelog
+
+## Unreleased — Evaluator evidence room & exam readiness
+- Evaluator portal "Kanıt Odası": read-only program/course/learning-outcome/program-outcome matrix, exams (questions, answer key, blank paper PDF, attainment), students with masked names, per-student answers, scanned pages and outcome cards; token-only auth, audit-logged, program-scoped.
+- Exam readiness: uncovered learning outcomes, duplicate questions, rubric/points mismatch, non-positive duration, uniform MCQ key.
+- Question key exceptions (`POST /api/exams/{id}/questions/{qid}/key-exception`): annul an MCQ (full credit) or accept an extra correct choice; persisted as answer-key revisions so later OMR/manual entries and regrades follow it; grade changes are audit-logged.
+- Evaluator room: course file (Word) download per course.
+- Student portal (`/student.html`): per-student HMAC links (no new tables; `STUDENT_LINK_SECRET`, `STUDENT_APPEAL_DAYS`), visible only after grade lock, own paper/scan/rubric scores, time-boxed appeals feeding the existing GradeAppeal workflow. Exam toolbar gets grade-lock and links-CSV buttons.
+- Classic-question annulment (full marks on every rubric criterion, honoured by later manual entries). Student appeals notify the course instructor (in-app notification). Exam workspace gets an appeals panel: accept (points/rubric) / reject, plus bulk reject with a shared note.
+- Institution replies to evaluator comments (`POST /api/compliance/visit-notes/{id}/reply`, "Yanıtla" in the visit center); replies show in the evaluator's "Yorumlarım".
+- Evaluator room: comments/questions land in institution visit notes (max 100 per workspace). Scan panel: phone camera capture.
+- `GET /api/exams/{id}/scan-coverage`: students without a scanned paper, pending reviews and papers with missing pages; shown in the scan panel.
 
 ## 6.68 — Operations & Automation
 - Added PostgreSQL-backed durable operational jobs with separate worker and scheduler containers.

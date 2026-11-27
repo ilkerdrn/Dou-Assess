@@ -463,10 +463,23 @@ def visible_course_ids(db: Session) -> set[int]:
     return set(db.scalars(visible_course_id_select()).all())
 
 
+def _outcome_term() -> str:
+    try:
+        from .db import SessionLocal
+        with SessionLocal() as db:
+            row = db.get(m.InstitutionSetting, "outcome_term")
+            if row and row.value in {"Öğrenim", "Öğrenme", "Kazanım"}:
+                return row.value
+    except Exception:
+        pass
+    return settings.outcome_term if settings.outcome_term in {"Öğrenim", "Öğrenme", "Kazanım"} else "Öğrenim"
+
+
 def auth_config() -> dict[str, Any]:
     entra_ready = bool(settings.entra_tenant_id and settings.entra_client_id and settings.entra_audience)
     return {
         "app_env": settings.app_env,
+        "outcome_term": _outcome_term(),
         "auth_required": settings.auth_required,
         "auth_provider": settings.auth_provider,
         "pilot_header": PILOT_HEADER if not settings.auth_required else None,

@@ -167,13 +167,24 @@ def _omr_normalized_layout(rows: list[dict]) -> dict:
         col_w = 0.92 / cols
         col_left = 0.04 + col * col_w
         y = 0.30 if rows_per_col == 1 else 0.30 + row * (0.62 / (rows_per_col - 1))
-        for j, letter in enumerate(letters):
+        n_choices = len(q.get("choices") or {}) or 5  # bubbles follow the question's real choice count (2..5)
+        for j, letter in enumerate(letters[:max(2, min(5, n_choices))]):
             x = col_left + col_w * (0.27 + j * 0.125)
             bubbles.append({
                 "display_no": q["display_no"], "question_id": q["id"],
                 "letter": letter, "x": round(x, 6), "y": round(y, 6),
             })
     return {"columns": cols if n else 0, "rows_per_column": rows_per_col if n else 0, "bubbles": bubbles}
+
+
+def effective_omr_mode(exam) -> str:
+    """Embedded answer sheets only stay readable up to 40 test questions; larger exams automatically get a separate answer page."""
+    mode = str(getattr(exam, "omr_mode", "embedded") or "embedded")
+    try:
+        mcq = sum(1 for q in exam.questions if q.question_type == "mcq")
+    except Exception:
+        mcq = 0
+    return "separate" if mode == "separate" or mcq > 40 else "embedded"
 
 
 def paper_metadata(exam, booklet: str = "A", student=None) -> dict:
@@ -217,7 +228,7 @@ def paper_metadata(exam, booklet: str = "A", student=None) -> dict:
         "paper": {
             "size": str(getattr(exam, "paper_size", "A4") or "A4").upper(),
             "orientation": str(getattr(exam, "paper_orientation", "portrait") or "portrait"),
-            "omr_mode": str(getattr(exam, "omr_mode", "embedded") or "embedded"),
+            "omr_mode": effective_omr_mode(exam),
             "duplex_print": bool(getattr(exam, "duplex_print", False)),
             "page_size_points": list(_page_size(exam)),
         },
@@ -298,8 +309,8 @@ def _paper_type(rows: list[dict]) -> str:
 def _default_rules(rows: list[dict]) -> str:
     mcq = [q for q in rows if q["question_type"] == "mcq"]
     classic = [q for q in rows if q["question_type"] == "classic"]
-    tr = f"Bu sınav toplam {len(rows)} sorudan oluşmaktadır; {len(mcq)} çoktan seçmeli (test), {len(classic)} klasik (açık uçlu) soru bulunmaktadır. Çoktan seçmeli soruların cevapları ön sayfadaki cevap formuna işaretlenmelidir. Açık uçlu cevaplar ilgili soru altında ayrılan alana yazılmalıdır."
-    en = f"This exam consists of {len(rows)} questions: {len(mcq)} multiple-choice and {len(classic)} open-ended questions. Multiple-choice answers must be marked on the answer area on the front page. Open-ended answers must be written in the space provided under the relevant question."
+    tr = f"Bu sınav toplam {len(rows)} sorudan oluşmaktadır; {len(mcq)} çoktan seçmeli (test), {len(classic)} klasik (açık uçlu) soru bulunmaktadır. Çoktan seçmeli soruların cevapları ön sayfadaki cevap formuna işaretlenmelidir. Açık uçlu cevaplar ilgili soru altında ayrılan alana yazılmalıdır. Cevap formunda her soru için yalnızca bir şıkkın balonunu koyu renkli kalemle tamamen doldurun; silinti, çift işaret veya balon dışına taşan işaretler geçersiz sayılabilir."
+    en = f"This exam consists of {len(rows)} questions: {len(mcq)} multiple-choice and {len(classic)} open-ended questions. Multiple-choice answers must be marked on the answer area on the front page. Open-ended answers must be written in the space provided under the relevant question. On the answer sheet, fill in exactly one bubble per question completely with a dark pen; erasures, double marks or marks outside the bubble may be invalid."
     return tr + " " + en
 
 
@@ -380,7 +391,9 @@ def _draw_first_page(c: canvas.Canvas, exam, rows: list[dict], metadata: dict) -
     duration_style = ParagraphStyle("duration", fontName="DOU-Regular", fontSize=6.9, leading=7.6)
     type_style = ParagraphStyle("type", fontName="DOU-Regular", fontSize=6.5, leading=7.0)
     _paragraph(c, f"<b>Tarih / Date:</b> {_esc(date_txt)} · <b>Saat:</b> {_esc(time_txt)}", detail_x + 5, y - 7, detail_w, date_style)
-    _paragraph(c, f"<b>Süre / Duration:</b> {exam.duration_minutes} dk · <b>Salon:</b> {_esc(location_txt)}", detail_x + 5, y - 36, detail_w, duration_style)
+    extra = int(metadata.get("extra_time_percent") or 0)
+    dur_txt = f"{exam.duration_minutes} dk" + (f" (+%{extra} ek süre = {math.ceil(exam.duration_minutes * (100 + extra) / 100)} dk)" if extra > 0 else "")
+    _paragraph(c, f"<b>Süre / Duration:</b> {dur_txt} · <b>Salon:</b> {_esc(location_txt)}", detail_x + 5, y - 36, detail_w, duration_style)
     _paragraph(c, "<b>Türü / Type:</b> " + _esc(_paper_type(rows)), detail_x + 5, y - 64, detail_w, type_style)
 
     y -= table_h + 5
@@ -396,8 +409,10 @@ def _draw_first_page(c: canvas.Canvas, exam, rows: list[dict], metadata: dict) -
 
     # Score grid, max 20 questions per band.
     all_nums = [q["display_no"] for q in rows]
-    bands = [all_nums[i:i+20] for i in range(0, len(all_nums), 20)] or [[]]
-    for band in bands[:2]:
+    separate = effective_omr_mode(exam) == "separate"
+    band_size = 20 if len(all_nums) <= 100 else -(-len(all_nums) // 5)
+    bands = [all_nums[i:i+band_size] for i in range(0, len(all_nums), band_size)] or [[]]
+    for band in bands[: (6 if separate else 2)]:
         row_h = 22
         label_w = 143
         c.rect(box_x, y - row_h * 2, box_w, row_h * 2)
@@ -420,13 +435,14 @@ def _draw_first_page(c: canvas.Canvas, exam, rows: list[dict], metadata: dict) -
     omr_top = y - 3
     omr_bottom = 34
     omr_h = max(145, omr_top - omr_bottom)
-    if str(getattr(exam, "omr_mode", "embedded") or "embedded") == "separate":
+    if effective_omr_mode(exam) == "separate":
         c.setStrokeColor(RED); c.setLineWidth(1.2)
-        c.roundRect(box_x + 20, omr_bottom, box_w - 40, omr_h, 10, stroke=1, fill=0)
+        notice_h = max(60.0, min(omr_h, omr_top - omr_bottom))  # never grow upward over the score grid
+        c.roundRect(box_x + 20, omr_bottom, box_w - 40, notice_h, 10, stroke=1, fill=0)
         c.setFillColor(DARK); c.setFont("DOU-Bold", 12)
-        c.drawCentredString(w / 2, omr_bottom + omr_h / 2 + 8, "CEVAP FORMU AYRI SAYFADADIR")
+        c.drawCentredString(w / 2, omr_bottom + notice_h / 2 + 8, "CEVAP FORMU AYRI SAYFADADIR")
         c.setFont("DOU-Regular", 8.5)
-        c.drawCentredString(w / 2, omr_bottom + omr_h / 2 - 10, "Answer sheet is provided on a separate page")
+        c.drawCentredString(w / 2, omr_bottom + notice_h / 2 - 10, "Answer sheet is provided on a separate page")
     else:
         _draw_omr_panel(c, exam, rows, metadata, box_x + 20, box_w - 40, omr_top, omr_bottom, metadata.get("student") or {})
     c.setFillColor(DARK); c.setFont("DOU-Regular", 6.5)
@@ -554,7 +570,7 @@ def question_regions(exam, booklet: str = "A", legacy_layout: bool = False) -> d
     x, width = 38, w - 76
     q_style = ParagraphStyle("q-region", fontName="DOU-Regular", fontSize=9.3, leading=12, spaceAfter=0)
     choice_style = ParagraphStyle("choice-region", fontName="DOU-Regular", fontSize=8.7, leading=11)
-    page_no = 2 + (1 if str(getattr(exam, "omr_mode", "embedded") or "embedded") == "separate" else 0)
+    page_no = 2 + (1 if effective_omr_mode(exam) == "separate" else 0)
     y = h - (55 if legacy_layout else 105)
     out: dict[int, dict] = {}
     for q in rows:
@@ -654,9 +670,10 @@ def _draw_question(c: canvas.Canvas, exam, q: dict, y: float, metadata: dict, pa
     return y, page_no
 
 
-def build_exam_pdf(exam, booklet: str = "A", student=None) -> tuple[bytes, dict]:
+def build_exam_pdf(exam, booklet: str = "A", student=None, extra_time_percent: int = 0) -> tuple[bytes, dict]:
     _register_fonts()
     metadata = paper_metadata(exam, booklet, student=student)
+    metadata["extra_time_percent"] = int(extra_time_percent or 0)
     rows = ordered_questions(exam, booklet)
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=_page_size(exam), pageCompression=1)
@@ -666,7 +683,7 @@ def build_exam_pdf(exam, booklet: str = "A", student=None) -> tuple[bytes, dict]
     _draw_first_page(c, exam, rows, metadata)
     c.showPage()
     page_no = 2
-    if str(getattr(exam, "omr_mode", "embedded") or "embedded") == "separate":
+    if effective_omr_mode(exam) == "separate":
         _draw_separate_omr_page(c, exam, rows, metadata, page_no)
         c.showPage(); page_no += 1
     y = _new_question_page(c, exam, metadata, page_no)
@@ -683,3 +700,24 @@ def build_exam_pdf(exam, booklet: str = "A", student=None) -> tuple[bytes, dict]
     metadata["pdf_sha256"] = sha256(data).hexdigest()
     metadata["pdf_size_bytes"] = len(data)
     return data, metadata
+
+
+def build_attendance_sheet_pdf(exam, rows: list[dict]) -> bytes:
+    """Yoklama / imza listesi: one line per student with assigned booklet and a signature cell."""
+    from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
+    _register_fonts()
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36, title="Yoklama / İmza Listesi")
+    head = ParagraphStyle("h", fontName="DOU-Bold", fontSize=13, leading=17)
+    small = ParagraphStyle("s", fontName="DOU-Regular", fontSize=9, leading=12)
+    cell = ParagraphStyle("c", fontName="DOU-Regular", fontSize=9, leading=11)
+    date = exam.exam_date.strftime("%d.%m.%Y") if getattr(exam, "exam_date", None) else "—"
+    story = [Paragraph(f"{_esc(exam.course_code_snapshot or '')} {_esc(exam.course_name_snapshot or '')} — {_esc(exam.title)}", head),
+             Paragraph(f"Yoklama / İmza Listesi · Tarih: {date} · Salon: {_esc(exam.location or '—')} · Süre: {exam.duration_minutes} dk · Öğrenci: {len(rows)}", small), Spacer(1, 10)]
+    data = [["#", "Öğrenci No", "Ad Soyad", "Kitapçık", "İmza"]] + [[str(i), r["student_no"], Paragraph(_esc(r["full_name"]) + (f" <b>(+%{r['extra_time_percent']} ek süre)</b>" if r.get("extra_time_percent") else ""), cell), r["booklet"], ""] for i, r in enumerate(rows, 1)]
+    t = Table(data, colWidths=[24, 78, 190, 50, 170], repeatRows=1, rowHeights=[20] + [24] * len(rows))
+    t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), "DOU-Regular"), ("FONTNAME", (0, 0), (-1, 0), "DOU-Bold"), ("FONTSIZE", (0, 0), (-1, -1), 9),
+                           ("GRID", (0, 0), (-1, -1), 0.5, colors.grey), ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#efece4")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    story += [t, Spacer(1, 14), Paragraph("Gözetmen: ______________________   İmza: ______________________   Teslim alınan kâğıt sayısı: ______", small)]
+    doc.build(story)
+    return buf.getvalue()

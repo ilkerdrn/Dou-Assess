@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
+    text,
     Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Integer,
     JSON, String, Text, UniqueConstraint
 )
@@ -490,6 +491,9 @@ class LearningOutcome(Base):
     code: Mapped[str] = mapped_column(String(64), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     target_percent: Mapped[float] = mapped_column(Float, default=60.0, nullable=False)
+    # Provenance: "obs" (came from OBS/import), "assess" (added here), "obs_modified" (OBS row edited here).
+    source: Mapped[str] = mapped_column(String(24), default="assess", server_default="assess", nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"), nullable=False)
 
     course: Mapped[Course] = relationship(back_populates="learning_outcomes")
     mappings: Mapped[list["OutcomeMapping"]] = relationship(back_populates="learning_outcome", cascade="all, delete-orphan")
@@ -562,6 +566,8 @@ class Exam(Base):
     approved_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     approval_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    printed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    printed_by: Mapped[str] = mapped_column(String(255), default="", server_default="", nullable=False)
     grade_locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     grade_locked_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     grade_lock_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
@@ -748,6 +754,7 @@ class ExamStudent(Base):
     attendance_status: Mapped[str] = mapped_column(String(24), default="attended", nullable=False, index=True)
     attendance_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
     attendance_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    extra_time_percent: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)  # accommodation, printed on the student's paper
 
     exam: Mapped[Exam] = relationship(back_populates="exam_students")
     student: Mapped[Student] = relationship()
@@ -844,6 +851,47 @@ class GradeAppeal(Base):
     created_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     decided_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class InstitutionSetting(Base):
+    """Institution-wide configuration (wording, workflow switches). Falls back to environment defaults when absent."""
+    __tablename__ = "institution_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    updated_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class OutcomeChangeRequest(Base):
+    """Maker-checker for learning-outcome edits when the institution enables approval."""
+    __tablename__ = "outcome_change_requests"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    learning_outcome_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(16), nullable=False)  # create | update | delete
+    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    before: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False, index=True)
+    requested_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    decided_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    decision_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OutcomeThreshold(Base):
+    """Versioned institution/program success targets. Newest active row per (program, year, kind) wins."""
+    __tablename__ = "outcome_thresholds"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[Optional[int]] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), nullable=True, index=True)  # NULL = institution-wide
+    academic_year: Mapped[str] = mapped_column(String(32), default="", nullable=False)  # "" = all years
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)  # lo | po
+    target_percent: Mapped[float] = mapped_column(Float, nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
