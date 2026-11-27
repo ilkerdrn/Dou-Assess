@@ -319,8 +319,15 @@ def room_comments(scope: RoomScope = Depends(room_scope), db: Session = Depends(
         m.AccreditationVisitNote.application_id == scope.app.id,
         m.AccreditationVisitNote.recorded_by == f"evaluator:{scope.ws.evaluator_email}",
     ).order_by(m.AccreditationVisitNote.id.desc())).all()
+    ids = {x.id for x in rows}
+    replies: dict[int, list[dict]] = {}
+    if ids:
+        for r in db.scalars(select(m.AccreditationVisitNote).where(m.AccreditationVisitNote.application_id == scope.app.id, m.AccreditationVisitNote.note_type == "institution_reply").order_by(m.AccreditationVisitNote.id)).all():
+            for ref in r.evidence_refs or []:
+                if isinstance(ref, str) and ref.startswith("reply_to:") and ref[9:].isdigit() and int(ref[9:]) in ids:
+                    replies.setdefault(int(ref[9:]), []).append({"note": r.note, "by": r.recorded_by, "at": r.created_at.isoformat() if r.created_at else None})
     return [{"id": x.id, "title": x.title, "note": x.note, "refs": x.evidence_refs, "criterion_code": x.criterion_code,
-             "created_at": x.created_at.isoformat() if x.created_at else None} for x in rows]
+             "replies": replies.get(x.id, []), "created_at": x.created_at.isoformat() if x.created_at else None} for x in rows]
 
 
 @router.post(BASE + "/comments", status_code=201)

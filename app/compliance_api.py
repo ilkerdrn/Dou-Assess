@@ -11,6 +11,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import func, or_, select
@@ -746,6 +747,29 @@ def accreditation_visit_note_create(body: AccreditationVisitNoteCreate, db: Sess
     if data.get("occurred_at") is None: data["occurred_at"] = datetime.now(timezone.utc)
     obj = m.AccreditationVisitNote(**data)
     db.add(obj); db.flush(); _audit(db, "accreditation_visit_note_create", "accreditation_visit_note", obj.id, data); _commit(db)
+    return model_dict(obj)
+
+
+class VisitNoteReply(BaseModel):
+    note: str = Field(min_length=2, max_length=4000)
+
+
+@router.post("/api/compliance/visit-notes/{note_id}/reply", status_code=201)
+def visit_note_reply(note_id: int, body: VisitNoteReply, db: Session = Depends(get_db)):
+    """Institution answers an evaluator's comment; the reply is visible in the evaluator room."""
+    parent = _obj(db, m.AccreditationVisitNote, note_id, "Not bulunamadı")
+    app = _obj(db, m.AccreditationApplication, parent.application_id, "Akreditasyon başvurusu bulunamadı")
+    _program(db, app.program_id)
+    if parent.note_type != "evaluator_comment":
+        raise HTTPException(409, "Yalnız değerlendirici yorumları yanıtlanabilir")
+    try:
+        who = current_user().get("email") or "institution"
+    except Exception:
+        who = "institution"
+    obj = m.AccreditationVisitNote(application_id=app.id, criterion_code=parent.criterion_code, note_type="institution_reply",
+                                   title=f"Yanıt: {parent.title}"[:255], note=body.note.strip(), recorded_by=who, visibility="evaluator",
+                                   evidence_refs=[f"reply_to:{parent.id}"])
+    db.add(obj); db.flush(); _audit(db, "accreditation_visit_note_reply", "accreditation_visit_note", obj.id, {"parent": parent.id}); _commit(db)
     return model_dict(obj)
 
 

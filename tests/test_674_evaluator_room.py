@@ -215,3 +215,14 @@ def test_classic_question_annulment_gives_full_marks_and_notifies_on_appeal():
     _post(f"/api/exams/{eid}/students/{studs[0]['id']}/responses", {"responses": [{"question_id": qc["id"], "answer_text": "y", "rubric_scores": {"a": 5}}]})
     an = client.get(f"/api/exams/{eid}/analytics").json()
     assert all(s["total_score"] >= 40 for s in an["students"])
+
+
+def test_institution_reply_reaches_evaluator():
+    program, course, exam, q, ws, hdr = _setup()
+    base = f"/api/public/evaluator-workspaces/{ws['id']}/room"
+    c = client.post(base + "/comments", headers=hdr, json={"title": "Ek örnek istiyoruz", "note": "Final"}).json()
+    other = client.post(f"/api/compliance/visit-notes/{c['id']}/reply", json={"note": "Kanıt odasına eklendi."}); assert other.status_code == 201, other.text
+    mine = client.get(base + "/comments", headers=hdr).json()
+    assert mine[0]["replies"][0]["note"] == "Kanıt odasına eklendi."
+    plain = _post("/api/compliance/visit-notes", {"application_id": ws["application_id"], "criterion_code": "", "note_type": "observation", "title": "iç not", "note": "", "recorded_by": "x", "visibility": "internal", "evidence_refs": [], "occurred_at": None})
+    assert client.post(f"/api/compliance/visit-notes/{plain['id']}/reply", json={"note": "olmaz"}).status_code == 409
