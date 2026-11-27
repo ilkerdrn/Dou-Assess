@@ -25,7 +25,7 @@ from . import models as m
 from .config import settings
 from .db import get_db
 from .services.analytics import exam_analytics, student_exam_analytics
-from .services.compliance import build_student_outcome_card
+from .services.compliance import build_course_file_docx, build_student_outcome_card
 from .services.paper import build_exam_pdf
 
 router = APIRouter()
@@ -285,3 +285,16 @@ def room_student_card(student_id: int, academic_year: str | None = None, scope: 
         card["student"]["full_name"] = mask_name(card["student"]["full_name"])
     _audit(db, scope, "evaluator_room_student_card", "student", s.id, {"academic_year": academic_year})
     return card
+
+
+@router.get(BASE + "/courses/{course_id}/course-file.docx")
+def room_course_file(course_id: int, scope: RoomScope = Depends(room_scope), db: Session = Depends(get_db)):
+    """Ders dosyası (course file) as Word — what accreditation teams usually ask for per course."""
+    c = _course(db, scope, course_id)
+    try:
+        payload, filename = build_course_file_docx(db, c.id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+    _audit(db, scope, "evaluator_room_course_file", "course", c.id)
+    from fastapi.responses import Response
+    return Response(payload, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": f'attachment; filename="{filename}"'})

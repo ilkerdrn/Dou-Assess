@@ -31,7 +31,7 @@ from . import models as m
 from .schemas import (
     ObsLoginRequest, AddBankQuestionRequest, AddBankQuestionsBatchRequest, QuestionReorderRequest, NormalizeQuestionPointsRequest, BulkEnrollRequest, CourseCreate, CourseUpdate, ExamCreate, ExamDuplicateRequest, ExamStatusUpdate, ExamUpdate, ImprovementCreate,
     LearningOutcomeCreate, LearningOutcomeUpdate, OutcomeMappingCreate, ProgramCreate, ProgramUpdate,
-    ProgramOutcomeCreate, ProgramOutcomeUpdate, QuestionBankCreate, QuestionBankUpdate, QuestionReviewRequest, BlueprintCreate, BlueprintStatusRequest, QuestionCreate, QuestionUpdate, ResponsesSubmit, StudentCreate, StudentUpdate, ScanReviewOut, ScanReviewResolve, AnswerKeyRegradeRequest,
+    ProgramOutcomeCreate, ProgramOutcomeUpdate, QuestionBankCreate, QuestionBankUpdate, QuestionReviewRequest, BlueprintCreate, BlueprintStatusRequest, QuestionCreate, QuestionUpdate, ResponsesSubmit, StudentCreate, StudentUpdate, ScanReviewOut, ScanReviewResolve, AnswerKeyRegradeRequest, QuestionKeyException,
     AccreditationProfileCreate, AccreditationPeriodCreate, AccreditationPeriodStatusUpdate, ImprovementUpdate,
     AppUserCreate, AppUserUpdate, UserRoleCreate, AcademicPeriodCreate, AcademicPeriodStatusUpdate, PilotFeedbackCreate, PilotFeedbackUpdate, ExamApprovalRequest, EvidenceUpdate, StudentAnonymizeRequest,
     AttendanceUpdate, GradeLockRequest, ExamIncidentCreate, ExamIncidentResolve, GradeAppealCreate, GradeAppealResolve,
@@ -3010,14 +3010,14 @@ def submit_responses(exam_id: int, student_id: int, data: ResponsesSubmit, db: S
     es = db.scalar(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.student_id == student_id))
     if not es: raise HTTPException(404, "Öğrenci bu sınava kayıtlı değil")
     saved = 0
+    policy = _key_policy(db, exam_id)
     for item in data.responses:
         q = db.get(m.Question, item.question_id)
         if not q or q.exam_id != exam_id: raise HTTPException(400, f"Soru bu sınava ait değil: {item.question_id}")
         existing = db.scalar(select(m.Response).where(m.Response.exam_student_id == es.id, m.Response.question_id == q.id))
         if q.question_type == "mcq":
             answer = normalize_correct_answer(item.answer_text, q.choices)
-            expected_answer = normalize_correct_answer(q.correct_answer, q.choices)
-            correct = bool(answer) and answer == expected_answer
+            correct = _mcq_is_correct(q, answer, policy)
             awarded = float(q.points) if correct else 0.0
             is_correct = correct
         else:
@@ -3195,6 +3195,28 @@ def _scan_review_out(item: m.ScanItem, review: m.ScanReview | None = None) -> di
     }
 
 
+def _key_policy(db: Session, exam_id: int) -> tuple[set[int], dict[int, set[str]]]:
+    """Annulled questions (everyone gets full credit) and accepted alternative answers, replayed from key revisions."""
+    annulled: set[int] = set(); alts: dict[int, set[str]] = {}
+    for rev in db.scalars(select(m.AnswerKeyRevision).where(m.AnswerKeyRevision.exam_id == exam_id).order_by(m.AnswerKeyRevision.id)).all():
+        c = rev.corrections or {}
+        for qid in c.get("__annulled__", []) or []:
+            annulled.add(int(qid))
+        for qid, letters in (c.get("__accepted__", {}) or {}).items():
+            alts.setdefault(int(qid), set()).update(str(x).upper() for x in letters)
+    return annulled, alts
+
+
+def _mcq_is_correct(q: "m.Question", normalized: str | None, policy: tuple[set[int], dict[int, set[str]]]) -> bool:
+    annulled, alts = policy
+    if q.id in annulled:
+        return True
+    expected = normalize_correct_answer(q.correct_answer, q.choices)
+    if not normalized:
+        return False
+    return normalized == expected or normalized.upper() in alts.get(q.id, set())
+
+
 def _apply_scan_answers(db: Session, exam: m.Exam, student: m.Student, booklet: str, answers: dict) -> int:
     if exam.status != "grading":
         raise HTTPException(409, "Optik cevapların otomatik uygulanması için sınav değerlendirme (grading) durumunda olmalıdır")
@@ -3206,6 +3228,7 @@ def _apply_scan_answers(db: Session, exam: m.Exam, student: m.Student, booklet: 
     meta = paper_metadata(exam, booklet, student=student)
     display_to_qid = {str(x["display_no"]): x["question_id"] for x in meta["question_order"] if x["question_type"] == "mcq"}
     saved = 0
+    policy = _key_policy(db, exam.id)
     for no, answer in answers.items():
         qid = display_to_qid.get(str(no))
         if not qid:
@@ -3213,8 +3236,7 @@ def _apply_scan_answers(db: Session, exam: m.Exam, student: m.Student, booklet: 
         q = db.get(m.Question, qid)
         existing = db.scalar(select(m.Response).where(m.Response.exam_student_id == es.id, m.Response.question_id == q.id))
         normalized = normalize_correct_answer(answer, q.choices) if answer else None
-        expected = normalize_correct_answer(q.correct_answer, q.choices)
-        correct = bool(normalized) and normalized == expected
+        correct = _mcq_is_correct(q, normalized, policy)
         now = datetime.now(timezone.utc)
         if existing:
             old_points, old_rubric = existing.awarded_points, dict(existing.rubric_scores or {})
@@ -3625,18 +3647,65 @@ def answer_key_regrade(exam_id: int, data: AnswerKeyRegradeRequest, db: Session 
         if not normalized or normalized not in (q.choices or {}): raise HTTPException(400,f"Geçersiz doğru cevap: {qid}")
         corrections[str(q.id)]={"old":q.correct_answer,"new":normalized}; q.correct_answer=normalized
     affected=0
+    policy=_key_policy(db,exam_id)
     rows=db.scalars(select(m.Response).join(m.ExamStudent,m.Response.exam_student_id==m.ExamStudent.id).where(m.ExamStudent.exam_id==exam_id)).all()
     for r in rows:
         q=db.get(m.Question,r.question_id)
         if q and q.question_type=="mcq" and str(q.id) in corrections:
             ans=normalize_correct_answer(r.answer_text,q.choices) if r.answer_text else None
-            expected=normalize_correct_answer(q.correct_answer,q.choices)
             old_points=r.awarded_points
-            r.is_correct=bool(ans) and ans==expected; r.awarded_points=float(q.points) if r.is_correct else 0.0; affected+=1
+            r.is_correct=_mcq_is_correct(q,ans,policy); r.awarded_points=float(q.points) if r.is_correct else 0.0; affected+=1
             _log_grade_revision(db, r, old_points, dict(r.rubric_scores or {}), "answer_key_regrade")
     rev=m.AnswerKeyRevision(exam_id=exam_id,corrections=corrections,reason=data.reason,affected_responses=affected); db.add(rev); db.flush()
     audit(db,"answer_key_regrade","exam",exam_id,{"revision_id":rev.id,"affected":affected,"corrections":corrections}); _commit(db)
     return {"revision_id":rev.id,"affected_responses":affected,"corrections":corrections}
+
+
+@app.post("/api/exams/{exam_id}/questions/{question_id}/key-exception")
+def question_key_exception(exam_id: int, question_id: int, data: QuestionKeyException, db: Session = Depends(get_db)):
+    """Annul a multiple-choice question (full credit to every attending student) or accept an
+    additional correct choice. Persisted as an answer-key revision so later scans/entries follow it."""
+    require_exam_access(db, exam_id, write=True)
+    exam = _load_exam_detail_model(db, exam_id)
+    if exam.status != "grading":
+        raise HTTPException(409, "Soru iptali / alternatif cevap yalnızca değerlendirme (grading) durumunda yapılabilir")
+    if exam.grade_locked_at:
+        raise HTTPException(409, "Puanlar kilitli. Önce kontrollü kilit açma gerekir")
+    if not (data.reason or "").strip():
+        raise HTTPException(400, "Gerekçe zorunludur")
+    q = db.get(m.Question, question_id)
+    if not q or q.exam_id != exam_id or q.question_type != "mcq":
+        raise HTTPException(400, "Yalnız bu sınavın çoktan seçmeli soruları için geçerlidir")
+    if data.action == "accept_alternative":
+        alt = normalize_correct_answer(data.alternative, q.choices)
+        if not alt or alt not in (q.choices or {}):
+            raise HTTPException(400, "Geçersiz alternatif şık")
+        corrections = {"__accepted__": {str(q.id): [alt]}}
+    else:
+        corrections = {"__annulled__": [q.id]}
+    rev = m.AnswerKeyRevision(exam_id=exam_id, corrections=corrections, reason=data.reason.strip(), affected_responses=0)
+    db.add(rev); db.flush()
+    policy = _key_policy(db, exam_id)
+    attended = db.scalars(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.attendance_status == "attended")).all()
+    existing = {r.exam_student_id: r for r in db.scalars(select(m.Response).where(m.Response.question_id == q.id)).all()}
+    affected = 0; now = datetime.now(timezone.utc)
+    actor = current_user().get("email") or "system"
+    for es in attended:
+        r = existing.get(es.id)
+        ans = normalize_correct_answer(r.answer_text, q.choices) if (r and r.answer_text) else None
+        ok = _mcq_is_correct(q, ans, policy)
+        pts = float(q.points) if ok else 0.0
+        if r:
+            if r.awarded_points != pts or r.is_correct != ok:
+                old = r.awarded_points
+                r.awarded_points = pts; r.is_correct = ok; r.graded_by = actor; r.graded_at = now; r.revision_no = int(r.revision_no or 1) + 1
+                _log_grade_revision(db, r, old, dict(r.rubric_scores or {}), "question_annulled" if data.action == "annul" else "alternative_accepted", actor)
+                affected += 1
+        elif ok:
+            db.add(m.Response(exam_student_id=es.id, question_id=q.id, answer_text=None, awarded_points=pts, is_correct=True, graded_by=actor, graded_at=now, revision_no=1)); affected += 1
+    rev.affected_responses = affected
+    audit(db, "question_key_exception", "question", q.id, {"action": data.action, "alternative": data.alternative, "affected": affected, "reason": data.reason}); _commit(db)
+    return {"revision_id": rev.id, "action": data.action, "affected_responses": affected}
 
 
 @app.get("/api/exams/{exam_id}/answer-key/revisions")

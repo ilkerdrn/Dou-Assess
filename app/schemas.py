@@ -373,6 +373,12 @@ class ScanReviewResolve(BaseModel):
     note: str = Field(default="", max_length=1000)
 
 
+class QuestionKeyException(BaseModel):
+    action: Literal["annul", "accept_alternative"]
+    alternative: str | None = Field(default=None, max_length=8)
+    reason: str = Field(default="", max_length=1000)
+
+
 class AnswerKeyRegradeRequest(BaseModel):
     corrections: dict[int, str]
     reason: str = Field(default="", max_length=1000)

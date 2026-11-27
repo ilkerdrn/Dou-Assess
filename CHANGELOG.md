@@ -25,6 +25,8 @@
 ## Unreleased — Evaluator evidence room & exam readiness
 - Evaluator portal "Kanıt Odası": read-only program/course/learning-outcome/program-outcome matrix, exams (questions, answer key, blank paper PDF, attainment), students with masked names, per-student answers, scanned pages and outcome cards; token-only auth, audit-logged, program-scoped.
 - Exam readiness: uncovered learning outcomes, duplicate questions, rubric/points mismatch, non-positive duration, uniform MCQ key.
+- Question key exceptions (`POST /api/exams/{id}/questions/{qid}/key-exception`): annul an MCQ (full credit) or accept an extra correct choice; persisted as answer-key revisions so later OMR/manual entries and regrades follow it; grade changes are audit-logged.
+- Evaluator room: course file (Word) download per course.
 - `GET /api/exams/{id}/scan-coverage`: students without a scanned paper, pending reviews and papers with missing pages; shown in the scan panel.
 
 ## 6.68 — Operations & Automation

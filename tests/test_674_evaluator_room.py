@@ -119,3 +119,34 @@ def test_room_ui_paths_match_backend_routes():
     program, course, exam, q, ws, hdr = _setup()
     base = f"/api/public/evaluator-workspaces/{ws['id']}/room"
     assert client.get(base + "?academic_year=2026-2027", headers=hdr).status_code == 200
+
+
+def test_question_annulment_and_alternative_answer():
+    program, course, exam, q, ws, hdr = _setup()
+    assert client.patch(f"/api/exams/{exam['id']}/questions/{q['id']}", json={"points": 50}).status_code == 200
+    q2 = _post(f"/api/exams/{exam['id']}/questions", {"order_no": 2, "question_type": "mcq", "text": "3+3?", "points": 50, "correct_answer": "A", "choices": {"A": "6", "B": "7", "C": "5"}, "learning_outcome_code": "Ö1"})
+    assert client.post(f"/api/exams/{exam['id']}/status", json={"status": "ready"}).status_code == 200
+    assert client.post(f"/api/exams/{exam['id']}/status", json={"status": "grading"}).status_code == 200
+    studs = client.get(f"/api/exams/{exam['id']}/students").json()
+    _post(f"/api/exams/{exam['id']}/students/{studs[0]['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "B"}, {"question_id": q2["id"], "answer_text": "B"}]})
+    _post(f"/api/exams/{exam['id']}/students/{studs[1]['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "A"}]})
+    url = f"/api/exams/{exam['id']}/questions/{q2['id']}/key-exception"
+    assert client.post(url, json={"action": "annul", "reason": ""}).status_code == 400
+    r = client.post(url, json={"action": "accept_alternative", "alternative": "B", "reason": "Soru hatası"}); assert r.status_code == 200, r.text
+    an = client.get(f"/api/exams/{exam['id']}/analytics").json()
+    by = {s["student_no"]: s["total_score"] for s in an["students"]}
+    assert sorted(by.values()) == [0.0, 100.0]  # s1: Q1 correct + Q2 alt B accepted; s2: both wrong/blank
+    # later entries honour the alternative
+    _post(f"/api/exams/{exam['id']}/students/{studs[1]['id']}/responses", {"responses": [{"question_id": q2["id"], "answer_text": "B"}]})
+    r = client.post(f"/api/exams/{exam['id']}/questions/{q['id']}/key-exception", json={"action": "annul", "reason": "Hatalı soru"}); assert r.status_code == 200
+    an = client.get(f"/api/exams/{exam['id']}/analytics").json()
+    assert [s["total_score"] for s in an["students"]] == [100.0, 100.0]  # Q1 annulled, Q2 alt B accepted for both
+    assert client.get(f"/api/exams/{exam['id']}/answer-key/revisions").json()
+
+
+def test_room_course_file_download():
+    program, course, exam, q, ws, hdr = _setup()
+    r = client.get(f"/api/public/evaluator-workspaces/{ws['id']}/room/courses/{course['id']}/course-file.docx", headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.content[:2] == b"PK"
+    assert client.get(f"/api/public/evaluator-workspaces/{ws['id']}/room/courses/{course['id']}/course-file.docx").status_code == 401
