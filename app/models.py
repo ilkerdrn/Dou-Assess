@@ -854,6 +854,32 @@ class GradeAppeal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
+class InstitutionSetting(Base):
+    """Institution-wide configuration (wording, workflow switches). Falls back to environment defaults when absent."""
+    __tablename__ = "institution_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    updated_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class OutcomeChangeRequest(Base):
+    """Maker-checker for learning-outcome edits when the institution enables approval."""
+    __tablename__ = "outcome_change_requests"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    learning_outcome_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(16), nullable=False)  # create | update | delete
+    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    before: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False, index=True)
+    requested_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    decided_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    decision_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class OutcomeThreshold(Base):
     """Versioned institution/program success targets. Newest active row per (program, year, kind) wins."""
     __tablename__ = "outcome_thresholds"

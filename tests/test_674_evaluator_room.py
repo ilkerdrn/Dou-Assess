@@ -508,3 +508,66 @@ def test_extra_time_accommodation_printed_and_locked_after_print():
     client.post(f"/api/exams/{eid}/status", json={"status": "ready"})
     assert client.post(f"/api/exams/{eid}/print-confirm").status_code == 200
     assert client.patch(f"/api/exams/{eid}/students/{s1['id']}/accommodation", json={"extra_time_percent": 50}).status_code == 409
+
+
+def _mkuser(email, name, role, **scope):
+    r = client.post("/api/users", json={"email": email, "display_name": name, "auth_source": "pilot", "is_active": True}); assert r.status_code == 201, r.text
+    assert client.post(f"/api/users/{r.json()['id']}/roles", json={"role": role, **scope}).status_code == 201
+
+
+def test_outcome_change_approval_workflow_and_institution_settings():
+    import uuid as _u
+    program, course, exam, q, ws, hdr = _setup()
+    cid, pid = course["id"], program["id"]
+    tag = _u.uuid4().hex[:6]
+    inst, head = f"inst-{tag}@dogus.edu.tr", f"head-{tag}@dogus.edu.tr"
+    client.patch(f"/api/courses/{cid}", json={"instructor_email": inst})
+    _mkuser(inst, "Hoca", "instructor", course_id=cid); _mkuser(head, "Başkan", "program_head", program_id=pid)
+    hi, hh = {"X-DOU-Pilot-User": inst}, {"X-DOU-Pilot-User": head}
+    assert client.put("/api/institution-settings/outcome_change_approval", json={"value": "maybe"}).status_code == 400
+    assert client.put("/api/institution-settings/outcome_change_approval", headers=hi, json={"value": "on"}).status_code == 403  # instructors cannot flip settings
+    assert client.put("/api/institution-settings/outcome_change_approval", json={"value": "on"}).status_code == 200
+    try:
+        lo = client.get(f"/api/courses/{cid}/outcomes", headers=hi).json()["learning_outcomes"][0]
+        r = client.patch(f"/api/learning-outcomes/{lo['id']}", headers=hi, json={"description": "Önerilen yeni metin"}); assert r.status_code == 202 and r.json()["pending_approval"]
+        assert client.get(f"/api/courses/{cid}/outcomes", headers=hi).json()["learning_outcomes"][0]["description"] == "Temel bilgi"  # unchanged until approved
+        r2 = client.post(f"/api/courses/{cid}/learning-outcomes", headers=hi, json={"code": "Ö8", "description": "Yeni çıktı önerisi"}); assert r2.status_code == 202
+        pend = client.get(f"/api/outcome-change-requests?status=pending&course_id={cid}", headers=hh).json(); assert len(pend) == 2
+        assert client.post(f"/api/outcome-change-requests/{pend[0]['id']}/decision", headers=hi, json={"decision": "approved"}).status_code == 403  # not a reviewer
+        for req in pend:
+            d = client.post(f"/api/outcome-change-requests/{req['id']}/decision", headers=hh, json={"decision": "approved", "note": "uygun"}); assert d.status_code == 200, d.text
+        los = {x["code"]: x for x in client.get(f"/api/courses/{cid}/outcomes", headers=hi).json()["learning_outcomes"]}
+        assert los["Ö1"]["description"] == "Önerilen yeni metin" and "Ö8" in los and los["Ö8"]["source"] == "assess"
+        assert client.post(f"/api/outcome-change-requests/{pend[0]['id']}/decision", headers=hh, json={"decision": "rejected"}).status_code == 409  # already decided
+        # a reviewer's own edit applies immediately
+        assert client.patch(f"/api/learning-outcomes/{los['Ö8']['id']}", headers=hh, json={"description": "Başkan düzeltti"}).status_code == 200
+    finally:
+        client.put("/api/institution-settings/outcome_change_approval", json={"value": "off"})
+    st = {x["key"]: x["value"] for x in client.get("/api/institution-settings").json()}
+    assert st["outcome_change_approval"] == "off"
+
+
+def test_question_maker_checker_and_shared_pool():
+    import uuid as _u
+    program, course, exam, q, ws, hdr = _setup()
+    pid, c1 = program["id"], course["id"]
+    c2 = _post("/api/courses", {"program_id": pid, "code": "ODA 202", "name": "İkinci Ders", "academic_year": "2026-2027", "term": "Güz", "instructor_email": "x@dogus.edu.tr", "instructor_name": "X"})
+    _post(f"/api/courses/{c2['id']}/learning-outcomes", {"code": "Ö1", "description": "Aynı kodlu çıktı"})
+    bank = _post("/api/question-bank", {"course_id": c1, "question_type": "mcq", "text": "Ortak soru", "default_points": 5, "correct_answer": "A", "choices": {"A": "x", "B": "y"}, "tags": []})
+    client.put("/api/institution-settings/question_self_approval", json={"value": "off"})
+    try:
+        client.post(f"/api/question-bank/{bank['id']}/review", json={"status": "review"})
+        blocked = client.post(f"/api/question-bank/{bank['id']}/review", json={"status": "approved"})
+        assert blocked.status_code == 403 and "kendi sorusunu" in blocked.text  # author == current user
+    finally:
+        client.put("/api/institution-settings/question_self_approval", json={"value": "on"})
+    assert client.post(f"/api/question-bank/{bank['id']}/review", json={"status": "approved"}).status_code == 200
+    assert client.post(f"/api/question-bank/{bank['id']}/review", json={"status": "institutional"}).status_code == 200
+    shared = client.get(f"/api/question-bank/shared?course_id={c2['id']}").json()
+    assert [x["id"] for x in shared] == [bank["id"]] and shared[0]["course_code"] == "ODA 101"
+    assert client.get(f"/api/question-bank/shared?course_id={c1}").json() == []  # own course's questions are not 'shared'
+    cp = client.post(f"/api/question-bank/{bank['id']}/copy-to-course", json={"course_id": c2["id"]}); assert cp.status_code == 201, cp.text
+    assert cp.json()["review_status"] == "draft" and cp.json()["mapped_outcomes"] == [] and client.post(f"/api/question-bank/{bank['id']}/copy-to-course", json={"course_id": c1}).status_code == 409
+    other = _setup()[0]  # different program
+    c3 = _post("/api/courses", {"program_id": other["id"], "code": "XYZ 1", "name": "Başka program", "academic_year": "2026-2027", "term": "Güz", "instructor_email": "y@dogus.edu.tr", "instructor_name": "Y"})
+    assert client.post(f"/api/question-bank/{bank['id']}/copy-to-course", json={"course_id": c3["id"]}).status_code == 403

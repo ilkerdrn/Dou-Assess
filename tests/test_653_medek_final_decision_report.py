@@ -26,7 +26,7 @@ def make_ready(c,pid,fid):
 
 def test_653_release_contract():
     assert APP_VERSION=='6.70-production-hardening'
-    assert EXPECTED_SCHEMA_REVISION=='0046_exam_student_extra_time'
+    assert EXPECTED_SCHEMA_REVISION=='0047_institution_settings_outcome_approval'
     assert hasattr(m.AccreditationFinalReport,'decision_basis')
     assert hasattr(m.AccreditationFinalReport,'institution_report_sha256')
 

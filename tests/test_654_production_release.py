@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_654_version_and_schema_contract():
     main = (ROOT / 'app/main.py').read_text(encoding='utf-8')
     assert 'APP_VERSION = "6.70-production-hardening"' in main
-    assert 'EXPECTED_SCHEMA_REVISION = "0046_exam_student_extra_time"' in main
+    assert 'EXPECTED_SCHEMA_REVISION = "0047_institution_settings_outcome_approval"' in main
 
 
 def test_654_deployment_scripts_are_current():
@@ -14,9 +14,9 @@ def test_654_deployment_scripts_are_current():
     upgrade = (ROOT / 'Upgrade-Server.sh').read_text(encoding='utf-8')
     preflight = (ROOT / 'Preflight-Server.sh').read_text(encoding='utf-8')
     assert '6.70-production-hardening' in verify
-    assert '0046_exam_student_extra_time' in verify
+    assert '0047_institution_settings_outcome_approval' in verify
     assert '6.70-production-hardening' in upgrade
-    assert '0046_exam_student_extra_time' in upgrade
+    assert '0047_institution_settings_outcome_approval' in upgrade
     assert 'APP_ENV=production' in preflight
     assert 'PILOT_AUTH_ENABLED=false' in preflight
 

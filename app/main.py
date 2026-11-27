@@ -25,7 +25,7 @@ from .config import settings
 from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 # Historical release-contract tests search source text; runtime truth remains RELEASE.env.
 # APP_VERSION = "6.70-production-hardening"
-# EXPECTED_SCHEMA_REVISION = "0046_exam_student_extra_time"
+# EXPECTED_SCHEMA_REVISION = "0047_institution_settings_outcome_approval"
 # EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"
 # EXPECTED_SCHEMA_REVISION = "0039_evidence_integrity_security"
 from .db import engine, get_db, SessionLocal
@@ -64,6 +64,7 @@ from .program_review_api import router as program_review_router
 from .evaluator_room_api import router as evaluator_room_router
 from .student_portal_api import router as student_portal_router
 from .thresholds_api import router as thresholds_router
+from .governance_api import router as governance_router, approval_gate, lo_create_core, lo_delete_core, lo_out, lo_update_core, question_review_gate
 from .archive_api import router as archive_router
 from .p1_exports_api import router as p1_exports_router
 from .services.thresholds import active_threshold
@@ -100,6 +101,7 @@ app.include_router(program_review_router)
 app.include_router(evaluator_room_router)
 app.include_router(student_portal_router)
 app.include_router(thresholds_router)
+app.include_router(governance_router)
 app.include_router(archive_router)
 app.include_router(p1_exports_router)
 
@@ -1598,20 +1600,16 @@ def course_outcomes(course_id: int, db: Session = Depends(get_db)):
 
 
 def _lo_out(x: m.LearningOutcome) -> dict:
-    return {"id": x.id, "course_id": x.course_id, "code": x.code, "description": x.description, "target_percent": x.target_percent, "source": x.source, "is_active": x.is_active}
+    return lo_out(x)
 
 
 @app.post("/api/courses/{course_id}/learning-outcomes", status_code=201)
 def create_lo(course_id: int, data: LearningOutcomeCreate, db: Session = Depends(get_db)):
     require_course_access(db, course_id, write=True)  # instructors manage the outcomes of their own course
     if not db.get(m.Course, course_id): raise HTTPException(404, "Ders bulunamadı")
-    payload = data.model_dump()
-    if "target_percent" not in data.model_fields_set:  # not chosen explicitly -> institution/program default (versioned)
-        course = db.get(m.Course, course_id)
-        default = active_threshold(db, course.program_id, course.academic_year, "lo")
-        if default is not None: payload["target_percent"] = default
-    obj = m.LearningOutcome(course_id=course_id, source="assess", **payload); db.add(obj); db.flush()
-    audit(db, "create", "learning_outcome", obj.id, {"code": obj.code, "description": obj.description, "target_percent": obj.target_percent}); _commit(db)
+    gate = approval_gate(db, course_id, "create", data.model_dump(exclude_unset=True))
+    if gate: return gate
+    obj = lo_create_core(db, course_id, data.model_dump(), "target_percent" in data.model_fields_set); _commit(db)
     return _lo_out(obj)
 
 
@@ -1672,12 +1670,10 @@ def update_learning_outcome(outcome_id: int, data: LearningOutcomeUpdate, db: Se
     if not obj:
         raise HTTPException(404, "ÖÇ bulunamadı")
     require_course_access(db, obj.course_id, write=True)
-    before = {"code": obj.code, "description": obj.description, "target_percent": obj.target_percent}
-    changes = _apply_patch(obj, data)
-    if obj.source == "obs" and any(before[k] != getattr(obj, k) for k in before):
-        obj.source = "obs_modified"  # differs from OBS now; shows up in the OBS diff report
-    audit(db, "update", "learning_outcome", obj.id, {"before": before, "after": {k: getattr(obj, k) for k in before}, "source": obj.source})
-    _commit(db)
+    changes = data.model_dump(exclude_unset=True)
+    gate = approval_gate(db, obj.course_id, "update", changes, obj)
+    if gate: return gate
+    lo_update_core(db, obj, changes); _commit(db)
     return _lo_out(obj)
 
 
@@ -1710,18 +1706,10 @@ def delete_learning_outcome(outcome_id: int, db: Session = Depends(get_db)):
     if not obj:
         raise HTTPException(404, "ÖÇ bulunamadı")
     require_course_access(db, obj.course_id, write=True)
-    bank_links = db.scalar(select(func.count()).select_from(m.QuestionBankOutcome).where(m.QuestionBankOutcome.learning_outcome_id == outcome_id)) or 0
-    exam_snapshot_links = db.scalar(select(func.count()).select_from(m.ExamLearningOutcome).where(m.ExamLearningOutcome.source_learning_outcome_id == outcome_id)) or 0
-    question_links = db.scalar(select(func.count()).select_from(m.Question).join(m.ExamLearningOutcome, m.Question.exam_learning_outcome_id == m.ExamLearningOutcome.id).where(m.ExamLearningOutcome.source_learning_outcome_id == outcome_id)) or 0
-    if bank_links or exam_snapshot_links or question_links:
-        # Linked outcomes are deactivated, not deleted: past exams keep their snapshot, new exams skip it.
-        obj.is_active = False
-        audit(db, "deactivate", "learning_outcome", obj.id, {"code": obj.code, "bank_links": bank_links, "exam_snapshots": exam_snapshot_links})
-        _commit(db)
-        return {"deleted": False, "deactivated": True, "message": "ÖÇ bağlı soru/sınav içerdiği için silinmedi; pasife alındı."}
-    audit(db, "delete", "learning_outcome", obj.id, {"code": obj.code})
-    db.delete(obj); _commit(db)
-    return {"deleted": True}
+    gate = approval_gate(db, obj.course_id, "delete", {}, obj)
+    if gate: return gate
+    result = lo_delete_core(db, obj); _commit(db)
+    return result
 
 
 @app.patch("/api/program-outcomes/{outcome_id}")
@@ -2890,6 +2878,7 @@ def review_bank_question(question_id: int, data: QuestionReviewRequest, db: Sess
     current = obj.review_status or "draft"
     if data.status != current and data.status not in allowed.get(current, set()):
         raise HTTPException(400, f"Geçersiz soru yaşam döngüsü geçişi: {current} -> {data.status}")
+    if data.status != current: question_review_gate(db, obj, data.status)
     obj.review_status = data.status; obj.review_note = data.note or ""
     if data.reviewer: obj.reviewer = data.reviewer
     if data.status in {"approved", "institutional"}: obj.reviewed_at = datetime.now(timezone.utc)

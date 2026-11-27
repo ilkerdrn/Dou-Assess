@@ -22,7 +22,7 @@ def _post(path: str, payload: dict):
 
 def test_658_release_contract():
     assert APP_VERSION == "6.70-production-hardening"
-    assert EXPECTED_SCHEMA_REVISION == "0046_exam_student_extra_time"
+    assert EXPECTED_SCHEMA_REVISION == "0047_institution_settings_outcome_approval"
 
 
 def test_658_academic_hierarchy_curriculum_catalog_and_sections_api():
@@ -61,7 +61,7 @@ def test_658_upgrade_backfills_legacy_flat_structure(tmp_path):
     con.commit(); con.close()
     subprocess.run([sys.executable, '-m', 'alembic', 'upgrade', 'head'], cwd=ROOT, env=env, check=True, stdout=subprocess.DEVNULL)
     con = sqlite3.connect(db_path)
-    assert con.execute('select version_num from alembic_version').fetchone()[0] == '0046_exam_student_extra_time'
+    assert con.execute('select version_num from alembic_version').fetchone()[0] == '0047_institution_settings_outcome_approval'
     assert con.execute('select academic_unit_id from programs where id=?',(pid,)).fetchone()[0] is not None
     cat_id = con.execute('select catalog_item_id from courses where id=?',(cid,)).fetchone()[0]
     assert cat_id is not None
