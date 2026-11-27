@@ -24,7 +24,7 @@ def _put(path: str, payload: dict):
 
 def test_659_release_contract():
     assert APP_VERSION == '6.70-production-hardening'
-    assert EXPECTED_SCHEMA_REVISION == '0043_response_grade_revisions'
+    assert EXPECTED_SCHEMA_REVISION == '0044_outcome_source_and_print_confirm'
 
 
 def test_659_irm_curriculum_map_and_gap_engine():

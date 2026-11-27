@@ -11,7 +11,7 @@ def seed(c):
         f=m.QualityFrameworkProfile(code='MUDEK31-650',framework_family='MÜDEK',version='3.1',name='MÜDEK 3.1',effective_from_year=2026,status='active',criteria=[],thresholds={},source_meta={},is_builtin=False); db.add(f); db.commit(); return p.id,f.id
 
 def test_650_version_contract():
-    assert APP_VERSION=='6.70-production-hardening'; assert EXPECTED_SCHEMA_REVISION=='0043_response_grade_revisions'
+    assert APP_VERSION=='6.70-production-hardening'; assert EXPECTED_SCHEMA_REVISION=='0044_outcome_source_and_print_confirm'
 
 def test_final_report_freeze_and_revision_history(tmp_path):
     Base.metadata.drop_all(bind=engine); Base.metadata.create_all(bind=engine); c=TestClient(app); pid,fid=seed(c)

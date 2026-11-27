@@ -240,7 +240,7 @@ def validate_workbook(data: bytes) -> tuple[dict[str, list[dict]], list[str]]:
 
 
 def _ensure_exam_snapshot(db: Session, exam: m.Exam, course: m.Course) -> None:
-    live_los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course.id)).all()
+    live_los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course.id, m.LearningOutcome.is_active.is_(True))).all()
     existing_los = {x.code: x for x in db.scalars(select(m.ExamLearningOutcome).where(m.ExamLearningOutcome.exam_id == exam.id)).all()}
     lo_map: dict[int, m.ExamLearningOutcome] = {}
     for lo in live_los:
@@ -439,7 +439,7 @@ def import_workbook(
         lo_key = (course.id, lo_code)
         lo = lo_cache.get(lo_key) or db.scalar(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course.id, m.LearningOutcome.code == lo_code))
         if not lo:
-            lo = m.LearningOutcome(course_id=course.id, code=lo_code, description=_text(row["learning_outcome_description"]), target_percent=float(row["target"]))
+            lo = m.LearningOutcome(course_id=course.id, code=lo_code, description=_text(row["learning_outcome_description"]), target_percent=float(row["target"]), source="obs")
             db.add(lo); db.flush(); summary["learning_outcomes"] += 1
         else:
             lo.description = _text(row["learning_outcome_description"]); lo.target_percent = float(row["target"])

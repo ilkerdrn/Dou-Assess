@@ -23,7 +23,7 @@ from .config import settings
 from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 # Historical release-contract tests search source text; runtime truth remains RELEASE.env.
 # APP_VERSION = "6.70-production-hardening"
-# EXPECTED_SCHEMA_REVISION = "0043_response_grade_revisions"
+# EXPECTED_SCHEMA_REVISION = "0044_outcome_source_and_print_confirm"
 # EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"
 # EXPECTED_SCHEMA_REVISION = "0039_evidence_integrity_security"
 from .db import engine, get_db, SessionLocal
@@ -1543,18 +1543,23 @@ def course_outcomes(course_id: int, db: Session = Depends(get_db)):
     pos = db.scalars(select(m.ProgramOutcome).where(m.ProgramOutcome.program_id == course.program_id, m.ProgramOutcome.academic_year == course.academic_year).order_by(m.ProgramOutcome.code)).all()
     mappings = db.scalars(select(m.OutcomeMapping).join(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id, m.OutcomeMapping.contribution >= 1)).all()
     return {
-        "learning_outcomes": [{"id": x.id, "code": x.code, "description": x.description, "target_percent": x.target_percent} for x in los],
+        "learning_outcomes": [{"id": x.id, "code": x.code, "description": x.description, "target_percent": x.target_percent, "source": x.source, "is_active": x.is_active} for x in los],
         "program_outcomes": [{"id": x.id, "academic_year": x.academic_year, "code": x.code, "description": x.description} for x in pos],
         "mappings": [{"id": x.id, "learning_outcome_id": x.learning_outcome_id, "program_outcome_id": x.program_outcome_id, "contribution": x.contribution} for x in mappings],
     }
 
 
+def _lo_out(x: m.LearningOutcome) -> dict:
+    return {"id": x.id, "course_id": x.course_id, "code": x.code, "description": x.description, "target_percent": x.target_percent, "source": x.source, "is_active": x.is_active}
+
+
 @app.post("/api/courses/{course_id}/learning-outcomes", status_code=201)
 def create_lo(course_id: int, data: LearningOutcomeCreate, db: Session = Depends(get_db)):
-    require_course_management(db, course_id)
+    require_course_access(db, course_id, write=True)  # instructors manage the outcomes of their own course
     if not db.get(m.Course, course_id): raise HTTPException(404, "Ders bulunamadı")
-    obj = m.LearningOutcome(course_id=course_id, **data.model_dump()); db.add(obj); db.flush(); _commit(db)
-    return {"id": obj.id, "course_id": obj.course_id, "code": obj.code, "description": obj.description, "target_percent": obj.target_percent}
+    obj = m.LearningOutcome(course_id=course_id, source="assess", **data.model_dump()); db.add(obj); db.flush()
+    audit(db, "create", "learning_outcome", obj.id, {"code": obj.code, "description": obj.description, "target_percent": obj.target_percent}); _commit(db)
+    return _lo_out(obj)
 
 
 @app.post("/api/programs/{program_id}/program-outcomes", status_code=201)
@@ -1571,7 +1576,7 @@ def course_outcome_summary(course_id: int, db: Session = Depends(get_db)):
     course = db.get(m.Course, course_id)
     if not course:
         raise HTTPException(404, "Ders bulunamadı")
-    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id)).all()
+    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id, m.LearningOutcome.is_active.is_(True))).all()
     pos = db.scalars(select(m.ProgramOutcome).where(m.ProgramOutcome.program_id == course.program_id, m.ProgramOutcome.academic_year == course.academic_year)).all()
     mappings = db.scalars(select(m.OutcomeMapping).join(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id, m.OutcomeMapping.contribution > 0)).all()
     mapped_lo_ids = {x.learning_outcome_id for x in mappings}
@@ -1613,11 +1618,14 @@ def update_learning_outcome(outcome_id: int, data: LearningOutcomeUpdate, db: Se
     obj = db.get(m.LearningOutcome, outcome_id)
     if not obj:
         raise HTTPException(404, "ÖÇ bulunamadı")
-    require_course_management(db, obj.course_id)
+    require_course_access(db, obj.course_id, write=True)
+    before = {"code": obj.code, "description": obj.description, "target_percent": obj.target_percent}
     changes = _apply_patch(obj, data)
-    audit(db, "update", "learning_outcome", obj.id, changes)
+    if obj.source == "obs" and any(before[k] != getattr(obj, k) for k in before):
+        obj.source = "obs_modified"  # differs from OBS now; shows up in the OBS diff report
+    audit(db, "update", "learning_outcome", obj.id, {"before": before, "after": {k: getattr(obj, k) for k in before}, "source": obj.source})
     _commit(db)
-    return {"id": obj.id, "course_id": obj.course_id, "code": obj.code, "description": obj.description, "target_percent": obj.target_percent}
+    return _lo_out(obj)
 
 
 @app.delete("/api/learning-outcomes/{outcome_id}")
@@ -1625,13 +1633,16 @@ def delete_learning_outcome(outcome_id: int, db: Session = Depends(get_db)):
     obj = db.get(m.LearningOutcome, outcome_id)
     if not obj:
         raise HTTPException(404, "ÖÇ bulunamadı")
-    require_course_management(db, obj.course_id)
+    require_course_access(db, obj.course_id, write=True)
     bank_links = db.scalar(select(func.count()).select_from(m.QuestionBankOutcome).where(m.QuestionBankOutcome.learning_outcome_id == outcome_id)) or 0
     exam_snapshot_links = db.scalar(select(func.count()).select_from(m.ExamLearningOutcome).where(m.ExamLearningOutcome.source_learning_outcome_id == outcome_id)) or 0
-    if bank_links:
-        raise HTTPException(409, f"ÖÇ silinemez. Soru havuzunda {bank_links} ilişki var; önce sorulardaki ÖÇ eşleşmesini değiştirin.")
-    if exam_snapshot_links:
-        raise HTTPException(409, f"ÖÇ silinemez. {exam_snapshot_links} sınav snapshot'ı bu çıktıyı referanslıyor. Tarihsel kanıt bütünlüğü korunmalıdır.")
+    question_links = db.scalar(select(func.count()).select_from(m.Question).join(m.ExamLearningOutcome, m.Question.exam_learning_outcome_id == m.ExamLearningOutcome.id).where(m.ExamLearningOutcome.source_learning_outcome_id == outcome_id)) or 0
+    if bank_links or exam_snapshot_links or question_links:
+        # Linked outcomes are deactivated, not deleted: past exams keep their snapshot, new exams skip it.
+        obj.is_active = False
+        audit(db, "deactivate", "learning_outcome", obj.id, {"code": obj.code, "bank_links": bank_links, "exam_snapshots": exam_snapshot_links})
+        _commit(db)
+        return {"deleted": False, "deactivated": True, "message": "ÖÇ bağlı soru/sınav içerdiği için silinmedi; pasife alındı."}
     audit(db, "delete", "learning_outcome", obj.id, {"code": obj.code})
     db.delete(obj); _commit(db)
     return {"deleted": True}
@@ -1709,7 +1720,7 @@ def upsert_mapping(data: OutcomeMappingCreate, db: Session = Depends(get_db)):
 
 def _snapshot_exam(db: Session, exam: m.Exam) -> None:
     course = db.get(m.Course, exam.course_id)
-    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course.id)).all()
+    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course.id, m.LearningOutcome.is_active.is_(True))).all()
     pos = db.scalars(select(m.ProgramOutcome).where(m.ProgramOutcome.program_id == course.program_id, m.ProgramOutcome.academic_year == course.academic_year)).all()
     lo_map: dict[int, m.ExamLearningOutcome] = {}
     po_map: dict[int, m.ExamProgramOutcome] = {}

@@ -23,7 +23,7 @@ def _put(path: str, payload: dict):
 
 def test_661_release_contract():
     assert APP_VERSION == "6.70-production-hardening"
-    assert EXPECTED_SCHEMA_REVISION == "0043_response_grade_revisions"
+    assert EXPECTED_SCHEMA_REVISION == "0044_outcome_source_and_print_confirm"
 
 
 def test_661_direct_indirect_outcome_evidence_flow_and_anonymity():

@@ -38,4 +38,4 @@ def test_627_university_dashboard_and_ui_contract():
 def test_627_version_contract():
     from app.main import APP_VERSION, EXPECTED_SCHEMA_REVISION
     assert APP_VERSION=='6.70-production-hardening'
-    assert EXPECTED_SCHEMA_REVISION=='0043_response_grade_revisions'
+    assert EXPECTED_SCHEMA_REVISION=='0044_outcome_source_and_print_confirm'

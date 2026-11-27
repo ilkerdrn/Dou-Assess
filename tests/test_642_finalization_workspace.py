@@ -12,7 +12,7 @@ client=TestClient(app)
 
 def test_642_version_and_no_schema_bump():
     assert 'APP_VERSION = "6.70-production-hardening"' in MAIN
-    assert 'EXPECTED_SCHEMA_REVISION = "0043_response_grade_revisions"' in MAIN
+    assert 'EXPECTED_SCHEMA_REVISION = "0044_outcome_source_and_print_confirm"' in MAIN
 
 def test_642_action_center_and_student_workspace_contract():
     assert 'YAPILACAKLAR' in HTML and 'Sıradaki işiniz' in HTML

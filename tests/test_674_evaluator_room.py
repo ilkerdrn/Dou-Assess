@@ -226,3 +226,22 @@ def test_institution_reply_reaches_evaluator():
     assert mine[0]["replies"][0]["note"] == "Kanıt odasına eklendi."
     plain = _post("/api/compliance/visit-notes", {"application_id": ws["application_id"], "criterion_code": "", "note_type": "observation", "title": "iç not", "note": "", "recorded_by": "x", "visibility": "internal", "evidence_refs": [], "occurred_at": None})
     assert client.post(f"/api/compliance/visit-notes/{plain['id']}/reply", json={"note": "olmaz"}).status_code == 409
+
+
+def test_outcome_source_label_and_deactivate_instead_of_delete():
+    program, course, exam, q, ws, hdr = _setup()
+    cid = course["id"]
+    los = client.get(f"/api/courses/{cid}/outcomes").json()["learning_outcomes"]
+    assert los[0]["source"] == "obs" and los[0]["is_active"] is True
+    patched = client.patch(f"/api/learning-outcomes/{los[0]['id']}", json={"description": "Değiştirilmiş metin"}).json()
+    assert patched["source"] == "obs_modified"
+    new = _post(f"/api/courses/{cid}/learning-outcomes", {"code": "Ö9", "description": "Yeni çıktı", "target_percent": 60})
+    assert new["source"] == "assess"
+    assert client.delete(f"/api/learning-outcomes/{new['id']}").json()["deleted"] is True  # unlinked -> really deleted
+    # Ö1 is referenced by the exam snapshot -> deactivated, not deleted, and skipped by new exam snapshots
+    r = client.delete(f"/api/learning-outcomes/{los[0]['id']}").json()
+    assert r["deactivated"] is True
+    out = client.get(f"/api/courses/{cid}/outcomes").json()["learning_outcomes"]
+    assert out[0]["is_active"] is False
+    exam2 = _post("/api/exams", {"course_id": cid, "title": "Final", "exam_type": "Final", "exam_date": "2026-12-01", "duration_minutes": 50, "instructions": "", "sync_students": True})
+    assert exam2["learning_outcomes"] == []

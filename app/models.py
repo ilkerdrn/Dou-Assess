@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
+    text,
     Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Integer,
     JSON, String, Text, UniqueConstraint
 )
@@ -490,6 +491,9 @@ class LearningOutcome(Base):
     code: Mapped[str] = mapped_column(String(64), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     target_percent: Mapped[float] = mapped_column(Float, default=60.0, nullable=False)
+    # Provenance: "obs" (came from OBS/import), "assess" (added here), "obs_modified" (OBS row edited here).
+    source: Mapped[str] = mapped_column(String(24), default="assess", server_default="assess", nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"), nullable=False)
 
     course: Mapped[Course] = relationship(back_populates="learning_outcomes")
     mappings: Mapped[list["OutcomeMapping"]] = relationship(back_populates="learning_outcome", cascade="all, delete-orphan")
@@ -562,6 +566,8 @@ class Exam(Base):
     approved_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     approval_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    printed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    printed_by: Mapped[str] = mapped_column(String(255), default="", server_default="", nullable=False)
     grade_locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     grade_locked_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     grade_lock_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
