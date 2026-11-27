@@ -473,3 +473,38 @@ def test_obs_grade_export_positive_path():
     finals = sorted(x[-2] for x in rows[1:]); assert finals == [0.0, 100.0]
     assert {x[-1] for x in rows[1:]} == {"Geçti", "Kaldı"}
     assert dict(wb["Bilgi"].iter_rows(values_only=True))["Ağırlıklar geçerli mi"] == "Evet"
+
+
+def test_large_exam_uses_separate_answer_page_and_full_score_grid():
+    from io import BytesIO
+    from pypdf import PdfReader
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    client.patch(f"/api/exams/{eid}/questions/{q['id']}", json={"points": 1})
+    for n in range(2, 51):
+        _post(f"/api/exams/{eid}/questions", {"order_no": n, "question_type": "mcq", "text": f"Soru {n}", "points": 1, "correct_answer": "B", "choices": {"A": "a", "B": "b", "C": "c", "D": "d"}, "learning_outcome_code": "Ö1"})
+    meta = client.get(f"/api/exams/{eid}/paper-metadata").json()
+    assert meta["paper"]["omr_mode"] == "separate"  # 50 MCQ > 40 -> forced even though the exam says embedded
+    reader = PdfReader(BytesIO(client.get(f"/api/exams/{eid}/paper.pdf").content))
+    first = reader.pages[0].extract_text()
+    assert "CEVAP FORMU AYRI SAYFADADIR" in first and {"41", "49", "50"} <= set(first.split())  # score grid lists all questions (was capped at 40)
+    assert "AYRI CEVAP FORMU" in reader.pages[1].extract_text()
+
+
+def test_extra_time_accommodation_printed_and_locked_after_print():
+    from io import BytesIO
+    from pypdf import PdfReader
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    s1, s2 = client.get(f"/api/exams/{eid}/students").json()
+    assert client.patch(f"/api/exams/{eid}/students/{s1['id']}/accommodation", json={"extra_time_percent": 150}).status_code == 422
+    assert client.patch(f"/api/exams/{eid}/students/{s1['id']}/accommodation", json={"extra_time_percent": 25}).json()["extra_time_percent"] == 25
+    t1 = PdfReader(BytesIO(client.get(f"/api/exams/{eid}/students/{s1['id']}/paper.pdf").content)).pages[0].extract_text()
+    t2 = PdfReader(BytesIO(client.get(f"/api/exams/{eid}/students/{s2['id']}/paper.pdf").content)).pages[0].extract_text()
+    t1, t2 = " ".join(t1.split()), " ".join(t2.split())  # PDF text wraps lines
+    assert "ek süre" in t1 and "63 dk" in t1 and "ek süre" not in t2  # 50 dk +25% -> 63 dk (rounded up)
+    sheet = PdfReader(BytesIO(client.get(f"/api/exams/{eid}/attendance-sheet.pdf").content)).pages[0].extract_text()
+    assert "ek süre" in " ".join(sheet.split())
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"})
+    assert client.post(f"/api/exams/{eid}/print-confirm").status_code == 200
+    assert client.patch(f"/api/exams/{eid}/students/{s1['id']}/accommodation", json={"extra_time_percent": 50}).status_code == 409

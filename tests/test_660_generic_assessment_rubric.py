@@ -26,7 +26,7 @@ def _put(path: str, payload: dict):
 
 def test_660_release_contract():
     assert APP_VERSION == "6.70-production-hardening"
-    assert EXPECTED_SCHEMA_REVISION == "0045_outcome_thresholds"
+    assert EXPECTED_SCHEMA_REVISION == "0046_exam_student_extra_time"
 
 
 def test_660_project_rubric_outcome_and_student_result_flow():

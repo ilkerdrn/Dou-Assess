@@ -9,6 +9,7 @@
 - Fast grading grid for rubric-based classic questions (student x criterion, all-or-nothing validation, blind-mode aware, unchanged rows skipped, revisions logged). Institution wording for "learning outcome" via `OUTCOME_TERM` (Öğrenim | Öğrenme | Kazanım).
 - P1: versioned success thresholds (migration 0045: LO default target + PO threshold per institution/program/year, history kept, applied to new outcomes and analytics); random sampling of auto-accepted OMR pages with error-rate vs `SCAN_TARGET_ERROR_PERCENT`; hash-sealed semester closure package per exam; scan retention overview and recorded purge (`SCAN_RETENTION_DAYS`, default 1460, admin only).
 - P1: OBS bulk-entry grade export (`GET /api/courses/{id}/obs-grades.xlsx`, layout must be confirmed against the OBS template), PÇ calculation formula document (`GET /api/programs/{id}/po-formula.md`), Excel template + validated all-or-nothing import for assignment/project/lab scores, `docs/KVKK-AI-OCR-DEGERLENDIRME.md` assessment template.
+- P1: exams with more than 40 test questions automatically use a separate answer page (embedded bubbles overlapped at 100 questions); the score grid now lists every question (was capped at 40); per-student extra time (migration 0046) printed on the student's paper and attendance sheet, locked after print.
 - Demo scenario uses the real current term instead of 2099-2100 when that period is free.
 
 # 6.70 — Performance & Production Hardening

@@ -19,4 +19,4 @@ def test_release_metadata_marks_canonical_hotfix():
     assert release["RELEASE_VERSION"] == "6.70"
     assert release["DEPLOY_TOOLING_VERSION"] == "6.70"
     assert release["APP_VERSION"] == "6.70-production-hardening"
-    assert release["EXPECTED_SCHEMA_REVISION"] == "0045_outcome_thresholds"
+    assert release["EXPECTED_SCHEMA_REVISION"] == "0046_exam_student_extra_time"

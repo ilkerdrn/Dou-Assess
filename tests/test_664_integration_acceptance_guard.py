@@ -18,7 +18,7 @@ def _post(path: str, payload: dict):
 
 def test_664_release_and_obs_readonly_contract():
     assert APP_VERSION == "6.70-production-hardening"
-    assert EXPECTED_SCHEMA_REVISION == "0045_outcome_thresholds"
+    assert EXPECTED_SCHEMA_REVISION == "0046_exam_student_extra_time"
     root = Path(__file__).resolve().parents[1]
     cfg = (root / "app/config.py").read_text(encoding="utf-8")
     main = (root / "app/main.py").read_text(encoding="utf-8")

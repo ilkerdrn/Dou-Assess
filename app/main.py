@@ -12,6 +12,7 @@ import uuid
 import zipfile
 from urllib import error as urlerror, request as urlrequest
 
+from pydantic import BaseModel, Field
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, Request, Query
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +25,7 @@ from .config import settings
 from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 # Historical release-contract tests search source text; runtime truth remains RELEASE.env.
 # APP_VERSION = "6.70-production-hardening"
-# EXPECTED_SCHEMA_REVISION = "0045_outcome_thresholds"
+# EXPECTED_SCHEMA_REVISION = "0046_exam_student_extra_time"
 # EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"
 # EXPECTED_SCHEMA_REVISION = "0039_evidence_integrity_security"
 from .db import engine, get_db, SessionLocal
@@ -43,7 +44,7 @@ from .services.imports import ImportValidationError, import_workbook, validate_w
 from .services.question_bank_import import parse_question_bank_workbook
 from .services.excel_center import TEMPLATES as EXCEL_CENTER_TEMPLATES, template_bytes as excel_center_template_bytes, parse_workbook as parse_excel_center_workbook, yes_no as excel_yes_no, rubric_scores as parse_excel_rubric_scores
 from .services.quality360 import QUALITY_EXCEL_KINDS, validate_excel_rows as validate_quality_excel_rows, import_excel_rows as import_quality_excel_rows
-from .services.paper import build_attendance_sheet_pdf, build_exam_pdf, normalize_choices, normalize_correct_answer, paper_metadata, question_regions
+from .services.paper import effective_omr_mode, build_attendance_sheet_pdf, build_exam_pdf, normalize_choices, normalize_correct_answer, paper_metadata, question_regions
 from .services.pilot_ops import build_pilot_readiness, operational_issues, build_uat_checks
 from .services.scan import ScanError, analyze_page, decode_upload, iter_decode_upload, jpeg_bytes, parse_qr_payload, diagnostic_summary, annotated_review_preview, full_page_fingerprint
 from .services.accreditation import freeze_representatives, freeze_period_representatives, period_dashboard, representative_rows, sync_period_exams
@@ -2147,7 +2148,7 @@ def personalized_exam_paper(exam_id: int, student_id: int, booklet: str = "A", d
         raise HTTPException(404, "Öğrenci bu sınava kayıtlı değil")
     booklet = _require_allowed_booklet(exam, booklet)
     try:
-        data, meta = build_exam_pdf(exam, booklet, student=student)
+        data, meta = build_exam_pdf(exam, booklet, student=student, extra_time_percent=es.extra_time_percent or 0)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     safe = re.sub(r"[^A-Za-z0-9_-]+", "_", student.student_no)
@@ -2168,7 +2169,7 @@ def batch_exam_papers(exam_id: int, booklet_strategy: str = "rotate", db: Sessio
     booklets = _allowed_booklets(exam)
     for i, es in enumerate(rows):
         booklet = booklets[i % len(booklets)] if strategy == "rotate" else "A"
-        data, _ = build_exam_pdf(exam, booklet, student=es.student)
+        data, _ = build_exam_pdf(exam, booklet, student=es.student, extra_time_percent=es.extra_time_percent or 0)
         reader = PdfReader(BytesIO(data))
         for page in reader.pages:
             writer.add_page(page)
@@ -2180,7 +2181,7 @@ def batch_exam_papers(exam_id: int, booklet_strategy: str = "rotate", db: Sessio
 def _print_assignments(db: Session, exam: m.Exam) -> list[dict]:
     rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam.id).order_by(m.ExamStudent.id)).all()
     booklets = _allowed_booklets(exam)
-    return [{"student_id": es.student_id, "student_no": es.student.student_no, "full_name": es.student.full_name, "booklet": booklets[i % len(booklets)]} for i, es in enumerate(rows)]
+    return [{"student_id": es.student_id, "student_no": es.student.student_no, "full_name": es.student.full_name, "booklet": booklets[i % len(booklets)], "extra_time_percent": es.extra_time_percent or 0} for i, es in enumerate(rows)]
 
 
 @app.get("/api/exams/{exam_id}/print-summary")
@@ -3140,7 +3141,7 @@ def exam_students(exam_id: int, db: Session = Depends(get_db)):
     require_exam_access(db, exam_id, write=False)
     if not db.get(m.Exam, exam_id): raise HTTPException(404, "Sınav bulunamadı")
     rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id)).all()
-    return [{"exam_student_id": x.id, "attendance_status": x.attendance_status or "attended", "attendance_note": x.attendance_note or "", "attendance_updated_at": x.attendance_updated_at.isoformat() if x.attendance_updated_at else None, **_student_out(x.student)} for x in rows]
+    return [{"exam_student_id": x.id, "attendance_status": x.attendance_status or "attended", "extra_time_percent": x.extra_time_percent or 0, "attendance_note": x.attendance_note or "", "attendance_updated_at": x.attendance_updated_at.isoformat() if x.attendance_updated_at else None, **_student_out(x.student)} for x in rows]
 
 
 @app.get("/api/exams/{exam_id}/students/{student_id}/responses")
@@ -3503,7 +3504,7 @@ def _process_scan_bytes(db: Session, exam: m.Exam, data: bytes, source_name: str
         expected = paper_metadata(exam, booklet, student=student if student else None)
         token_mismatch = qr.get("token") != expected.get("token")
         result = analyze_page(page, expected)
-        omr_logical_page = 2 if str(getattr(exam, "omr_mode", "embedded") or "embedded") == "separate" else 1
+        omr_logical_page = 2 if effective_omr_mode(exam) == "separate" else 1
         if result.get("kind") != "omr":
             status = "review" if token_mismatch else "skipped"
             issues = [{"code":"TOKEN_MISMATCH", "message":"Sınav/kitapçık doğrulama tokenı eşleşmedi"}] if token_mismatch else []
@@ -4821,6 +4822,24 @@ def _grade_lock_blockers(db: Session, exam_id: int) -> dict:
     incidents = db.scalar(select(func.count()).select_from(m.ExamIncident).where(m.ExamIncident.exam_id == exam_id, m.ExamIncident.status == "open", m.ExamIncident.severity == "critical")) or 0
     appeals = db.scalar(select(func.count()).select_from(m.GradeAppeal).where(m.GradeAppeal.exam_id == exam_id, m.GradeAppeal.status == "open")) or 0
     return {"question_count": int(q_count), "active_student_count": int(active), "expected_responses": int(expected), "response_count": int(responses), "missing_responses": max(0, int(expected-responses)), "open_scan_reviews": int(reviews), "open_critical_incidents": int(incidents), "open_appeals": int(appeals), "ready": (responses >= expected and reviews == 0 and incidents == 0 and appeals == 0)}
+
+
+class AccommodationUpdate(BaseModel):
+    extra_time_percent: int = Field(ge=0, le=100)
+
+
+@app.patch("/api/exams/{exam_id}/students/{student_id}/accommodation")
+def update_exam_accommodation(exam_id: int, student_id: int, data: AccommodationUpdate, db: Session = Depends(get_db)):
+    """Per-student extra time (printed on that student's paper and on the attendance sheet). Locked once papers are printed."""
+    require_exam_access(db, exam_id, write=True)
+    exam = db.get(m.Exam, exam_id)
+    if not exam: raise HTTPException(404, "Sınav bulunamadı")
+    if exam.printed_at: raise HTTPException(409, "Kâğıtlar basıldı; ek süre değiştirilemez (ek kâğıt için kopya sınav kullanın)")
+    es = db.scalar(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.student_id == student_id))
+    if not es: raise HTTPException(404, "Öğrenci bu sınava kayıtlı değil")
+    es.extra_time_percent = data.extra_time_percent
+    audit(db, "exam_accommodation", "exam_student", es.id, {"extra_time_percent": data.extra_time_percent}); _commit(db)
+    return {"student_id": student_id, "extra_time_percent": es.extra_time_percent}
 
 
 @app.patch("/api/exams/{exam_id}/students/{student_id}/attendance")

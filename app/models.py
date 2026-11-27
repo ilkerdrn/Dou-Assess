@@ -754,6 +754,7 @@ class ExamStudent(Base):
     attendance_status: Mapped[str] = mapped_column(String(24), default="attended", nullable=False, index=True)
     attendance_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
     attendance_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    extra_time_percent: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)  # accommodation, printed on the student's paper
 
     exam: Mapped[Exam] = relationship(back_populates="exam_students")
     student: Mapped[Student] = relationship()

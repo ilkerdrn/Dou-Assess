@@ -641,7 +641,8 @@ Kod doğruluğu | 4
       <div id="printSummary" class="card"><p class="muted">Sınav seçin.</p></div>
       <div class="card"><div class="section-head"><div><span class="eyebrow">ÇIKTILAR</span><h3>İndir ve yazdır</h3></div></div>
         <div class="actions"><button id="printBatch" class="primary" type="button" disabled>Tüm öğrenciler için toplu PDF</button><button id="printAttendance" class="ghost" type="button" disabled>Yoklama / imza listesi</button></div>
-        <div class="row"><label>Tek öğrenci / ek kâğıt<select id="printStudent"></select></label><button id="printOne" class="ghost" type="button" disabled>Bu öğrencinin kâğıdını indir</button></div></div>
+        <div class="row"><label>Tek öğrenci / ek kâğıt<select id="printStudent"></select></label><button id="printOne" class="ghost" type="button" disabled>Bu öğrencinin kâğıdını indir</button></div>
+        <div class="row"><label>Seçili öğrenci için ek süre (%)<input id="printExtra" type="number" min="0" max="100" step="5" value="0"></label><button id="printExtraSave" class="ghost" type="button">Ek süreyi kaydet</button><small class="muted">Kâğıda ve yoklama listesine yazılır; basımdan sonra değiştirilemez.</small></div></div>
       <div class="card"><div class="section-head"><div><span class="eyebrow">ONAY</span><h3>Yazdırdım</h3><p class="muted">Onaylandıktan sonra sorular değiştirilemez; değişiklik gerekirse sınavı kopyalayıp yeni sürüm oluşturursunuz.</p></div><button id="printConfirm" class="primary" type="button" disabled>Yazdırdım, soruları kilitle</button></div></div>
       <div class="actions"><button id="printNext" class="ghost" type="button">Sonraki adım: Optik Okuma →</button></div>
     </section>

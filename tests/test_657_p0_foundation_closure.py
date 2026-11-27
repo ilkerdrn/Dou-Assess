@@ -12,7 +12,7 @@ def test_release_metadata_is_canonical():
     meta = build_metadata()
     assert APP_VERSION == "6.70-production-hardening"
     assert meta["version"] == APP_VERSION
-    assert meta["schema_expected"] == EXPECTED_SCHEMA_REVISION == "0045_outcome_thresholds"
+    assert meta["schema_expected"] == EXPECTED_SCHEMA_REVISION == "0046_exam_student_extra_time"
     assert meta["asset_version"] == "6.70-production-hardening"
 
 

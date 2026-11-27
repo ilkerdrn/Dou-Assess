@@ -1369,7 +1369,7 @@ async function loadPrintSummary(){
   try{
     const [s,students]=await Promise.all([api('GET',`/api/exams/${id}/print-summary`),api('GET',`/api/exams/${id}/students`)]);
     const ready=s.student_count>0&&s.pages_per_paper>0;set(!ready);document.getElementById('printConfirm').disabled=!s.can_confirm;
-    document.getElementById('printStudent').innerHTML=students.map(x=>`<option value="${x.id}">${esc(x.student_no+' · '+x.full_name)}</option>`).join('');
+    state.printStudents=students;document.getElementById('printStudent').innerHTML=students.map(x=>`<option value="${x.id}">${esc(x.student_no+' · '+x.full_name)}${x.extra_time_percent?` (+%${x.extra_time_percent} süre)`:''}</option>`).join('');syncPrintExtra();
     box.innerHTML=`<div class="readiness-head"><div><b>${s.printed_at?'Basıldı — sorular kilitli':s.ready?'Basıma hazır':'Basımdan önce eksikleri tamamlayın'}</b><small>${s.printed_at?`${esc(s.printed_by)} · ${esc(s.printed_at.slice(0,16).replace('T',' '))}`:`Durum: ${esc(s.status)}`}</small></div></div><div class="readiness-counts"><span>${s.student_count} öğrenci için kâğıt</span><span>${s.pages_per_paper} sayfa / kâğıt</span><span>${s.total_pages} sayfa toplam</span><span>${s.sheets_total} yaprak${s.duplex?' (çift taraflı)':''}</span><span>Kitapçık: ${esc(Object.entries(s.booklets).map(([k,v])=>`${k}=${v}`).join(' · ')||'—')}</span></div>${s.issues.length?`<div class="readiness-issue-list">${s.issues.map(x=>`<div><i>!</i><span>${esc(x)}</span></div>`).join('')}</div>`:''}${s.status==='draft'?'<div class="readiness-warning-list"><div><i>i</i><span>Sınav hâlâ taslak. Önce "Sınav Hazırla" ekranında hazır durumuna alın.</span></div></div>':''}`;
   }catch(e){box.innerHTML=`<p class="muted">${esc(e.message)}</p>`;set(true)}
 }
@@ -1405,6 +1405,10 @@ async function loadRetention(){
   }catch(e){box.innerHTML=`<p class="muted">${esc(e.message)}</p>`}
 }
 document.getElementById('retentionCard')?.addEventListener('toggle',e=>{if(e.target.open)loadRetention()});
+
+function syncPrintExtra(){const id=Number(document.getElementById('printStudent')?.value||0),s=(state.printStudents||[]).find(x=>x.id===id);const i=document.getElementById('printExtra');if(i)i.value=s?.extra_time_percent||0}
+document.getElementById('printStudent')?.addEventListener('change',syncPrintExtra);
+document.getElementById('printExtraSave')?.addEventListener('click',async()=>{const ex=document.getElementById('printExam').value,st=document.getElementById('printStudent').value;if(!ex||!st)return;try{await api('PATCH',`/api/exams/${ex}/students/${st}/accommodation`,{extra_time_percent:Number(document.getElementById('printExtra').value||0)});toast('Ek süre kaydedildi.');await loadPrintSummary()}catch(e){toast(e.message,'error')}});
 
 async function prepareScan(){
   try{await refreshCore();await loadScanContext();renderScanFileCount();}catch(e){toast(e.message,'error');}
