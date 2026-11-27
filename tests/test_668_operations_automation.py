@@ -19,7 +19,7 @@ SUFFIX = uuid.uuid4().hex[:8]
 
 def test_668_release_migration_worker_scheduler_contract():
     assert APP_VERSION == "6.70-production-hardening"
-    assert EXPECTED_SCHEMA_REVISION == "0044_outcome_source_and_print_confirm"
+    assert EXPECTED_SCHEMA_REVISION == "0045_outcome_thresholds"
     root = Path(__file__).resolve().parents[1]
     migration = (root / "migrations/versions/0040_operations_automation.py").read_text(encoding="utf-8")
     assert 'revision = "0040_operations_automation"' in migration

@@ -342,3 +342,22 @@ def test_classic_grid_bulk_entry_validation_and_progress():
 
 def test_outcome_term_is_configurable_via_auth_config():
     assert client.get("/api/auth/config").json()["outcome_term"] in {"Öğrenim", "Öğrenme", "Kazanım"}
+
+
+def test_versioned_thresholds_drive_po_target_and_lo_default():
+    program, course, exam, q, ws, hdr = _setup()
+    pid, cid, eid = program["id"], course["id"], exam["id"]
+    t1 = _post("/api/outcome-thresholds", {"program_id": pid, "kind": "lo", "target_percent": 75})
+    assert t1["version_no"] == 1
+    t2 = _post("/api/outcome-thresholds", {"program_id": pid, "kind": "lo", "target_percent": 80, "note": "yeni yönerge"})
+    assert t2["version_no"] == 2
+    rows = [r for r in client.get(f"/api/outcome-thresholds?program_id={pid}").json() if r["kind"] == "lo" and r["program_id"] == pid]
+    assert sorted((r["version_no"], r["is_active"]) for r in rows) == [(1, False), (2, True)]
+    lo = _post(f"/api/courses/{cid}/learning-outcomes", {"code": "Ö5", "description": "Varsayılan hedef"})
+    assert lo["target_percent"] == 80
+    explicit = _post(f"/api/courses/{cid}/learning-outcomes", {"code": "Ö6", "description": "Açık hedef", "target_percent": 55})
+    assert explicit["target_percent"] == 55
+    _post("/api/outcome-thresholds", {"program_id": pid, "kind": "po", "target_percent": 90})
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
+    an = client.get(f"/api/exams/{eid}/analytics").json()
+    assert an["program_outcomes"] and all(p["target_percent"] == 90 for p in an["program_outcomes"])

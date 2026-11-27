@@ -37,7 +37,7 @@ def _pdf_bytes() -> bytes:
 
 def test_667_release_contract_and_migration_present():
     assert APP_VERSION == "6.70-production-hardening"
-    assert EXPECTED_SCHEMA_REVISION == "0044_outcome_source_and_print_confirm"
+    assert EXPECTED_SCHEMA_REVISION == "0045_outcome_thresholds"
     root = Path(__file__).resolve().parents[1]
     migration = (root / "migrations/versions/0039_evidence_integrity_security.py").read_text(encoding="utf-8")
     assert 'revision = "0039_evidence_integrity_security"' in migration

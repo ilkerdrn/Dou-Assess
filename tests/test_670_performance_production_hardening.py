@@ -46,7 +46,7 @@ def test_670_release_migration_and_index_contract():
         if line and not line.startswith("#") and "=" in line
     )
     assert release["APP_VERSION"] == "6.70-production-hardening"
-    assert release["EXPECTED_SCHEMA_REVISION"] == "0044_outcome_source_and_print_confirm"
+    assert release["EXPECTED_SCHEMA_REVISION"] == "0045_outcome_thresholds"
     migration = (ROOT / "migrations/versions/0042_performance_production_hardening.py").read_text(encoding="utf-8")
     assert 'revision = "0042_performance_production_hardening"' in migration
     assert 'down_revision = "0041_program_review_evidence_hub"' in migration

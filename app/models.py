@@ -853,6 +853,21 @@ class GradeAppeal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
+class OutcomeThreshold(Base):
+    """Versioned institution/program success targets. Newest active row per (program, year, kind) wins."""
+    __tablename__ = "outcome_thresholds"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[Optional[int]] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), nullable=True, index=True)  # NULL = institution-wide
+    academic_year: Mapped[str] = mapped_column(String(32), default="", nullable=False)  # "" = all years
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)  # lo | po
+    target_percent: Mapped[float] = mapped_column(Float, nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
 class ResponseGradeRevision(Base):
     """Immutable before/after trail for every change to an already-graded
     Response.awarded_points/rubric_scores, across every pathway that can

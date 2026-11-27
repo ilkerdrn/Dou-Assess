@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models as m
+from .thresholds import active_threshold
 
 
 def _question_outcome_map(db: Session, questions: list[m.Question]) -> dict[int, set[int]]:
@@ -173,6 +174,8 @@ def exam_analytics(db: Session, exam_id: int) -> dict:
 
     po_rows = db.scalars(select(m.ExamProgramOutcome).where(m.ExamProgramOutcome.exam_id == exam_id)).all()
     po_result = []
+    _course = db.get(m.Course, exam.course_id)
+    po_override = active_threshold(db, _course.program_id, _course.academic_year, "po") if _course else None
     for po in po_rows:
         mappings = db.scalars(
             select(m.ExamOutcomeMapping).where(m.ExamOutcomeMapping.exam_program_outcome_id == po.id)
@@ -191,6 +194,8 @@ def exam_analytics(db: Session, exam_id: int) -> dict:
             contributors.append({"learning_outcome": stat["code"], "contribution": mp.contribution})
         attainment = numerator / denominator if denominator else 0.0
         target = target_numerator / denominator if denominator else 0.0
+        if po_override is not None and denominator:
+            target = po_override  # institution/program success threshold (versioned)
         po_result.append({
             "id": po.id,
             "code": po.code,
@@ -410,6 +415,8 @@ def student_exam_analytics(db: Session, exam_id: int, exam_student_id: int) -> d
         }
 
     po_result = []
+    _course = db.get(m.Course, exam.course_id)
+    po_override = active_threshold(db, _course.program_id, _course.academic_year, "po") if _course else None
     for po in db.scalars(select(m.ExamProgramOutcome).where(m.ExamProgramOutcome.exam_id == exam_id)).all():
         mappings = db.scalars(select(m.ExamOutcomeMapping).where(m.ExamOutcomeMapping.exam_program_outcome_id == po.id)).all()
         numerator = target_numerator = denominator = 0.0
@@ -424,6 +431,8 @@ def student_exam_analytics(db: Session, exam_id: int, exam_student_id: int) -> d
             contributors.append({"learning_outcome": stat["code"], "contribution": mp.contribution})
         attainment = numerator / denominator if denominator else 0.0
         target = target_numerator / denominator if denominator else 0.0
+        if po_override is not None and denominator:
+            target = po_override
         po_result.append({
             "code": po.code,
             "description": po.description,

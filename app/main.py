@@ -24,7 +24,7 @@ from .config import settings
 from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 # Historical release-contract tests search source text; runtime truth remains RELEASE.env.
 # APP_VERSION = "6.70-production-hardening"
-# EXPECTED_SCHEMA_REVISION = "0044_outcome_source_and_print_confirm"
+# EXPECTED_SCHEMA_REVISION = "0045_outcome_thresholds"
 # EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"
 # EXPECTED_SCHEMA_REVISION = "0039_evidence_integrity_security"
 from .db import engine, get_db, SessionLocal
@@ -62,6 +62,8 @@ from .operations_api import router as operations_router
 from .program_review_api import router as program_review_router
 from .evaluator_room_api import router as evaluator_room_router
 from .student_portal_api import router as student_portal_router
+from .thresholds_api import router as thresholds_router
+from .services.thresholds import active_threshold
 from .security import (
     add_security_event, allowed_host, enforce_production_security, production_security_issues, production_security_warnings,
     rate_limit_check, read_upload_limited, request_id_for, request_is_https, security_error, security_headers,
@@ -94,6 +96,7 @@ app.include_router(operations_router)
 app.include_router(program_review_router)
 app.include_router(evaluator_room_router)
 app.include_router(student_portal_router)
+app.include_router(thresholds_router)
 
 
 @app.exception_handler(HTTPException)
@@ -1597,7 +1600,12 @@ def _lo_out(x: m.LearningOutcome) -> dict:
 def create_lo(course_id: int, data: LearningOutcomeCreate, db: Session = Depends(get_db)):
     require_course_access(db, course_id, write=True)  # instructors manage the outcomes of their own course
     if not db.get(m.Course, course_id): raise HTTPException(404, "Ders bulunamadı")
-    obj = m.LearningOutcome(course_id=course_id, source="assess", **data.model_dump()); db.add(obj); db.flush()
+    payload = data.model_dump()
+    if "target_percent" not in data.model_fields_set:  # not chosen explicitly -> institution/program default (versioned)
+        course = db.get(m.Course, course_id)
+        default = active_threshold(db, course.program_id, course.academic_year, "lo")
+        if default is not None: payload["target_percent"] = default
+    obj = m.LearningOutcome(course_id=course_id, source="assess", **payload); db.add(obj); db.flush()
     audit(db, "create", "learning_outcome", obj.id, {"code": obj.code, "description": obj.description, "target_percent": obj.target_percent}); _commit(db)
     return _lo_out(obj)
 

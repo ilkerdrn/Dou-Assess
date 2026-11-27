@@ -3,7 +3,7 @@
 # DOU Assess — 6.70 PERFORMANCE & PRODUCTION HARDENING
 
 **Sürüm:** `6.70-production-hardening`  
-**Veritabanı şeması:** `0044_outcome_source_and_print_confirm` (bkz. "Not/puan değişikliği audit izi" eklentisi, 0042'den sonra)
+**Veritabanı şeması:** `0045_outcome_thresholds` (bkz. "Not/puan değişikliği audit izi" eklentisi, 0042'den sonra)
 
 **Production baseline:** 6.53 akademik/ölçme/kalite/akreditasyon fonksiyonları donduruldu. 6.54 yeni business feature eklemez; sunucuya güvenli kurulum, yükseltme, backup/restore ve go-live doğrulamasını standardize eder.
 

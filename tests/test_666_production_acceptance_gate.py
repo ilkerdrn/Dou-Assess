@@ -8,7 +8,7 @@ client=TestClient(app)
 
 def test_666_release_and_ui_contract():
     assert APP_VERSION=='6.70-production-hardening'
-    assert EXPECTED_SCHEMA_REVISION=='0044_outcome_source_and_print_confirm'
+    assert EXPECTED_SCHEMA_REVISION=='0045_outcome_thresholds'
     root=Path(__file__).resolve().parents[1]
     assert 'institution_acceptance_records' in (root/'migrations/versions/0038_institution_acceptance_gate.py').read_text(encoding='utf-8')
     html=(root/'app/static/index.html').read_text(encoding='utf-8')
