@@ -67,6 +67,7 @@ from .thresholds_api import router as thresholds_router
 from .governance_api import router as governance_router, approval_gate, lo_create_core, lo_delete_core, lo_out, lo_update_core, question_review_gate
 from .archive_api import router as archive_router
 from .p1_exports_api import router as p1_exports_router
+from .ai_scoring_api import router as ai_scoring_router
 from .services.thresholds import active_threshold
 from .security import (
     add_security_event, allowed_host, enforce_production_security, production_security_issues, production_security_warnings,
@@ -104,6 +105,7 @@ app.include_router(thresholds_router)
 app.include_router(governance_router)
 app.include_router(archive_router)
 app.include_router(p1_exports_router)
+app.include_router(ai_scoring_router)
 
 
 @app.exception_handler(HTTPException)

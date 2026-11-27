@@ -571,3 +571,55 @@ def test_question_maker_checker_and_shared_pool():
     other = _setup()[0]  # different program
     c3 = _post("/api/courses", {"program_id": other["id"], "code": "XYZ 1", "name": "Başka program", "academic_year": "2026-2027", "term": "Güz", "instructor_email": "y@dogus.edu.tr", "instructor_name": "Y"})
     assert client.post(f"/api/question-bank/{bank['id']}/copy-to-course", json={"course_id": c3["id"]}).status_code == 403
+
+
+def test_second_institution_connector_uses_the_same_canonical_sync():
+    import uuid as _u
+    from app.services.connectors import CanonCourse, CanonPeriod, CanonStudent, CanonTeacher, sync_canonical
+    tag = _u.uuid4().hex[:5]
+
+    class FakeSisConnector:  # a different university's OBS: only translation code, no sync logic
+        source = "sis-x"
+        def resolve_period(self, ref): return CanonPeriod("2027-2028", "Bahar")
+        def teacher_courses(self, teacher_ref, period_ref):
+            return [CanonCourse(code=f"SIS{tag}", name="Veri Yapıları", external_id="c1", program_external_id=f"p{tag}", program_name="Yazılım", faculty="Müh.", department="Bil. Müh.",
+                                students=[CanonStudent(f"{tag}001", "Ali Veli"), CanonStudent(f"{tag}002")])]
+    with SessionLocal() as db:
+        from app import models as _m
+        stats = sync_canonical(db, FakeSisConnector(), CanonTeacher("hoca@x.edu", "Hoca X"), "T1", "p1"); db.commit()
+        assert stats == {"courses": 1, "students": 2, "enrollments": 2}
+        again = sync_canonical(db, FakeSisConnector(), CanonTeacher("hoca@x.edu", "Hoca X"), "T1", "p1"); db.commit()
+        assert again == {"courses": 0, "students": 0, "enrollments": 0}  # idempotent
+        c = db.scalar(select_(_m.Course).where(_m.Course.code == f"SIS{tag}"))
+        assert c.external_source == "sis-x" and c.academic_year == "2027-2028" and c.instructor_email == "hoca@x.edu"
+
+
+def test_ai_scoring_suggestion_is_gated_anonymous_and_never_writes_grades(monkeypatch):
+    import dataclasses, json as _json
+    import app.ai_scoring_api as ai
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    client.patch(f"/api/exams/{eid}/questions/{q['id']}", json={"points": 60})
+    qc = _post(f"/api/exams/{eid}/questions", {"order_no": 2, "question_type": "classic", "text": "Açıkla", "points": 40, "learning_outcome_code": "Ö1", "expected_answer": "beklenen",
+                                               "rubric": {"criteria": [{"id": "a", "label": "Doğruluk", "max_points": 25, "outcome_codes": ["Ö1"]}, {"id": "b", "label": "Anlatım", "max_points": 15, "outcome_codes": ["Ö1"]}]}})
+    url = f"/api/exams/{eid}/questions/{qc['id']}/ai-suggestion"
+    assert client.get("/api/ai-scoring/status").json()["available"] is False
+    assert client.post(url, json={"answer_text": "cevap"}).status_code == 403  # off by default
+    monkeypatch.setattr(ai, "settings", dataclasses.replace(ai.settings, ai_scoring_enabled=True, ai_scoring_api_key="k", ai_scoring_model="m"))
+    assert client.post(url, json={"answer_text": "cevap"}).status_code == 403  # institution setting still off
+    client.put("/api/institution-settings/ai_scoring", json={"value": "on"})
+    seen = {}
+    def fake(prompt, system):
+        seen["prompt"] = prompt
+        return 'Tamam: {"criteria": {"a": {"score": 99, "reason": "iyi"}, "b": {"score": 10, "reason": "orta"}}}'
+    monkeypatch.setattr(ai, "call_provider", fake)
+    try:
+        r = client.post(url, json={"answer_text": "Öğrencinin cevabı"}); assert r.status_code == 200, r.text
+        sug = r.json()["suggestion"]
+        assert sug["a"]["score"] == 25.0 and sug["b"]["score"] == 10.0 and r.json()["total"] == 35.0  # clamped to the rubric maximum
+        assert "Ayşe" not in seen["prompt"] and "student" not in seen["prompt"].lower() and "Öğrencinin cevabı" in seen["prompt"]
+        assert client.post(f"/api/exams/{eid}/questions/{q['id']}/ai-suggestion", json={"answer_text": "x"}).status_code == 409  # MCQ not eligible
+        grid = client.get(f"/api/exams/{eid}/questions/{qc['id']}/grid")
+        assert grid.status_code == 200 and not any(x["entered"] for x in grid.json()["rows"])  # nothing was graded
+    finally:
+        client.put("/api/institution-settings/ai_scoring", json={"value": "off"})

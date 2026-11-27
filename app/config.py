@@ -84,6 +84,10 @@ class Settings:
     obs_results_endpoint: str = os.getenv("OBS_RESULTS_ENDPOINT", "").strip()
     obs_results_token: str = _secret("OBS_RESULTS_TOKEN", "")
     outcome_term: str = os.getenv("OUTCOME_TERM", "Öğrenim").strip() or "Öğrenim"  # Öğrenim | Öğrenme | Kazanım (institution wording)
+    ai_scoring_enabled: bool = os.getenv("AI_SCORING_ENABLED", "false").lower() in {"1", "true", "yes"}  # also needs the institution setting + KVKK sign-off
+    ai_scoring_api_url: str = os.getenv("AI_SCORING_API_URL", "https://api.anthropic.com/v1/messages")
+    ai_scoring_model: str = os.getenv("AI_SCORING_MODEL", "")
+    ai_scoring_api_key: str = _secret("AI_SCORING_API_KEY", "")
     student_link_secret: str = _secret("STUDENT_LINK_SECRET", "")
     student_appeal_days: int = int(os.getenv("STUDENT_APPEAL_DAYS", "7"))
     obs_results_timeout_seconds: int = int(os.getenv("OBS_RESULTS_TIMEOUT_SECONDS", "15"))

@@ -22,6 +22,7 @@ router = APIRouter()
 SETTING_KEYS = {
     "outcome_term": {"default": lambda: settings.outcome_term, "choices": {"Öğrenim", "Öğrenme", "Kazanım"}, "label": "ÖÇ terimi"},
     "outcome_change_approval": {"default": lambda: "off", "choices": {"on", "off"}, "label": "ÖÇ değişikliklerinde bölüm başkanı onayı"},
+    "ai_scoring": {"default": lambda: "off", "choices": {"on", "off"}, "label": "Yapay zekâ puan önerisi (KVKK onayı sonrası)"},
     "question_self_approval": {"default": lambda: "on", "choices": {"on", "off"}, "label": "Soru yazarı kendi sorusunu onaylayabilir"},
 }
 REVIEWER_ROLES = ("admin", "program_head", "department_head", "faculty_admin")

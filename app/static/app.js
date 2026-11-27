@@ -1540,6 +1540,16 @@ document.getElementById('gradeGridSave')?.addEventListener('click',async()=>{
   try{const r=await api('POST',`/api/exams/${id}/questions/${qid}/grid`,{rows});toast(`${r.saved} öğrencinin puanı kaydedildi.`);document.getElementById('gradeGridLoad').click();loadGradeCompleteness();}catch(e){toast(e.message,'error');}
 });
 
+async function initAiSuggest(){const box=document.getElementById('aiSuggestBox');if(!box)return;try{const st=await api('GET','/api/ai-scoring/status');box.classList.toggle('hidden',!st.available)}catch{box.classList.add('hidden')}}
+document.getElementById('gradeGridCard')?.addEventListener('toggle',e=>{if(e.target.open)initAiSuggest()});
+document.getElementById('aiSuggestBtn')?.addEventListener('click',async()=>{
+  const id=Number(document.getElementById('gradeExam').value),qid=Number(document.getElementById('gradeGridQuestion').value),out=document.getElementById('aiSuggestResult'),txt=document.getElementById('aiAnswer').value.trim();
+  if(!id||!qid||!txt)return toast('Soru seçin ve cevap metnini girin.','error');
+  try{const r=await api('POST',`/api/exams/${id}/questions/${qid}/ai-suggestion`,{answer_text:txt});
+    out.innerHTML=`<div class="readiness-warning-list">${Object.values(r.suggestion).map(x=>`<div><i>i</i><span><b>${esc(x.label)}</b>: ${x.score}/${x.max_points} — ${esc(x.reason)}</span></div>`).join('')}<div><i>Σ</i><span>Önerilen toplam: <b>${r.total}</b>. ${esc(r.note)}</span></div></div>`;
+  }catch(e){toast(e.message,'error')}
+});
+
 async function prepareGrade(){
   try{await refreshCore();await loadGradeStudents();renderGradeProgress();syncGradeModeUI();}catch(e){toast(e.message,'error');}
 }

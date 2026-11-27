@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import obs_proliz
+from .connectors import CanonCourse, CanonPeriod, CanonStudent, CanonTeacher, sync_canonical
 from .. import models as m
 
 
@@ -77,71 +78,43 @@ def _parse_donem_ad(donem_ad: str) -> tuple[str, str]:
     return donem_ad.strip(), ""
 
 
-def sync_teacher_courses(db: Session, profile: TeacherProfile, donem_id: str) -> dict:
-    """Pulls the teacher's own courses + enrolled students for one dönem and
-    upserts them, exactly like the Excel OBS import does for manual data."""
-    stats = {"courses": 0, "students": 0, "enrollments": 0}
-    courses = obs_proliz.fetch_akademisyen_verdigi_ders(profile.tck, donem_id)
-    course_rows = courses if isinstance(courses, list) else ([courses] if isinstance(courses, dict) else [])
+class ProlizConnector:
+    """Proliz OBS -> canonical records (the only Proliz-specific code in the sync path)."""
+    source = "proliz"
 
-    donemler = obs_proliz.fetch_akademik_donem()
-    donem_ad = ""
-    for row in (donemler if isinstance(donemler, list) else ([donemler] if isinstance(donemler, dict) else [])):
-        if _text(row.get("ID")) == donem_id:
-            donem_ad = _text(row.get("AD"))
-            break
-    academic_year, term = _parse_donem_ad(donem_ad) if donem_ad else (donem_id, "")
+    def resolve_period(self, period_ref: str) -> CanonPeriod:
+        donem_ad = ""
+        donemler = obs_proliz.fetch_akademik_donem()
+        for row in (donemler if isinstance(donemler, list) else ([donemler] if isinstance(donemler, dict) else [])):
+            if _text(row.get("ID")) == period_ref:
+                donem_ad = _text(row.get("AD"))
+                break
+        year, term = _parse_donem_ad(donem_ad) if donem_ad else (period_ref, "")
+        return CanonPeriod(academic_year=year, term=term)
 
-    for row in course_rows:
-        prog_id = _text(row.get("PROG_ID"))
-        prog_ad = _text(row.get("PROG_AD"))
-        if not prog_id or not prog_ad:
-            continue
-        program = db.scalar(select(m.Program).where(m.Program.external_source == "proliz", m.Program.external_id == prog_id))
-        if not program:
-            code = _text(row.get("FAKULTE_KOD")) + "-" + prog_id
-            program = db.scalar(select(m.Program).where(m.Program.code == code))
-        if not program:
-            program = m.Program(
-                code=f"PRZ-{prog_id}", name=prog_ad,
-                faculty=_text(row.get("FAKULTE_AD")), department=_text(row.get("BOLUM_AD")),
-                external_source="proliz", external_id=prog_id,
-            )
-            db.add(program); db.flush()
-        elif not program.external_id:
-            program.external_source = "proliz"; program.external_id = prog_id
+    def teacher_courses(self, teacher_ref: str, period_ref: str) -> list[CanonCourse]:
+        courses = obs_proliz.fetch_akademisyen_verdigi_ders(teacher_ref, period_ref)
+        rows = courses if isinstance(courses, list) else ([courses] if isinstance(courses, dict) else [])
+        out = []
+        for row in rows:
+            ders_id = _text(row.get("DERS_ID")); ders_kod = _text(row.get("DERS_KOD")) or ders_id
+            prog_id = _text(row.get("PROG_ID"))
+            roster = obs_proliz.fetch_akademisyen_verdigi_dersi_alan_ogrenci(teacher_ref, period_ref, ders_id)
+            roster_rows = roster if isinstance(roster, list) else ([roster] if isinstance(roster, dict) else [])
+            out.append(CanonCourse(code=ders_kod, name=_text(row.get("DERS_AD")) or ders_kod, external_id=ders_id, program_external_id=prog_id, program_name=_text(row.get("PROG_AD")),
+                                   faculty=_text(row.get("FAKULTE_AD")), department=_text(row.get("BOLUM_AD")), program_code=f"PRZ-{prog_id}",
+                                   students=[CanonStudent(student_no=_text(r.get("OGR_NO")), external_id=_text(r.get("OGR_NO"))) for r in roster_rows if _text(r.get("OGR_NO"))]))
+        return out
 
-        ders_id = _text(row.get("DERS_ID"))
-        ders_kod = _text(row.get("DERS_KOD")) or ders_id
-        course = db.scalar(select(m.Course).where(m.Course.program_id == program.id, m.Course.code == ders_kod, m.Course.academic_year == academic_year, m.Course.term == term))
-        if not course:
-            course = m.Course(
-                program_id=program.id, code=ders_kod, name=_text(row.get("DERS_AD")) or ders_kod,
-                academic_year=academic_year, term=term,
-                instructor_email=profile.eposta, instructor_name=profile.display_name,
-                external_source="proliz", external_id=ders_id,
-            )
-            db.add(course); db.flush(); stats["courses"] += 1
-        else:
-            course.instructor_email = profile.eposta; course.instructor_name = profile.display_name
-            if not course.external_id:
-                course.external_source = "proliz"; course.external_id = ders_id
 
-        roster = obs_proliz.fetch_akademisyen_verdigi_dersi_alan_ogrenci(profile.tck, donem_id, ders_id)
-        roster_rows = roster if isinstance(roster, list) else ([roster] if isinstance(roster, dict) else [])
-        for student_row in roster_rows:
-            ogr_no = _text(student_row.get("OGR_NO"))
-            if not ogr_no:
-                continue
-            student = db.scalar(select(m.Student).where(m.Student.student_no == ogr_no))
-            if not student:
-                student = m.Student(program_id=program.id, student_no=ogr_no, full_name=ogr_no, external_source="proliz", external_id=ogr_no)
-                db.add(student); db.flush(); stats["students"] += 1
-            enrollment = db.scalar(select(m.Enrollment).where(m.Enrollment.course_id == course.id, m.Enrollment.student_id == student.id))
-            if not enrollment:
-                db.add(m.Enrollment(course_id=course.id, student_id=student.id)); stats["enrollments"] += 1
+def get_connector(name: str | None = None):
+    """Registry of institution connectors; add a new university here."""
+    return {"proliz": ProlizConnector}.get((name or "proliz").lower(), ProlizConnector)()
 
-    return stats
+
+def sync_teacher_courses(db: Session, profile: TeacherProfile, donem_id: str, connector=None) -> dict:
+    """Pulls the teacher's own courses + enrolled students for one dönem through the connector and upserts them."""
+    return sync_canonical(db, connector or get_connector("proliz"), CanonTeacher(email=profile.eposta, display_name=profile.display_name), profile.tck, donem_id)
 
 
 def provision_teacher_account(db: Session, profile: TeacherProfile) -> m.AppUser:
