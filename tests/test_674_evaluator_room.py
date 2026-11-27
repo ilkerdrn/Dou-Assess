@@ -103,3 +103,10 @@ def test_readiness_flags_uncovered_outcomes_duplicates_and_uniform_key():
     r = client.get(f"/api/exams/{exam['id']}/readiness").json()
     assert any("aynı metne" in w for w in r["warnings"])
     assert any("aynı şık" in w for w in r["warnings"])
+
+
+def test_scan_coverage_lists_students_without_scanned_paper():
+    program, course, exam, q, ws, hdr = _setup()
+    r = client.get(f"/api/exams/{exam['id']}/scan-coverage"); assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["attended"] == 2 and d["scanned"] == 0 and d["missing_count"] == 2

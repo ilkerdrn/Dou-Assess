@@ -3472,6 +3472,32 @@ def scan_reviews(exam_id: int, db: Session = Depends(get_db)):
     return out
 
 
+@app.get("/api/exams/{exam_id}/scan-coverage")
+def scan_coverage(exam_id: int, db: Session = Depends(get_db)):
+    """Which attending students have no usable scanned page yet (missing papers) and which have pending reviews."""
+    require_exam_access(db, exam_id, write=False)
+    if not db.get(m.Exam, exam_id): raise HTTPException(404, "Sınav bulunamadı")
+    rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id).order_by(m.ExamStudent.id)).all()
+    by_student: dict[int, set[str]] = {}
+    for sid, st in db.execute(select(m.ScanItem.student_id, m.ScanItem.status).where(m.ScanItem.exam_id == exam_id, m.ScanItem.student_id.is_not(None))).all():
+        by_student.setdefault(int(sid), set()).add(st)
+    unmatched = db.scalar(select(func.count()).select_from(m.ScanItem).where(m.ScanItem.exam_id == exam_id, m.ScanItem.status == "review", m.ScanItem.student_id.is_(None))) or 0
+    missing, pending, scanned, absent = [], [], 0, 0
+    for es in rows:
+        if es.attendance_status != "attended":
+            absent += 1; continue
+        states = by_student.get(es.student_id, set())
+        row = {"student_id": es.student_id, "student_no": es.student.student_no, "full_name": es.student.full_name}
+        if states & {"accepted", "support"}:
+            scanned += 1
+        else:
+            missing.append(row)
+        if "review" in states:
+            pending.append(row)
+    return {"exam_id": exam_id, "attended": scanned + len(missing), "absent": absent, "scanned": scanned,
+            "missing_count": len(missing), "missing": missing, "pending_review": pending, "unmatched_review_pages": int(unmatched)}
+
+
 @app.get("/api/scan-items/{item_id}/preview")
 def scan_item_preview(item_id: int, db: Session = Depends(get_db)):
     item = db.get(m.ScanItem, item_id)
