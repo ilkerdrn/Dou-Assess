@@ -847,6 +847,25 @@ class GradeAppeal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
+class ResponseGradeRevision(Base):
+    """Immutable before/after trail for every change to an already-graded
+    Response.awarded_points/rubric_scores, across every pathway that can
+    change a grade (manual entry, OMR, answer-key regrade, Excel import,
+    appeal resolution). Written once per change; never updated or deleted."""
+    __tablename__ = "response_grade_revisions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    response_id: Mapped[int] = mapped_column(ForeignKey("responses.id", ondelete="CASCADE"), nullable=False, index=True)
+    exam_student_id: Mapped[int] = mapped_column(ForeignKey("exam_students.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id: Mapped[int] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True)
+    previous_awarded_points: Mapped[float] = mapped_column(Float, nullable=False)
+    new_awarded_points: Mapped[float] = mapped_column(Float, nullable=False)
+    previous_rubric_scores: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    new_rubric_scores: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    changed_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+
+
 class AcademicPeriod(Base):
     __tablename__ = "academic_periods"
     __table_args__ = (

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-# release-contract marker: 6.70-production-hardening / 0042_performance_production_hardening
+# release-contract marker: 6.70-production-hardening / 0043_response_grade_revisions
 BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
 ACCESS_TOKEN="${ACCESS_TOKEN:-}"
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"

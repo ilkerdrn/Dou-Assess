@@ -20,7 +20,7 @@ def create_app(c,pid,fid,typ='general',prev=None):
 
 def test_651_version_contract():
     assert APP_VERSION=='6.70-production-hardening'
-    assert EXPECTED_SCHEMA_REVISION=='0042_performance_production_hardening'
+    assert EXPECTED_SCHEMA_REVISION=='0043_response_grade_revisions'
 
 
 def test_medek_pdr_phases_seven_day_response_and_final_decision():

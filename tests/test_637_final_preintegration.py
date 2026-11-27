@@ -7,7 +7,7 @@ README = (ROOT / "README.md").read_text(encoding="utf-8")
 
 def test_final_version_and_schema_contract():
     assert '6.70-production-hardening' in MAIN
-    assert 'EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"' in MAIN
+    assert 'EXPECTED_SCHEMA_REVISION = "0043_response_grade_revisions"' in MAIN
     assert '6.70-production-hardening' in README
     assert '0042_performance_production_hardening' in README
 

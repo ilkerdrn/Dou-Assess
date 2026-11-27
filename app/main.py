@@ -23,6 +23,7 @@ from .config import settings
 from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 # Historical release-contract tests search source text; runtime truth remains RELEASE.env.
 # APP_VERSION = "6.70-production-hardening"
+# EXPECTED_SCHEMA_REVISION = "0043_response_grade_revisions"
 # EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"
 # EXPECTED_SCHEMA_REVISION = "0039_evidence_integrity_security"
 from .db import engine, get_db, SessionLocal
@@ -132,6 +133,26 @@ def audit(db: Session, action: str, entity_type: str, entity_id: int | None = No
         actor_user_id=actor.get("id"), actor_email=actor.get("email") or "system",
         actor_roles=list(actor.get("role_names") or []), action=action, entity_type=entity_type,
         entity_id=entity_id, payload=safe_payload,
+    ))
+
+
+def _log_grade_revision(db: Session, response: "m.Response", old_points: float, old_rubric: dict, source: str, changed_by: str | None = None) -> None:
+    """Record an immutable before/after row whenever an already-graded
+    Response's awarded_points/rubric_scores change. Never log a brand-new
+    grade (nothing to compare against) and never log a true no-op."""
+    new_points = float(response.awarded_points or 0.0)
+    new_rubric = dict(response.rubric_scores or {})
+    if old_points == new_points and (old_rubric or {}) == new_rubric:
+        return
+    try:
+        actor_email = changed_by or (current_user().get("email") or "system")
+    except Exception:
+        actor_email = changed_by or "system"
+    db.add(m.ResponseGradeRevision(
+        response_id=response.id, exam_student_id=response.exam_student_id, question_id=response.question_id,
+        previous_awarded_points=float(old_points or 0.0), new_awarded_points=new_points,
+        previous_rubric_scores=old_rubric or {}, new_rubric_scores=new_rubric,
+        source=source, changed_by=actor_email,
     ))
 
 
@@ -2997,13 +3018,38 @@ def submit_responses(exam_id: int, student_id: int, data: ResponsesSubmit, db: S
             rubric_scores = {}
         actor = current_user(); grader = actor.get("email") or "system"; now = datetime.now(timezone.utc)
         if existing:
+            old_points, old_rubric = existing.awarded_points, dict(existing.rubric_scores or {})
             existing.answer_text = item.answer_text; existing.awarded_points = awarded; existing.is_correct = is_correct; existing.rubric_scores = rubric_scores
             existing.graded_by = grader; existing.graded_at = now; existing.revision_no = int(existing.revision_no or 1) + 1
+            _log_grade_revision(db, existing, old_points, old_rubric, "manual", grader)
         else:
             db.add(m.Response(exam_student_id=es.id, question_id=q.id, answer_text=item.answer_text, awarded_points=awarded, is_correct=is_correct, rubric_scores=rubric_scores, graded_by=grader, graded_at=now, revision_no=1))
         saved += 1
     audit(db, "grade", "exam_student", es.id, {"responses": saved}); _commit(db)
     return {"saved": saved}
+
+
+@app.get("/api/exams/{exam_id}/students/{student_id}/grade-history")
+def student_grade_history(exam_id: int, student_id: int, db: Session = Depends(get_db)):
+    require_exam_access(db, exam_id, write=False)
+    es = db.scalar(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.student_id == student_id))
+    if not es: raise HTTPException(404, "Öğrenci bu sınava kayıtlı değil")
+    rows = db.scalars(
+        select(m.ResponseGradeRevision).where(m.ResponseGradeRevision.exam_student_id == es.id)
+        .order_by(m.ResponseGradeRevision.changed_at.desc())
+    ).all()
+    out = []
+    for r in rows:
+        q = db.get(m.Question, r.question_id)
+        out.append({
+            "id": r.id, "response_id": r.response_id, "question_id": r.question_id,
+            "question_order_no": q.order_no if q else None,
+            "previous_awarded_points": r.previous_awarded_points, "new_awarded_points": r.new_awarded_points,
+            "previous_rubric_scores": r.previous_rubric_scores, "new_rubric_scores": r.new_rubric_scores,
+            "source": r.source, "changed_by": r.changed_by,
+            "changed_at": r.changed_at.isoformat() if r.changed_at else None,
+        })
+    return out
 
 
 @app.get("/api/exams/{exam_id}/students/{student_id}/classic-scans")
@@ -3146,10 +3192,12 @@ def _apply_scan_answers(db: Session, exam: m.Exam, student: m.Student, booklet: 
         correct = bool(normalized) and normalized == expected
         now = datetime.now(timezone.utc)
         if existing:
+            old_points, old_rubric = existing.awarded_points, dict(existing.rubric_scores or {})
             existing.answer_text = normalized
             existing.awarded_points = float(q.points) if correct else 0.0
             existing.is_correct = correct
             existing.graded_by = "OMR"; existing.graded_at = now; existing.revision_no = int(existing.revision_no or 1) + 1
+            _log_grade_revision(db, existing, old_points, old_rubric, "omr", "OMR")
         else:
             db.add(m.Response(exam_student_id=es.id, question_id=q.id, answer_text=normalized,
                               awarded_points=float(q.points) if correct else 0.0, is_correct=correct, graded_by="OMR", graded_at=now, revision_no=1))
@@ -3516,7 +3564,9 @@ def answer_key_regrade(exam_id: int, data: AnswerKeyRegradeRequest, db: Session 
         if q and q.question_type=="mcq" and str(q.id) in corrections:
             ans=normalize_correct_answer(r.answer_text,q.choices) if r.answer_text else None
             expected=normalize_correct_answer(q.correct_answer,q.choices)
+            old_points=r.awarded_points
             r.is_correct=bool(ans) and ans==expected; r.awarded_points=float(q.points) if r.is_correct else 0.0; affected+=1
+            _log_grade_revision(db, r, old_points, dict(r.rubric_scores or {}), "answer_key_regrade")
     rev=m.AnswerKeyRevision(exam_id=exam_id,corrections=corrections,reason=data.reason,affected_responses=affected); db.add(rev); db.flush()
     audit(db,"answer_key_regrade","exam",exam_id,{"revision_id":rev.id,"affected":affected,"corrections":corrections}); _commit(db)
     return {"revision_id":rev.id,"affected_responses":affected,"corrections":corrections}
@@ -4072,7 +4122,10 @@ async def excel_center_import(kind: str, file: UploadFile = File(...), db: Sessi
         elif kind == "classic_grades":
             exam=db.get(m.Exam,int(row["exam_id"])); st=db.scalar(select(m.Student).where(m.Student.student_no==str(row["student_no"]).strip())); es=db.scalar(select(m.ExamStudent).where(m.ExamStudent.exam_id==exam.id,m.ExamStudent.student_id==st.id)); q=db.scalar(select(m.Question).where(m.Question.exam_id==exam.id,m.Question.order_no==int(row["question_order"])))
             scores=parse_excel_rubric_scores(row.get("rubric_scores")); r=db.scalar(select(m.Response).where(m.Response.exam_student_id==es.id,m.Response.question_id==q.id)); total=round(sum(scores.values()),4)
-            if r: r.answer_text=str(row.get("answer_text") or "");r.rubric_scores=scores;r.awarded_points=total;r.graded_by=current_user().get("email") or "excel";r.graded_at=now;r.revision_no=int(r.revision_no or 1)+1;updated+=1
+            if r:
+                old_points,old_rubric=r.awarded_points,dict(r.rubric_scores or {})
+                r.answer_text=str(row.get("answer_text") or "");r.rubric_scores=scores;r.awarded_points=total;r.graded_by=current_user().get("email") or "excel";r.graded_at=now;r.revision_no=int(r.revision_no or 1)+1;updated+=1
+                _log_grade_revision(db, r, old_points, old_rubric, "excel_import")
             else: db.add(m.Response(exam_student_id=es.id,question_id=q.id,answer_text=str(row.get("answer_text") or ""),awarded_points=total,is_correct=None,rubric_scores=scores,graded_by=current_user().get("email") or "excel",graded_at=now,revision_no=1));created+=1
         elif kind == "improvements":
             def fp(name):
@@ -4521,7 +4574,9 @@ def resolve_grade_appeal(appeal_id:int,data:GradeAppealResolve,db:Session=Depend
             new_points=float(data.awarded_points)
             if new_points<0 or new_points>float(q.points): raise HTTPException(400,"Yeni puan soru puan aralığında olmalıdır")
         obj.old_points=float(r.awarded_points); obj.old_rubric_scores=dict(r.rubric_scores or obj.old_rubric_scores or {}) if q.question_type!="classic" else obj.old_rubric_scores
+        _old_points_for_log=r.awarded_points; _old_rubric_for_log=dict(r.rubric_scores or {})
         r.awarded_points=new_points; r.graded_by=current_user().get("email") or "system"; r.graded_at=datetime.now(timezone.utc); r.revision_no=int(r.revision_no or 1)+1
+        _log_grade_revision(db, r, _old_points_for_log, _old_rubric_for_log, "appeal")
         obj.new_points=new_points
     obj.status=data.decision; obj.decision_note=data.decision_note.strip(); obj.decided_by=current_user().get("email") or "system"; obj.decided_at=datetime.now(timezone.utc)
     audit(db,"appeal_resolve","grade_appeal",obj.id,{"decision":data.decision,"new_points":obj.new_points,"note":data.decision_note}); _commit(db); return _appeal_out(obj)

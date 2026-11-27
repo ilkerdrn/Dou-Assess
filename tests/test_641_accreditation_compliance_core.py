@@ -79,7 +79,7 @@ def context() -> dict:
 def test_641_release_schema_and_framework_registry_contract():
     main = (ROOT / "app/main.py").read_text(encoding="utf-8")
     assert 'APP_VERSION = "6.70-production-hardening"' in main
-    assert 'EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"' in main
+    assert 'EXPECTED_SCHEMA_REVISION = "0043_response_grade_revisions"' in main
     assert len(YOKAK_2026_SUBCRITERIA) == 46
 
     r = client.get("/api/quality360/frameworks")
