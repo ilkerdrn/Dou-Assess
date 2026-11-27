@@ -150,5 +150,11 @@ def student_appeal(body: StudentAppeal, ctx: Ctx = Depends(student_ctx), db: Ses
                         old_points=float(r.awarded_points) if r else None, old_rubric_scores=dict(r.rubric_scores or {}) if r else {},
                         created_by=f"student:{ctx.student.student_no}")
     db.add(obj); db.flush()
+    course = db.get(m.Course, ctx.exam.course_id)
+    if course and course.instructor_email:
+        db.add(m.OperationalNotification(
+            user_email=course.instructor_email.lower(), program_id=course.program_id, notification_type="student_appeal", severity="warning",
+            title=f"Yeni not itirazı: {ctx.exam.title}", body=f"{ctx.student.student_no} · soru {q.order_no}: {obj.reason[:200]}",
+            action_url=f"/#exam={ctx.exam.id}", dedupe_key=f"student_appeal:{obj.id}", source_entity_type="grade_appeal", source_entity_id=obj.id))
     _audit(db, ctx, "student_appeal_create", {"appeal_id": obj.id, "question_id": q.id})
     return {"id": obj.id, "status": obj.status}

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook
 from io import BytesIO
 
-from app.db import Base, engine
+from app.db import Base, engine, SessionLocal
 from app.main import app
 
 Base.metadata.create_all(engine)
@@ -189,5 +189,29 @@ def test_student_portal_links_release_and_appeal():
     assert client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "kısa"}).status_code == 422
     r = client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "Cevabım doğru olmalı, kontrol edilsin."}); assert r.status_code == 201, r.text
     assert client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "Tekrar itiraz gerekçesi uzun."}).status_code == 409
+    with SessionLocal() as db:
+        from sqlalchemy import select as _sel
+        from app import models as _m
+        assert db.scalar(_sel(_m.OperationalNotification).where(_m.OperationalNotification.notification_type == "student_appeal", _m.OperationalNotification.user_email == "hoca@dogus.edu.tr").order_by(_m.OperationalNotification.id.desc()))
     staff = client.get(f"/api/exams/{eid}/appeals").json()
     assert any(a["created_by"].startswith("student:") for a in staff)
+
+
+def test_classic_question_annulment_gives_full_marks_and_notifies_on_appeal():
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    assert client.patch(f"/api/exams/{eid}/questions/{q['id']}", json={"points": 60}).status_code == 200
+    qc = _post(f"/api/exams/{eid}/questions", {"order_no": 2, "question_type": "classic", "text": "Açıkla", "points": 40, "learning_outcome_code": "Ö1",
+                                               "expected_answer": "Beklenen cevap", "rubric": {"criteria": [{"id": "a", "label": "A", "max_points": 40, "outcome_codes": ["Ö1"]}]}})
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
+    studs = client.get(f"/api/exams/{eid}/students").json()
+    _post(f"/api/exams/{eid}/students/{studs[0]['id']}/responses", {"responses": [{"question_id": qc["id"], "answer_text": "x", "rubric_scores": {"a": 10}}]})
+    r = client.post(f"/api/exams/{eid}/questions/{qc['id']}/key-exception", json={"action": "annul", "reason": "Soru kapsam dışı"}); assert r.status_code == 200, r.text
+    assert r.json()["affected_responses"] == 2  # one regraded, one blank filled
+    assert client.post(f"/api/exams/{eid}/questions/{qc['id']}/key-exception", json={"action": "accept_alternative", "alternative": "A", "reason": "x"}).status_code == 400
+    an = client.get(f"/api/exams/{eid}/analytics").json()
+    assert all(s["total_score"] >= 40 for s in an["students"])
+    # manual re-entry on an annulled classic question keeps full marks
+    _post(f"/api/exams/{eid}/students/{studs[0]['id']}/responses", {"responses": [{"question_id": qc["id"], "answer_text": "y", "rubric_scores": {"a": 5}}]})
+    an = client.get(f"/api/exams/{eid}/analytics").json()
+    assert all(s["total_score"] >= 40 for s in an["students"])

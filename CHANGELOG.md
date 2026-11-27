@@ -28,6 +28,7 @@
 - Question key exceptions (`POST /api/exams/{id}/questions/{qid}/key-exception`): annul an MCQ (full credit) or accept an extra correct choice; persisted as answer-key revisions so later OMR/manual entries and regrades follow it; grade changes are audit-logged.
 - Evaluator room: course file (Word) download per course.
 - Student portal (`/student.html`): per-student HMAC links (no new tables; `STUDENT_LINK_SECRET`, `STUDENT_APPEAL_DAYS`), visible only after grade lock, own paper/scan/rubric scores, time-boxed appeals feeding the existing GradeAppeal workflow. Exam toolbar gets grade-lock and links-CSV buttons.
+- Classic-question annulment (full marks on every rubric criterion, honoured by later manual entries). Student appeals notify the course instructor (in-app notification). Exam workspace gets an appeals panel: accept (points/rubric) / reject, plus bulk reject with a shared note.
 - Evaluator room: comments/questions land in institution visit notes (max 100 per workspace). Scan panel: phone camera capture.
 - `GET /api/exams/{id}/scan-coverage`: students without a scanned paper, pending reviews and papers with missing pages; shown in the scan panel.
 

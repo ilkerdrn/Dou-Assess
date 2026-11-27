@@ -3041,6 +3041,8 @@ def submit_responses(exam_id: int, student_id: int, data: ResponsesSubmit, db: S
                 raise HTTPException(400, f"Klasik soru {q.order_no} rubriksiz puanlanamaz")
             if awarded < 0 or awarded > float(q.points): raise HTTPException(400, f"Klasik soru {q.order_no} puanı 0-{q.points} arasında olmalıdır")
             is_correct = None
+            if q.id in policy[0]:  # annulled classic question: everyone keeps full marks
+                awarded = float(q.points); rubric_scores = {str(c.get("id")): float(c.get("max_points") or 0) for c in (q.rubric or {}).get("criteria") or []}
         if q.question_type == "mcq":
             rubric_scores = {}
         actor = current_user(); grader = actor.get("email") or "system"; now = datetime.now(timezone.utc)
@@ -3676,8 +3678,12 @@ def question_key_exception(exam_id: int, question_id: int, data: QuestionKeyExce
     if not (data.reason or "").strip():
         raise HTTPException(400, "Gerekçe zorunludur")
     q = db.get(m.Question, question_id)
-    if not q or q.exam_id != exam_id or q.question_type != "mcq":
-        raise HTTPException(400, "Yalnız bu sınavın çoktan seçmeli soruları için geçerlidir")
+    if not q or q.exam_id != exam_id:
+        raise HTTPException(400, "Soru bu sınava ait değil")
+    if q.question_type != "mcq" and data.action != "annul":
+        raise HTTPException(400, "Alternatif cevap yalnız çoktan seçmeli sorular için geçerlidir")
+    if q.question_type == "classic" and not ((q.rubric or {}).get("criteria") or []):
+        raise HTTPException(409, "Rubriksiz klasik soru iptal edilemez")
     if data.action == "accept_alternative":
         alt = normalize_correct_answer(data.alternative, q.choices)
         if not alt or alt not in (q.choices or {}):
@@ -3692,8 +3698,18 @@ def question_key_exception(exam_id: int, question_id: int, data: QuestionKeyExce
     existing = {r.exam_student_id: r for r in db.scalars(select(m.Response).where(m.Response.question_id == q.id)).all()}
     affected = 0; now = datetime.now(timezone.utc)
     actor = current_user().get("email") or "system"
+    full_rubric = {str(c.get("id")): float(c.get("max_points") or 0) for c in ((q.rubric or {}).get("criteria") or [])} if q.question_type == "classic" else {}
     for es in attended:
         r = existing.get(es.id)
+        if q.question_type == "classic":  # annulment: full marks on every criterion
+            if r:
+                if r.awarded_points != float(q.points) or (r.rubric_scores or {}) != full_rubric:
+                    old, old_rub = r.awarded_points, dict(r.rubric_scores or {})
+                    r.awarded_points = float(q.points); r.rubric_scores = dict(full_rubric); r.graded_by = actor; r.graded_at = now; r.revision_no = int(r.revision_no or 1) + 1
+                    _log_grade_revision(db, r, old, old_rub, "question_annulled", actor); affected += 1
+            else:
+                db.add(m.Response(exam_student_id=es.id, question_id=q.id, answer_text=None, awarded_points=float(q.points), is_correct=None, rubric_scores=dict(full_rubric), graded_by=actor, graded_at=now, revision_no=1)); affected += 1
+            continue
         ans = normalize_correct_answer(r.answer_text, q.choices) if (r and r.answer_text) else None
         ok = _mcq_is_correct(q, ans, policy)
         pts = float(q.points) if ok else 0.0
