@@ -3479,8 +3479,19 @@ def scan_coverage(exam_id: int, db: Session = Depends(get_db)):
     if not db.get(m.Exam, exam_id): raise HTTPException(404, "Sınav bulunamadı")
     rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id).order_by(m.ExamStudent.id)).all()
     by_student: dict[int, set[str]] = {}
-    for sid, st in db.execute(select(m.ScanItem.student_id, m.ScanItem.status).where(m.ScanItem.exam_id == exam_id, m.ScanItem.student_id.is_not(None))).all():
+    pages_seen: dict[tuple[int, str], set[int]] = {}
+    for sid, st, bk, kind, lp in db.execute(select(m.ScanItem.student_id, m.ScanItem.status, m.ScanItem.booklet, m.ScanItem.page_kind, m.ScanItem.logical_page_no).where(m.ScanItem.exam_id == exam_id, m.ScanItem.student_id.is_not(None))).all():
         by_student.setdefault(int(sid), set()).add(st)
+        if kind == "question" and st == "support" and lp:
+            pages_seen.setdefault((int(sid), (bk or "A").upper()), set()).add(int(lp))
+    exam_full = _load_exam_detail_model(db, exam_id)
+    expected_pages: dict[str, set[int]] = {}
+    for bk in _allowed_booklets(exam_full):
+        try:
+            expected_pages[bk] = {int(r["page_no"]) for r in question_regions(exam_full, bk).values() if r.get("page_no")}
+        except Exception:
+            expected_pages[bk] = set()
+    incomplete = []
     unmatched = db.scalar(select(func.count()).select_from(m.ScanItem).where(m.ScanItem.exam_id == exam_id, m.ScanItem.status == "review", m.ScanItem.student_id.is_(None))) or 0
     missing, pending, scanned, absent = [], [], 0, 0
     for es in rows:
@@ -3494,7 +3505,12 @@ def scan_coverage(exam_id: int, db: Session = Depends(get_db)):
             missing.append(row)
         if "review" in states:
             pending.append(row)
-    return {"exam_id": exam_id, "attended": scanned + len(missing), "absent": absent, "scanned": scanned,
+        for (psid, bk), seen in pages_seen.items():
+            if psid == es.student_id and expected_pages.get(bk):
+                gap = sorted(expected_pages[bk] - seen)
+                if gap:
+                    incomplete.append({**row, "booklet": bk, "missing_pages": gap})
+    return {"incomplete_papers": incomplete, "exam_id": exam_id, "attended": scanned + len(missing), "absent": absent, "scanned": scanned,
             "missing_count": len(missing), "missing": missing, "pending_review": pending, "unmatched_review_pages": int(unmatched)}
 
 

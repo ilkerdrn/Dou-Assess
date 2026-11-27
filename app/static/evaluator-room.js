@@ -16,7 +16,7 @@
   const view={stack:[]};
   function setCrumbs(items){crumbs.innerHTML=items.map((x,i)=>x.go?`<a data-i="${i}">${esc(x.t)}</a>`:esc(x.t)).join(' › ');crumbs.querySelectorAll('a').forEach(a=>a.onclick=()=>items[a.dataset.i].go())}
   async function overview(year){
-    const d=await json('/'+(year?`?academic_year=${encodeURIComponent(year)}`:''));setCrumbs([{t:d.program.name}]);
+    const d=await json(''+(year?`?academic_year=${encodeURIComponent(year)}`:''));setCrumbs([{t:d.program.name}]);
     body.innerHTML=`<div class="kv-list"><div class="kv"><span>Program</span><b>${esc(d.program.code)} · ${esc(d.program.name)}</b></div><div class="kv"><span>Fakülte / Bölüm</span><b>${esc(d.program.faculty)} / ${esc(d.program.department)}</b></div><div class="kv"><span>Öğrenci sayısı</span><b>${d.student_count}</b></div><div class="kv"><span>Ders sayısı</span><b>${d.courses.length}</b></div></div>
     <div class="search"><label>Akademik yıl <select id="yr"><option value="">Tümü</option>${d.academic_years.map(y=>`<option ${y===year?'selected':''}>${esc(y)}</option>`).join('')}</select></label></div>
     <h3>Program çıktıları</h3>${table(['Kod','Açıklama'],d.program_outcomes.map(p=>`<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description)}</td></tr>`))}

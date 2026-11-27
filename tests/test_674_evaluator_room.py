@@ -110,3 +110,12 @@ def test_scan_coverage_lists_students_without_scanned_paper():
     r = client.get(f"/api/exams/{exam['id']}/scan-coverage"); assert r.status_code == 200, r.text
     d = r.json()
     assert d["attended"] == 2 and d["scanned"] == 0 and d["missing_count"] == 2
+
+
+def test_room_ui_paths_match_backend_routes():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "app/static/evaluator-room.js").read_text(encoding="utf-8")
+    assert "json('/'+" not in js  # '/room/' with trailing slash 404s; overview must call '/room'
+    program, course, exam, q, ws, hdr = _setup()
+    base = f"/api/public/evaluator-workspaces/{ws['id']}/room"
+    assert client.get(base + "?academic_year=2026-2027", headers=hdr).status_code == 200
