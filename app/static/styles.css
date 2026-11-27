@@ -1980,3 +1980,12 @@ body.role-management-simple #managementNavGroup:not(.open) .nav-submenu{display:
 /* checkbox + text stay on one line (checkbox must not stretch to the field width) */
 label.check-label{display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start!important;gap:10px}
 label.check-label input[type=checkbox]{width:auto!important;flex:0 0 auto;margin:0}
+
+/* persistent exam state bar */
+.exam-state-bar{margin:6px 0 12px;padding:10px 14px;border:1px solid var(--line,#e2ded4);border-radius:8px;background:#fbfaf7}
+.state-steps{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:0 0 6px;padding:0}
+.state-steps li{font-size:12px;padding:3px 10px;border-radius:12px;background:#efece4;color:#786f68}
+.state-steps li.done{background:#e5f0e7;color:#2e6b4e}.state-steps li.current{background:#7a1230;color:#fff;font-weight:600}
+.state-rule{margin:0;font-size:13px}
+.scan-review-station .section-head,.scan-review-head{flex-wrap:wrap;min-width:0}
+.scan-review-head>*{min-width:0}

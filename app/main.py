@@ -1668,6 +1668,29 @@ def update_learning_outcome(outcome_id: int, data: LearningOutcomeUpdate, db: Se
     return _lo_out(obj)
 
 
+@app.get("/api/courses/{course_id}/outcome-diff")
+def course_outcome_diff(course_id: int, db: Session = Depends(get_db)):
+    """OBS vs Assess difference report: what was added/edited/deactivated here, so it can be mirrored to OBS by hand."""
+    require_course_access(db, course_id, write=False)
+    los = db.scalars(select(m.LearningOutcome).where(m.LearningOutcome.course_id == course_id).order_by(m.LearningOutcome.code)).all()
+    ids = [x.id for x in los]
+    first_before: dict[int, dict] = {}
+    if ids:
+        for log in db.scalars(select(m.AuditLog).where(m.AuditLog.entity_type == "learning_outcome", m.AuditLog.entity_id.in_(ids), m.AuditLog.action == "update").order_by(m.AuditLog.id)).all():
+            b = (log.payload or {}).get("before")
+            if isinstance(b, dict) and log.entity_id not in first_before:
+                first_before[log.entity_id] = b
+    rows = []
+    for x in los:
+        kind = "inactive" if not x.is_active else {"assess": "added_in_assess", "obs_modified": "modified"}.get(x.source)
+        if not kind:
+            continue
+        orig = first_before.get(x.id) if x.source == "obs_modified" else None
+        rows.append({"id": x.id, "code": x.code, "kind": kind, "current": {"code": x.code, "description": x.description, "target_percent": x.target_percent},
+                     "obs_original": orig, "is_active": x.is_active})
+    return {"course_id": course_id, "difference_count": len(rows), "items": rows}
+
+
 @app.delete("/api/learning-outcomes/{outcome_id}")
 def delete_learning_outcome(outcome_id: int, db: Session = Depends(get_db)):
     obj = db.get(m.LearningOutcome, outcome_id)
@@ -3611,6 +3634,25 @@ def scan_reviews(exam_id: int, db: Session = Depends(get_db)):
         if item:
             out.append(_scan_review_out(item, review))
     return out
+
+
+@app.get("/api/exams/{exam_id}/grading-progress")
+def grading_progress(exam_id: int, db: Session = Depends(get_db)):
+    """'Girilmedi' (no response row) vs a real 0: per question and per student, for attending students."""
+    require_exam_access(db, exam_id, write=False)
+    exam = db.get(m.Exam, exam_id)
+    if not exam: raise HTTPException(404, "Sınav bulunamadı")
+    qs = db.scalars(select(m.Question).where(m.Question.exam_id == exam_id).order_by(m.Question.order_no)).all()
+    attended = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.attendance_status == "attended")).all()
+    entered = {(r.exam_student_id, r.question_id) for r in db.scalars(select(m.Response).join(m.ExamStudent, m.ExamStudent.id == m.Response.exam_student_id).where(m.ExamStudent.exam_id == exam_id)).all()}
+    per_q = [{"question_id": q.id, "order_no": q.order_no, "type": q.question_type, "entered": sum(1 for es in attended if (es.id, q.id) in entered),
+              "missing": sum(1 for es in attended if (es.id, q.id) not in entered)} for q in qs]
+    missing_students = [{"student_id": es.student_id, "student_no": es.student.student_no, "missing_questions": [q.order_no for q in qs if (es.id, q.id) not in entered]}
+                        for es in attended if any((es.id, q.id) not in entered for q in qs)]
+    total = len(attended) * len(qs); done = sum(x["entered"] for x in per_q)
+    return {"exam_id": exam_id, "attended": len(attended), "expected": total, "entered": done, "missing": total - done,
+            "percent": round(done / total * 100, 1) if total else 0.0, "complete": bool(total) and done == total,
+            "questions": per_q, "students_with_missing": missing_students}
 
 
 @app.get("/api/exams/{exam_id}/scan-coverage")

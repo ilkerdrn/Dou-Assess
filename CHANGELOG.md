@@ -5,6 +5,7 @@
 - Menu follows the working order (1 Derslerim, 2 Soru Bankası, 3 Sınav Hazırla, 4 Basım, 5 Optik Okuma, 6 Değerlendirme) with numbered badges; header buttons are text-only.
 - OBS: "OBS'den getir" re-sync (password not stored, ownership-checked) and last-sync status on Derslerim.
 - Mobile: 44px touch targets, checkbox/label alignment; no horizontal scroll at 360/390/414/768/1024 (verified in Chromium).
+- P1: persistent exam state bar (Taslak → Hazır → Basıldı → Puanlama → Onaylı, with what is locked); OBS vs Assess outcome diff report (`GET /api/courses/{id}/outcome-diff`, original OBS text recovered from the audit trail); grading completeness (`GET /api/exams/{id}/grading-progress`) separating "girilmedi" from a real 0.
 - Demo scenario uses the real current term instead of 2099-2100 when that period is free.
 
 # 6.70 — Performance & Production Hardening

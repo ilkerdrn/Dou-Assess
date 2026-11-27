@@ -287,10 +287,32 @@ def test_obs_resync_status_and_ownership_guard(monkeypatch):
     import dataclasses
     monkeypatch.setattr(main_mod, "settings", dataclasses.replace(main_mod.settings, obs_proliz_enabled=True))
     st = client.get("/api/auth/obs-sync-status").json()
-    assert st["enabled"] is True and st["last_sync_at"] is None
+    assert st["enabled"] is True
+    before_at = st["last_sync_at"]  # DB may already hold a run from an earlier invocation
     monkeypatch.setattr(main_mod, "teacher_login_and_sync", lambda db, u, p, d=None: (SimpleNamespace(id=1, email="someone.else@dogus.edu.tr"), {"courses": 1, "students": 2, "enrollments": 2, "donem_id": "1"}))
     assert client.post("/api/integrations/obs/resync", json={"username": "S1", "password": "x"}).status_code == 403
     monkeypatch.setattr(main_mod, "teacher_login_and_sync", lambda db, u, p, d=None: (SimpleNamespace(id=1, email=me), {"courses": 1, "students": 2, "enrollments": 2, "donem_id": "1"}))
     r = client.post("/api/integrations/obs/resync", json={"username": "S1", "password": "x"}); assert r.status_code == 200, r.text
     st = client.get("/api/auth/obs-sync-status").json()
-    assert st["last_sync_at"] and st["summary"]["students"] == 2
+    assert st["last_sync_at"] and st["last_sync_at"] != before_at and st["summary"]["students"] == 2
+
+
+def test_outcome_diff_report_and_grading_progress():
+    program, course, exam, q, ws, hdr = _setup()
+    cid, eid = course["id"], exam["id"]
+    assert client.get(f"/api/courses/{cid}/outcome-diff").json()["difference_count"] == 0
+    lo = client.get(f"/api/courses/{cid}/outcomes").json()["learning_outcomes"][0]
+    client.patch(f"/api/learning-outcomes/{lo['id']}", json={"description": "Yeni metin"})
+    client.patch(f"/api/learning-outcomes/{lo['id']}", json={"description": "Daha yeni metin"})
+    _post(f"/api/courses/{cid}/learning-outcomes", {"code": "Ö7", "description": "Assess'te eklendi", "target_percent": 60})
+    d = client.get(f"/api/courses/{cid}/outcome-diff").json()
+    kinds = {i["code"]: i for i in d["items"]}
+    assert kinds["Ö1"]["kind"] == "modified" and kinds["Ö1"]["obs_original"]["description"] == "Temel bilgi"  # first 'before' = OBS original
+    assert kinds["Ö7"]["kind"] == "added_in_assess"
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
+    gp = client.get(f"/api/exams/{eid}/grading-progress").json()
+    assert gp["missing"] == 2 and gp["complete"] is False and len(gp["students_with_missing"]) == 2
+    studs = client.get(f"/api/exams/{eid}/students").json()
+    _post(f"/api/exams/{eid}/students/{studs[0]['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "A"}]})  # wrong answer = a real 0
+    gp = client.get(f"/api/exams/{eid}/grading-progress").json()
+    assert gp["entered"] == 1 and gp["missing"] == 1 and gp["questions"][0]["entered"] == 1
