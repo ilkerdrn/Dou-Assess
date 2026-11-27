@@ -60,6 +60,7 @@ from .production_acceptance_api import router as production_acceptance_router
 from .operations_api import router as operations_router
 from .program_review_api import router as program_review_router
 from .evaluator_room_api import router as evaluator_room_router
+from .student_portal_api import router as student_portal_router
 from .security import (
     add_security_event, allowed_host, enforce_production_security, production_security_issues, production_security_warnings,
     rate_limit_check, read_upload_limited, request_id_for, request_is_https, security_error, security_headers,
@@ -91,6 +92,7 @@ app.include_router(production_acceptance_router)
 app.include_router(operations_router)
 app.include_router(program_review_router)
 app.include_router(evaluator_room_router)
+app.include_router(student_portal_router)
 
 
 @app.exception_handler(HTTPException)
@@ -179,7 +181,7 @@ def _auth_error_payload(exc: HTTPException) -> JSONResponse:
 @app.middleware("http")
 async def identity_context_middleware(request: Request, call_next):
     path = request.url.path
-    if not path.startswith("/api/") or path in _PUBLIC_API or path.startswith("/api/public/surveys/") or path.startswith("/api/public/evaluator-workspaces/"):
+    if not path.startswith("/api/") or path in _PUBLIC_API or path.startswith("/api/public/surveys/") or path.startswith("/api/public/evaluator-workspaces/") or path.startswith("/api/public/student-exam/"):
         return await call_next(request)
     try:
         with SessionLocal() as db:

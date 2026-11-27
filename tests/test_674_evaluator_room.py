@@ -164,3 +164,30 @@ def test_evaluator_comment_lands_in_visit_notes_and_is_scoped():
     assert len(mine) == 1 and mine[0]["refs"] == [f"course:{course['id']}"]
     snap = client.get(f"/api/public/evaluator-workspaces/{ws['id']}/snapshot", headers=hdr).json()
     assert any(n["title"] == "Ek örnek istiyoruz" for n in snap["visit_notes"])
+
+
+def test_student_portal_links_release_and_appeal():
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    assert client.get(f"/api/exams/{eid}/student-links").status_code == 409  # grades not locked yet
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
+    studs = client.get(f"/api/exams/{eid}/students").json()
+    _post(f"/api/exams/{eid}/students/{studs[0]['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "A"}]})
+    _post(f"/api/exams/{eid}/students/{studs[1]['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "B"}]})
+    lock = client.post(f"/api/exams/{eid}/grade-lock", json={"note": "ok"}); assert lock.status_code == 200, lock.text
+    links = client.get(f"/api/exams/{eid}/student-links").json()["links"]
+    assert len(links) == 2
+    import re
+    def parse(l):
+        m_ = re.match(r"/student\.html\?exam=(\d+)&student=(\d+)#t=(\w+)", l["path"]); return m_.group(1), m_.group(2), {"X-DOU-Student-Token": m_.group(3)}
+    e1, s1, h1 = parse(links[0]); e2, s2, h2 = parse(links[1])
+    pub = f"/api/public/student-exam/{e1}/{s1}"
+    assert client.get(pub).status_code == 401
+    assert client.get(pub, headers=h2).status_code == 401  # another student's token
+    v = client.get(pub, headers=h1); assert v.status_code == 200, v.text
+    assert len(v.json()["questions"]) == 1 and v.json()["appeal_open"] is True
+    assert client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "kısa"}).status_code == 422
+    r = client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "Cevabım doğru olmalı, kontrol edilsin."}); assert r.status_code == 201, r.text
+    assert client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "Tekrar itiraz gerekçesi uzun."}).status_code == 409
+    staff = client.get(f"/api/exams/{eid}/appeals").json()
+    assert any(a["created_by"].startswith("student:") for a in staff)
