@@ -13,6 +13,9 @@
   const json=async p=>(await api(p)).json();
   async function openBlob(path){const w=window.open('','_blank');try{const b=await (await api(path)).blob();w.location=URL.createObjectURL(b)}catch(e){w.close();alert(e.message)}}
   const table=(head,rows)=>`<div class="tw"><table class="rt"><thead><tr>${head.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')||`<tr><td colspan="${head.length}" class="empty">Kayıt yok.</td></tr>`}</tbody></table></div>`;
+  const commentBox=(refType,refId)=>`<h3>Kuruma soru / yorum</h3><div class="search"><input id="cTitle" maxlength="200" placeholder="Başlık"><button class="link" id="cSend">Gönder</button></div><textarea id="cNote" rows="2" maxlength="4000" placeholder="Soru veya gözleminiz (kurumun ziyaret notlarına düşer)" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:7px"></textarea><div class="note" id="cMsg">Bu, salt-okunur odada yapabileceğiniz tek yazma işlemidir.</div>`;
+  function bindComment(refType,refId){const send=body.querySelector('#cSend');if(!send)return;send.onclick=async()=>{const title=body.querySelector('#cTitle').value.trim();if(title.length<2)return;send.disabled=true;try{const r=await fetch(base+'/comments',{method:'POST',headers:{'X-DOU-Evaluator-Token':token,'Content-Type':'application/json'},body:JSON.stringify({title,note:body.querySelector('#cNote').value,ref_type:refType,ref_id:refId})});if(!r.ok)throw new Error((await r.json())?.error?.message||'Gönderilemedi');body.querySelector('#cMsg').textContent='Gönderildi.';body.querySelector('#cTitle').value='';body.querySelector('#cNote').value=''}catch(e){body.querySelector('#cMsg').textContent=e.message}finally{send.disabled=false}}}
+  async function comments(){setCrumbs([{t:'Yorumlarım'}]);const d=await json('/comments');body.innerHTML=table(['Başlık','Not','Bağlam','Tarih'],d.map(x=>`<tr><td>${esc(x.title)}</td><td>${esc(x.note)}</td><td>${(x.refs||[]).map(r=>`<span class="chip">${esc(r)}</span>`).join('')}</td><td>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</td></tr>`))+commentBox('',null);bindComment('',null)}
   const view={stack:[]};
   function setCrumbs(items){crumbs.innerHTML=items.map((x,i)=>x.go?`<a data-i="${i}">${esc(x.t)}</a>`:esc(x.t)).join(' › ');crumbs.querySelectorAll('a').forEach(a=>a.onclick=()=>items[a.dataset.i].go())}
   async function overview(year){
@@ -33,8 +36,8 @@
     body.innerHTML=`<div class="kv-list"><div class="kv"><span>Dönem</span><b>${esc(c.academic_year)} ${esc(c.term)}</b></div><div class="kv"><span>Öğretim elemanı</span><b>${esc(c.instructor)}</b></div><div class="kv"><span>Geçme notu</span><b>${num(c.pass_threshold_percent)}%</b></div></div>
     <p><button class="link" id="cfile">Ders dosyasını indir (Word)</button></p><h3>Ders öğrenme çıktıları ve program çıktısı katkıları</h3>${table(['Kod','Açıklama','Hedef','Program çıktıları'],d.learning_outcomes.map(l=>`<tr><td><b>${esc(l.code)}</b></td><td>${esc(l.description)}</td><td>${pct(l.target_percent)}</td><td>${l.program_outcomes.map(p=>`<span class="chip" title="${esc(p.description)}">${esc(p.code)} · ${p.contribution}</span>`).join('')}</td></tr>`))}
     <h3>Sınavlar</h3>${table(['Sınav','Tür','Tarih','Ağırlık','Soru','Durum',''],d.exams.map(e=>`<tr><td>${esc(e.title)}</td><td>${esc(e.exam_type)}</td><td>${esc(e.exam_date||'—')}</td><td>${e.weight_percent==null?'—':pct(e.weight_percent)}</td><td>${e.question_count}</td><td>${esc(e.status)}</td><td><button class="link" data-exam="${e.id}">Aç</button></td></tr>`))}
-    <h3>Kayıtlı öğrenciler</h3>${table(['No','Ad (maskeli)','Sınıf',''],d.students.map(s=>`<tr><td>${esc(s.student_no)}</td><td>${esc(s.name)}</td><td>${esc(s.class_name)}</td><td><button class="link" data-card="${s.student_id}">Karne</button></td></tr>`))}`;
-    body.querySelector('#cfile').onclick=async()=>{try{const b=await (await api(`/courses/${id}/course-file.docx`)).blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`ders-dosyasi-${c.code}.docx`;a.click()}catch(e){alert(e.message)}};body.querySelectorAll('[data-exam]').forEach(b=>b.onclick=()=>exam(b.dataset.exam,id,c));body.querySelectorAll('[data-card]').forEach(b=>b.onclick=()=>card(b.dataset.card,()=>course(id)));
+    <h3>Kayıtlı öğrenciler</h3>${table(['No','Ad (maskeli)','Sınıf',''],d.students.map(s=>`<tr><td>${esc(s.student_no)}</td><td>${esc(s.name)}</td><td>${esc(s.class_name)}</td><td><button class="link" data-card="${s.student_id}">Karne</button></td></tr>`))}${commentBox()}`;
+    bindComment('course',Number(id));body.querySelector('#cfile').onclick=async()=>{try{const b=await (await api(`/courses/${id}/course-file.docx`)).blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`ders-dosyasi-${c.code}.docx`;a.click()}catch(e){alert(e.message)}};body.querySelectorAll('[data-exam]').forEach(b=>b.onclick=()=>exam(b.dataset.exam,id,c));body.querySelectorAll('[data-card]').forEach(b=>b.onclick=()=>card(b.dataset.card,()=>course(id)));
   }
   async function exam(id,courseId,c){
     const d=await json('/exams/'+id);const e=d.exam,s=d.summary||{};
@@ -44,8 +47,8 @@
     <h3>Öğrenme çıktısı başarısı</h3>${table(['Çıktı','Açıklama','Hedef','Başarı'],d.learning_outcomes.map(l=>`<tr><td><b>${esc(l.code)}</b></td><td>${esc(l.description)}</td><td>${pct(l.target_percent)}</td><td>${st(l)}</td></tr>`))}
     <h3>Program çıktısı başarısı</h3>${table(['Çıktı','Açıklama','Hedef','Başarı'],d.program_outcomes.map(l=>`<tr><td><b>${esc(l.code)}</b></td><td>${esc(l.description)}</td><td>${pct(l.target_percent)}</td><td>${st(l)}</td></tr>`))}
     <h3>Sorular ve cevap anahtarı</h3>${table(['#','Soru','Tür','Puan','Çıktılar','Doğru / beklenen cevap','Başarı'],d.questions.map(x=>`<tr><td>${x.order_no}</td><td>${esc(x.text)}${x.has_image?' <span class="chip">görsel</span>':''}</td><td>${esc(x.type)}</td><td>${num(x.points)}</td><td>${x.learning_outcomes.map(k=>`<span class="chip">${esc(k)}</span>`).join('')}</td><td>${esc(x.correct_answer||x.expected_answer||'—')}</td><td>${pct(x.attainment_percent)}</td></tr>`))}
-    <h3>Öğrenciler</h3>${table(['No','Ad (maskeli)','Katılım','Puan','%','Tarama',''],d.students.map(x=>`<tr><td>${esc(x.student_no)}</td><td>${esc(x.name)}</td><td>${esc(x.attendance)}</td><td>${num(x.total_score)}</td><td>${pct(x.score_percent)}</td><td>${x.has_scan?'var':'—'}</td><td><button class="link" data-st="${x.student_id}">Kâğıt</button></td></tr>`))}`;
-    body.querySelector('#pdf').onclick=()=>openBlob(`/exams/${id}/paper.pdf`);
+    <h3>Öğrenciler</h3>${table(['No','Ad (maskeli)','Katılım','Puan','%','Tarama',''],d.students.map(x=>`<tr><td>${esc(x.student_no)}</td><td>${esc(x.name)}</td><td>${esc(x.attendance)}</td><td>${num(x.total_score)}</td><td>${pct(x.score_percent)}</td><td>${x.has_scan?'var':'—'}</td><td><button class="link" data-st="${x.student_id}">Kâğıt</button></td></tr>`))}${commentBox()}`;
+    bindComment('exam',Number(id));body.querySelector('#pdf').onclick=()=>openBlob(`/exams/${id}/paper.pdf`);
     body.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>studentExam(id,b.dataset.st,()=>exam(id,courseId,c)));
   }
   async function studentExam(examId,sid,back){
@@ -70,7 +73,7 @@
     body.querySelectorAll('[data-card]').forEach(b=>b.onclick=()=>card(b.dataset.card,students));
   }
   const fail=e=>{body.innerHTML=`<div class="empty bad">${esc(e.message||'Yüklenemedi')}</div>`};
-  const go={overview:()=>overview(),matrix,courses:()=>overview(),students};
+  const go={overview:()=>overview(),matrix,comments,students};
   tabs.querySelectorAll('button').forEach(b=>b.onclick=()=>{tabs.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));go[b.dataset.tab]().catch(fail)});
   overview().catch(fail);
 })();

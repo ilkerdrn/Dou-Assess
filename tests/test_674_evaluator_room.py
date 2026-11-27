@@ -150,3 +150,17 @@ def test_room_course_file_download():
     assert r.status_code == 200, r.text
     assert r.content[:2] == b"PK"
     assert client.get(f"/api/public/evaluator-workspaces/{ws['id']}/room/courses/{course['id']}/course-file.docx").status_code == 401
+
+
+def test_evaluator_comment_lands_in_visit_notes_and_is_scoped():
+    program, course, exam, q, ws, hdr = _setup()
+    base = f"/api/public/evaluator-workspaces/{ws['id']}/room"
+    assert client.post(base + "/comments", json={"title": "x"}).status_code in (401, 422)
+    r = client.post(base + "/comments", headers=hdr, json={"title": "Ek örnek istiyoruz", "note": "Vize kâğıtları", "ref_type": "course", "ref_id": course["id"]})
+    assert r.status_code == 201, r.text
+    assert client.post(base + "/comments", headers=hdr, json={"title": "Başka program", "ref_type": "course", "ref_id": 10**6}).status_code == 404
+    assert client.post(base + "/comments", headers=hdr, json={"title": "Yanlış tür", "ref_type": "user", "ref_id": 1}).status_code == 422
+    mine = client.get(base + "/comments", headers=hdr).json()
+    assert len(mine) == 1 and mine[0]["refs"] == [f"course:{course['id']}"]
+    snap = client.get(f"/api/public/evaluator-workspaces/{ws['id']}/snapshot", headers=hdr).json()
+    assert any(n["title"] == "Ek örnek istiyoruz" for n in snap["visit_notes"])

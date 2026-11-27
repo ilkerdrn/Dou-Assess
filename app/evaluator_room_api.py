@@ -298,3 +298,45 @@ def room_course_file(course_id: int, scope: RoomScope = Depends(room_scope), db:
     _audit(db, scope, "evaluator_room_course_file", "course", c.id)
     from fastapi.responses import Response
     return Response(payload, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+from pydantic import BaseModel, Field  # noqa: E402
+
+MAX_COMMENTS_PER_WORKSPACE = 100
+
+
+class RoomComment(BaseModel):
+    title: str = Field(min_length=2, max_length=200)
+    note: str = Field(default="", max_length=4000)
+    ref_type: str = Field(default="", pattern=r"^(|course|exam|student|program)$")
+    ref_id: int | None = None
+    criterion_code: str = Field(default="", max_length=64)
+
+
+@router.get(BASE + "/comments")
+def room_comments(scope: RoomScope = Depends(room_scope), db: Session = Depends(get_db)):
+    rows = db.scalars(select(m.AccreditationVisitNote).where(
+        m.AccreditationVisitNote.application_id == scope.app.id,
+        m.AccreditationVisitNote.recorded_by == f"evaluator:{scope.ws.evaluator_email}",
+    ).order_by(m.AccreditationVisitNote.id.desc())).all()
+    return [{"id": x.id, "title": x.title, "note": x.note, "refs": x.evidence_refs, "criterion_code": x.criterion_code,
+             "created_at": x.created_at.isoformat() if x.created_at else None} for x in rows]
+
+
+@router.post(BASE + "/comments", status_code=201)
+def room_comment_create(body: RoomComment, scope: RoomScope = Depends(room_scope), db: Session = Depends(get_db)):
+    """The only write an evaluator can make: a comment/question that lands in the institution's visit notes."""
+    who = f"evaluator:{scope.ws.evaluator_email}"
+    used = db.scalar(select(func.count()).select_from(m.AccreditationVisitNote).where(m.AccreditationVisitNote.application_id == scope.app.id, m.AccreditationVisitNote.recorded_by == who)) or 0
+    if used >= MAX_COMMENTS_PER_WORKSPACE:
+        raise HTTPException(429, "Bu çalışma alanı için yorum sınırına ulaşıldı")
+    refs: list[str] = []
+    if body.ref_type and body.ref_id:
+        # Refs must point inside this program; reuse the scoped loaders (they 404 otherwise).
+        {"course": _course, "exam": _exam, "student": _student}.get(body.ref_type, lambda *_: None)(db, scope, body.ref_id)
+        refs.append(f"{body.ref_type}:{body.ref_id}")
+    row = m.AccreditationVisitNote(application_id=scope.app.id, criterion_code=body.criterion_code, note_type="evaluator_comment",
+                                   title=body.title.strip(), note=body.note.strip(), recorded_by=who, visibility="institution", evidence_refs=refs)
+    db.add(row); db.flush()
+    _audit(db, scope, "evaluator_room_comment", "visit_note", row.id, {"refs": refs})
+    return {"id": row.id, "title": row.title, "refs": refs}

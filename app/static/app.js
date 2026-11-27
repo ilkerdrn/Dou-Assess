@@ -1306,6 +1306,7 @@ function renderScanModeStatus(){
   const grading=exam.status==='grading';box.className=`scan-mode-status ${grading?'is-ready':'needs-action'}`;box.innerHTML=`<span class="status-dot"></span><div><b>${grading?'Tarama ve otomatik puanlama açık':'Otomatik puanlama bekliyor'}</b><small>${grading?'Sınav değerlendirme durumunda. Güvenli optikler doğrudan sonuçlara yazılır.':`Mevcut durum: ${esc(statusLabel(exam.status))}. Tarama yapılabilir ancak sayfalar incelemeye düşebilir.`}</small></div>`;
   btn.classList.toggle('hidden',grading);btn.disabled=exam.status==='draft';btn.title=exam.status==='draft'?'Önce Sınav Hazırla ekranında sınavı hazır durumuna alın.':'';renderScanFileCount();
 }
+document.getElementById('scanCamera')?.addEventListener('change',e=>{const main=document.getElementById('scanFile');if(!main)return;const dt=new DataTransfer();[...main.files,...e.target.files].forEach(f=>dt.items.add(f));main.files=dt.files;e.target.value='';renderScanFileCount();toast(`${main.files.length} fotoğraf/dosya yüklemeye hazır. Tüm kâğıtları çekince "Yükle ve oku"ya basın.`);});
 function renderScanFileCount(){
   const el=document.getElementById('scanFileCount'),input=document.getElementById('scanFile'),drop=input?.closest('.scan-file-drop'),btn=document.getElementById('uploadScan'),count=input?.files?.length||0,hasExam=Boolean(Number(document.getElementById('scanExam')?.value||0));
   if(el)el.textContent=`${count} dosya`;if(drop)drop.classList.toggle('has-files',count>0);if(btn)btn.disabled=!hasExam||count===0;
