@@ -59,6 +59,7 @@ from .assessment_plan_api import router as assessment_plan_router
 from .production_acceptance_api import router as production_acceptance_router
 from .operations_api import router as operations_router
 from .program_review_api import router as program_review_router
+from .evaluator_room_api import router as evaluator_room_router
 from .security import (
     add_security_event, allowed_host, enforce_production_security, production_security_issues, production_security_warnings,
     rate_limit_check, read_upload_limited, request_id_for, request_is_https, security_error, security_headers,
@@ -89,6 +90,7 @@ app.include_router(assessment_plan_router)
 app.include_router(production_acceptance_router)
 app.include_router(operations_router)
 app.include_router(program_review_router)
+app.include_router(evaluator_room_router)
 
 
 @app.exception_handler(HTTPException)
@@ -474,6 +476,29 @@ def _exam_readiness(db: Session, exam: m.Exam) -> dict:
                             issues.append(f"{q.order_no}. soru / {criterion.get('label')}: rubrik ölçütü en az bir ÖÇ ile eşleştirilmelidir")
                         elif any(code.casefold() not in q_codes for code in c_codes):
                             issues.append(f"{q.order_no}. soru / {criterion.get('label')}: rubrik ÖÇ eşleşmesi sorunun ÖÇ listesinde bulunmalıdır")
+    if (exam.duration_minutes or 0) <= 0:
+        issues.append("Sınav süresi pozitif olmalıdır")
+    if questions:
+        # Coverage: every learning outcome snapshotted on the exam should be measured by at least one question.
+        covered = {c.casefold() for q in questions for c in _question_outcome_codes(q)}
+        exam_los = db.scalars(select(m.ExamLearningOutcome).where(m.ExamLearningOutcome.exam_id == exam.id)).all()
+        missing = sorted(lo.code for lo in exam_los if lo.code.casefold() not in covered)
+        if missing:
+            warnings.append(f"Şu Öğrenim Çıktıları hiçbir soruyla ölçülmüyor: {', '.join(missing)}")
+        seen: dict[str, int] = {}
+        for q in questions:
+            key = re.sub(r"\s+", " ", (q.text or "").strip().casefold())
+            if key and key in seen:
+                warnings.append(f"{q.order_no}. soru, {seen[key]}. soru ile aynı metne sahip")
+            seen.setdefault(key, q.order_no)
+        for q in questions:
+            if q.question_type == "classic" and q.rubric and q.rubric.get("criteria"):
+                rubric_total = round(sum(float(c.get("max_points") or 0) for c in q.rubric["criteria"]), 4)
+                if abs(rubric_total - float(q.points)) > 0.01:
+                    issues.append(f"{q.order_no}. soru rubrik toplamı ({rubric_total:g}) soru puanına ({float(q.points):g}) eşit olmalıdır")
+        keys = [str(q.correct_answer or "").upper() for q in questions if q.question_type == "mcq" and q.correct_answer]
+        if len(keys) >= 5 and len(set(keys)) == 1:
+            warnings.append(f"Tüm test sorularının doğru cevabı aynı şık ({keys[0]}); cevap anahtarı dağılımını gözden geçirin")
     exam_student_count = db.scalar(select(func.count()).select_from(m.ExamStudent).where(m.ExamStudent.exam_id == exam.id)) or 0
     course_enrollment_count = db.scalar(select(func.count()).select_from(m.Enrollment).where(m.Enrollment.course_id == exam.course_id)) or 0
     if not exam_student_count:
