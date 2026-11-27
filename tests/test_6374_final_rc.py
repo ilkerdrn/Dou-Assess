@@ -7,7 +7,8 @@ def test_production_compose_forces_pilot_kill_switches():
     text = (ROOT / 'docker-compose.production.yml').read_text(encoding='utf-8')
     assert 'PILOT_AUTH_ENABLED: "false"' in text
     assert 'PILOT_DEMO_ENABLED: "false"' in text
-    assert 'AUTH_PROVIDER: entra' in text
+    # Login is OBS for now (Entra later): the provider is env-selectable, defaults to obs, and never falls back to pilot.
+    assert 'AUTH_PROVIDER: ${AUTH_PROVIDER:-obs}' in text and 'AUTH_PROVIDER: pilot' not in text
 
 
 def test_production_env_documents_pilot_kill_switches():

@@ -623,3 +623,28 @@ def test_ai_scoring_suggestion_is_gated_anonymous_and_never_writes_grades(monkey
         assert grid.status_code == 200 and not any(x["entered"] for x in grid.json()["rows"])  # nothing was graded
     finally:
         client.put("/api/institution-settings/ai_scoring", json={"value": "off"})
+
+
+def test_production_obs_mode_bootstrap_admin_and_deploy_files(monkeypatch):
+    import dataclasses, uuid as _u
+    from pathlib import Path
+    import app.services.obs_proliz_sync as ops
+    tag = _u.uuid4().hex[:6]
+    boss, teacher = f"yonetici-{tag}@dogus.edu.tr", f"hoca-{tag}@dogus.edu.tr"
+    monkeypatch.setattr(ops, "settings", dataclasses.replace(ops.settings, bootstrap_admin_emails=(boss,)))
+    with SessionLocal() as db:
+        from app import models as _m
+        u1 = ops.provision_teacher_account(db, ops.TeacherProfile(tck="1", sicil_no="S1", ad="Ali", soyad="Y", eposta=boss.upper()))
+        u2 = ops.provision_teacher_account(db, ops.TeacherProfile(tck="2", sicil_no="S2", ad="Veli", soyad="H", eposta=teacher))
+        db.commit()
+        roles1 = {r.role for r in db.scalars(select_(_m.UserRoleAssignment).where(_m.UserRoleAssignment.user_id == u1.id)).all()}
+        roles2 = {r.role for r in db.scalars(select_(_m.UserRoleAssignment).where(_m.UserRoleAssignment.user_id == u2.id)).all()}
+        assert roles1 == {"instructor", "admin"} and roles2 == {"instructor"}  # only the configured e-mail becomes admin
+        ops.provision_teacher_account(db, ops.TeacherProfile(tck="1", sicil_no="S1", ad="Ali", soyad="Y", eposta=boss)); db.commit()
+        assert len([r for r in db.scalars(select_(_m.UserRoleAssignment).where(_m.UserRoleAssignment.user_id == u1.id, _m.UserRoleAssignment.role == "admin")).all()]) == 1  # idempotent
+    root = Path(__file__).resolve().parents[1]
+    env = (root / ".env.production.example").read_text(encoding="utf-8")
+    assert "AUTH_PROVIDER=obs" in env and "BOOTSTRAP_ADMIN_EMAILS=" in env and "OBS_JWT_SECRET=" in env and "# ENTRA_TENANT_ID=" in env  # Entra block is commented out
+    comp = (root / "docker-compose.production.yml").read_text(encoding="utf-8")
+    assert "ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}" in comp and "OBS_JWT_SECRET:" in comp and "BOOTSTRAP_ADMIN_EMAILS:" in comp
+    assert "STUDENT_LINK_SECRET:" in comp

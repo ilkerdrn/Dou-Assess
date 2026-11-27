@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import obs_proliz
+from ..config import settings
 from .connectors import CanonCourse, CanonPeriod, CanonStudent, CanonTeacher, sync_canonical
 from .. import models as m
 
@@ -132,6 +133,11 @@ def provision_teacher_account(db: Session, profile: TeacherProfile) -> m.AppUser
     existing_role = db.scalar(select(m.UserRoleAssignment).where(m.UserRoleAssignment.user_id == user.id, m.UserRoleAssignment.role == "instructor", m.UserRoleAssignment.course_id.is_(None)))
     if not existing_role:
         db.add(m.UserRoleAssignment(user_id=user.id, role="instructor"))
+    if email in settings.bootstrap_admin_emails:
+        # Operator-configured first administrator (BOOTSTRAP_ADMIN_EMAILS); everyone else is promoted from the Users screen.
+        if not db.scalar(select(m.UserRoleAssignment).where(m.UserRoleAssignment.user_id == user.id, m.UserRoleAssignment.role == "admin")):
+            db.add(m.UserRoleAssignment(user_id=user.id, role="admin"))
+            db.add(m.AuditLog(actor_user_id=user.id, actor_email=email, actor_roles=["admin"], action="bootstrap_admin_granted", entity_type="app_user", entity_id=user.id, payload={"source": "BOOTSTRAP_ADMIN_EMAILS"}))
     return user
 
 

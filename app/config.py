@@ -103,6 +103,7 @@ class Settings:
     # username/password instead of Microsoft Entra. DOU Assess verifies the
     # credentials against Proliz, then mints its own short-lived session JWT.
     obs_jwt_secret: str = _secret("OBS_JWT_SECRET", "")
+    bootstrap_admin_emails: tuple[str, ...] = tuple(x.lower() for x in _csv("BOOTSTRAP_ADMIN_EMAILS"))  # first admin(s) when no admin exists yet
     obs_jwt_expires_minutes: int = int(os.getenv("OBS_JWT_EXPIRES_MINUTES", "480"))
 
     rate_limit_enabled: bool = _bool("RATE_LIMIT_ENABLED", _env_is_production())
