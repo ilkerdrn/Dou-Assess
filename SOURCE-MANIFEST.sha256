@@ -158,7 +158,7 @@ de0f7c48a94fe392c9dbb148d21fa51bdd8cd50c346ce08ad3486291907da540  ./app/services
 e2b5bc778d63d6e6f37f8296be0be74c4f4ff3c5d431f756a4b000e478a0a5e8  ./app/services/quality360.py
 bf4a8d9a73e059a840b34d654589c8f362d9c560f7519d5c98665151e01bae67  ./app/services/question_bank_import.py
 b52274b3d052558c9ed977a5f6389ebd7d67c775f045c3a5b549a702d70a06e5  ./app/services/scan.py
-7f99ac9f8a807bfed5f654a334d6b40f8dbd3a93d34ef8b6c71a07aca79a2dff  ./app/static/app.js
+5f867f9116c716df0653972a3cb726408eddd0a2324ff7208bee49edd166f84d  ./app/static/app.js
 bb5acf25d3a99146eb0d84137ee8e479c61e3c45ff3a9a1a0b1caa1ce53472c5  ./app/static/dou-logo.png
 e3a2d3ed28c4655379a389584cf355daee127a697a66c4848dfaa5621f1e2c6f  ./app/static/evaluator.css
 2dfd7be9e5a3e175675783c422b3eeec11d698ccf340ecbec6e51fadacbe1bd3  ./app/static/evaluator.html
