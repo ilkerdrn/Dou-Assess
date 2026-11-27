@@ -25,7 +25,10 @@ docker compose version >/dev/null 2>&1 && pass 'Docker Compose v2' || err 'Docke
 [[ -s secrets/postgres_password.txt ]] && pass 'PostgreSQL secret mevcut' || err 'secrets/postgres_password.txt eksik/boş'
 if [[ -s secrets/postgres_password.txt ]]; then mode=$(stat -c '%a' secrets/postgres_password.txt 2>/dev/null || true); [[ "$mode" == '600' ]] && pass 'PostgreSQL secret mode 600' || warn "PostgreSQL secret mode ${mode:-?}; chmod 600 önerilir"; fi
 if [[ -f "$ENV_FILE" ]]; then
-  required=(COMPOSE_PROJECT_NAME APP_ENV POSTGRES_DB POSTGRES_USER PUBLIC_HOSTNAME ALLOWED_HOSTS AUTH_REQUIRED AUTH_PROVIDER ENTRA_TENANT_ID ENTRA_CLIENT_ID ENTRA_AUDIENCE ENTRA_ALLOWED_CLIENT_IDS ENTRA_REQUIRED_SCOPES ENTRA_LOGIN_SCOPES ENTRA_REDIRECT_URI)
+  PROVIDER="$(grep -E '^AUTH_PROVIDER=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
+  required=(COMPOSE_PROJECT_NAME APP_ENV POSTGRES_DB POSTGRES_USER PUBLIC_HOSTNAME ALLOWED_HOSTS AUTH_REQUIRED AUTH_PROVIDER)
+  if [[ "$PROVIDER" == entra ]]; then required+=(ENTRA_TENANT_ID ENTRA_CLIENT_ID ENTRA_AUDIENCE ENTRA_ALLOWED_CLIENT_IDS ENTRA_REQUIRED_SCOPES ENTRA_LOGIN_SCOPES ENTRA_REDIRECT_URI); fi
+  if [[ "$PROVIDER" == obs ]]; then required+=(OBS_PROLIZ_USERNAME OBS_PROLIZ_PASSWORD OBS_JWT_SECRET BOOTSTRAP_ADMIN_EMAILS); fi
   for key in "${required[@]}"; do
     value="$(grep -E "^${key}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
     [[ -n "$value" ]] && pass "$key tanımlı" || err "$key eksik"
@@ -34,7 +37,11 @@ if [[ -f "$ENV_FILE" ]]; then
   if [[ -z "$sl" ]]; then err 'STUDENT_LINK_SECRET eksik; öğrenci itiraz bağlantıları çalışmaz (openssl rand -base64 48)'; elif (( ${#sl} < 32 )); then warn 'STUDENT_LINK_SECRET kısa; en az 32 karakter önerilir'; else pass 'STUDENT_LINK_SECRET tanımlı'; fi
   grep -Eq '^APP_ENV=production$' "$ENV_FILE" && pass 'APP_ENV=production' || err 'APP_ENV=production olmalı'
   grep -Eq '^AUTH_REQUIRED=(true|1|yes|on)$' "$ENV_FILE" && pass 'AUTH_REQUIRED açık' || err 'AUTH_REQUIRED=true olmalı'
-  grep -Eq '^AUTH_PROVIDER=entra$' "$ENV_FILE" && pass 'AUTH_PROVIDER=entra' || err 'AUTH_PROVIDER=entra olmalı'
+  [[ "$PROVIDER" == entra || "$PROVIDER" == obs ]] && pass "AUTH_PROVIDER=$PROVIDER" || err 'AUTH_PROVIDER entra veya obs olmalı'
+  if [[ "$PROVIDER" == obs ]]; then
+    grep -Eq '^OBS_PROLIZ_ENABLED=(true|1|yes|on)$' "$ENV_FILE" && pass 'OBS_PROLIZ_ENABLED açık' || err 'AUTH_PROVIDER=obs iken OBS_PROLIZ_ENABLED=true olmalı'
+    oj="$(grep -E '^OBS_JWT_SECRET=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' || true)"; (( ${#oj} >= 32 )) && pass 'OBS_JWT_SECRET uzunluğu yeterli' || err 'OBS_JWT_SECRET en az 32 karakter olmalı'
+  fi
   grep -Eq '^PILOT_AUTH_ENABLED=(false|0|no|off)$' "$ENV_FILE" && pass 'Pilot auth kapalı' || err 'PILOT_AUTH_ENABLED=false olmalı'
   grep -Eq '^PILOT_DEMO_ENABLED=(false|0|no|off)$' "$ENV_FILE" && pass 'Pilot demo kapalı' || err 'PILOT_DEMO_ENABLED=false olmalı'
   if grep -Eq '^BACKUP_AUTOMATION_ENABLED=(true|1|yes|on)$' "$ENV_FILE"; then pass 'Otomatik backup açık'; else warn 'BACKUP_AUTOMATION_ENABLED kapalı; 6.68 scheduler backup üretmez'; fi
