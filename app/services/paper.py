@@ -167,7 +167,8 @@ def _omr_normalized_layout(rows: list[dict]) -> dict:
         col_w = 0.92 / cols
         col_left = 0.04 + col * col_w
         y = 0.30 if rows_per_col == 1 else 0.30 + row * (0.62 / (rows_per_col - 1))
-        for j, letter in enumerate(letters):
+        n_choices = len(q.get("choices") or {}) or 5  # bubbles follow the question's real choice count (2..5)
+        for j, letter in enumerate(letters[:max(2, min(5, n_choices))]):
             x = col_left + col_w * (0.27 + j * 0.125)
             bubbles.append({
                 "display_no": q["display_no"], "question_id": q["id"],
@@ -298,8 +299,8 @@ def _paper_type(rows: list[dict]) -> str:
 def _default_rules(rows: list[dict]) -> str:
     mcq = [q for q in rows if q["question_type"] == "mcq"]
     classic = [q for q in rows if q["question_type"] == "classic"]
-    tr = f"Bu sınav toplam {len(rows)} sorudan oluşmaktadır; {len(mcq)} çoktan seçmeli (test), {len(classic)} klasik (açık uçlu) soru bulunmaktadır. Çoktan seçmeli soruların cevapları ön sayfadaki cevap formuna işaretlenmelidir. Açık uçlu cevaplar ilgili soru altında ayrılan alana yazılmalıdır."
-    en = f"This exam consists of {len(rows)} questions: {len(mcq)} multiple-choice and {len(classic)} open-ended questions. Multiple-choice answers must be marked on the answer area on the front page. Open-ended answers must be written in the space provided under the relevant question."
+    tr = f"Bu sınav toplam {len(rows)} sorudan oluşmaktadır; {len(mcq)} çoktan seçmeli (test), {len(classic)} klasik (açık uçlu) soru bulunmaktadır. Çoktan seçmeli soruların cevapları ön sayfadaki cevap formuna işaretlenmelidir. Açık uçlu cevaplar ilgili soru altında ayrılan alana yazılmalıdır. Cevap formunda her soru için yalnızca bir şıkkın balonunu koyu renkli kalemle tamamen doldurun; silinti, çift işaret veya balon dışına taşan işaretler geçersiz sayılabilir."
+    en = f"This exam consists of {len(rows)} questions: {len(mcq)} multiple-choice and {len(classic)} open-ended questions. Multiple-choice answers must be marked on the answer area on the front page. Open-ended answers must be written in the space provided under the relevant question. On the answer sheet, fill in exactly one bubble per question completely with a dark pen; erasures, double marks or marks outside the bubble may be invalid."
     return tr + " " + en
 
 

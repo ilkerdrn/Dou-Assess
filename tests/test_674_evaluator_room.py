@@ -262,3 +262,19 @@ def test_print_screen_summary_confirm_lock_and_attendance_sheet():
     back = client.post(f"/api/exams/{eid}/status", json={"status": "draft"})
     assert back.status_code == 409 and "kopyal" in back.text
     assert client.get(f"/api/exams/{eid}/print-summary").json()["can_confirm"] is False
+
+
+def test_answer_sheet_bubbles_follow_choice_count_and_rules_have_marking_instruction():
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    _post(f"/api/exams/{eid}/questions", {"order_no": 2, "question_type": "mcq", "text": "Üç şık", "points": 1, "correct_answer": "C", "choices": {"A": "a", "B": "b", "C": "c"}, "learning_outcome_code": "Ö1"})
+    meta = client.get(f"/api/exams/{eid}/paper-metadata").json()
+    per_q = {}
+    for b in meta["omr_layout"]["bubbles"]:
+        per_q.setdefault(b["display_no"], []).append(b["letter"])
+    assert sorted(len(v) for v in per_q.values()) == [2, 3]
+    pdf = client.get(f"/api/exams/{eid}/paper.pdf").content
+    from pypdf import PdfReader
+    from io import BytesIO
+    text = PdfReader(BytesIO(pdf)).pages[0].extract_text()
+    assert "tamamen doldurun" in text
