@@ -76,6 +76,8 @@ class Settings:
     max_xlsx_uncompressed_mb: int = int(os.getenv("MAX_XLSX_UNCOMPRESSED_MB", "80"))
     max_xlsx_members: int = int(os.getenv("MAX_XLSX_MEMBERS", "5000"))
     evidence_retention_days: int = int(os.getenv("EVIDENCE_RETENTION_DAYS", "1825"))
+    scan_retention_days: int = int(os.getenv("SCAN_RETENTION_DAYS", "1460"))  # scanned papers: confirm against the university archive directive
+    scan_target_error_percent: float = float(os.getenv("SCAN_TARGET_ERROR_PERCENT", "1.0"))
     student_data_retention_days: int = int(os.getenv("STUDENT_DATA_RETENTION_DAYS", "2555"))
     privacy_contact: str = os.getenv("PRIVACY_CONTACT", "").strip()
     obs_writeback_enabled: bool = _bool("OBS_WRITEBACK_ENABLED", False)

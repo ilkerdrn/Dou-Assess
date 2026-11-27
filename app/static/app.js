@@ -711,6 +711,25 @@ function mappedProgramsForLo(data,loId){
 async function prepareOutcomes(){
   try{await refreshCore();const manage=canAcademicMaster();document.getElementById('loQuickForm').closest('.card').classList.toggle('hidden',!manage);document.getElementById('poQuickForm').closest('.card').classList.toggle('hidden',!manage);const grid=document.querySelector('.outcome-quick-grid');if(grid)grid.classList.toggle('hidden',!manage);document.getElementById('outcomeBackToExam').classList.toggle('hidden',!state.currentExam);const sel=document.getElementById('outcomeCourse');if(sel&&sel.value)await loadOutcomeMap();}catch(e){toast(e.message,'error');}
 }
+async function loadThresholds(){
+  const box=document.getElementById('thresholdList');if(!box)return;
+  const course=(state.courses||[]).find(x=>x.id===Number(document.getElementById('outcomeCourse')?.value));
+  try{const rows=await api('GET',`/api/outcome-thresholds${course?`?program_id=${course.program_id}`:''}`);
+    box.innerHTML=rows.length?`<div class="tw"><table class="rt"><thead><tr><th>Tür</th><th>Kapsam</th><th>Yıl</th><th>Hedef</th><th>Sürüm</th><th>Durum</th><th>Not</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.kind==='lo'?'ÖÇ varsayılanı':'PÇ eşiği'}</td><td>${r.program_id?'Program':'Kurum'}</td><td>${esc(r.academic_year||'Tümü')}</td><td>%${r.target_percent}</td><td>v${r.version_no}</td><td>${r.is_active?'<span class="chip">geçerli</span>':'eski'}</td><td>${esc(r.note||'')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Tanımlı eşik yok; ÖÇ hedefleri tek tek belirlenir.</p>';
+  }catch(e){box.innerHTML=`<p class="muted">${esc(e.message)}</p>`}
+}
+document.getElementById('thresholdCard')?.addEventListener('toggle',e=>{if(e.target.open)loadThresholds()});
+document.getElementById('thresholdAdd')?.addEventListener('click',async()=>{
+  const course=(state.courses||[]).find(x=>x.id===Number(document.getElementById('outcomeCourse')?.value));
+  const d=await workflowForm({eyebrow:'BAŞARI EŞİĞİ',title:'Yeni eşik sürümü',description:'Aynı kapsam ve türdeki geçerli sürüm kapatılır; geçmiş saklanır.',submitLabel:'Sürümü kaydet',fields:[
+    {name:'kind',label:'Tür',type:'select',options:[{value:'lo',label:'ÖÇ varsayılan hedefi (yeni çıktılar)'},{value:'po',label:'PÇ başarı eşiği (analizler)'}]},
+    {name:'scope',label:'Kapsam',type:'select',options:[...(course?[{value:'program',label:`Bu program (${course.program_name||course.program_id})`}]:[]),{value:'institution',label:'Tüm kurum (kalite/yönetici)'}]},
+    {name:'year',label:'Akademik yıl (boş = tümü)',placeholder:'2026-2027'},
+    {name:'target',label:'Hedef %',type:'number',required:true,value:60},{name:'note',label:'Gerekçe / yönerge',type:'textarea',rows:2}]});
+  if(!d)return;
+  try{await api('POST','/api/outcome-thresholds',{program_id:d.scope==='program'&&course?course.program_id:null,academic_year:(d.year||'').trim(),kind:d.kind,target_percent:Number(d.target),note:d.note||''});toast('Eşik sürümü kaydedildi.');await loadThresholds()}catch(e){toast(e.message,'error')}
+});
+
 async function loadOutcomeMap(){
   const courseId=Number(document.getElementById('outcomeCourse').value);if(!courseId)return;
   const [data,summary]=await Promise.all([api('GET',`/api/courses/${courseId}/outcomes`),api('GET',`/api/courses/${courseId}/outcome-summary`)]);state.currentOutcomeData=data;state.currentOutcomeSummary=summary;
@@ -1360,6 +1379,32 @@ document.getElementById('printAttendance')?.addEventListener('click',async()=>{c
 document.getElementById('printOne')?.addEventListener('click',async()=>{const id=document.getElementById('printExam').value,st=document.getElementById('printStudent').value;if(!st)return;try{await downloadApi(`/api/exams/${id}/students/${st}/paper.pdf`,`sinav-${id}-ogrenci-${st}.pdf`,true)}catch(e){toast(e.message,'error')}});
 document.getElementById('printConfirm')?.addEventListener('click',async()=>{const id=document.getElementById('printExam').value;if(!confirm('Kâğıtlar yazdırıldı olarak işaretlenecek ve sorular kilitlenecek. Değişiklik için sınavın kopyası gerekir. Devam?'))return;try{await api('POST',`/api/exams/${id}/print-confirm`);toast('Basım onaylandı; sorular kilitlendi.');await loadPrintSummary()}catch(e){toast(e.message,'error')}});
 document.getElementById('printNext')?.addEventListener('click',()=>showPage('scan'));
+
+async function loadScanAudit(){
+  const id=Number(document.getElementById('scanExam')?.value||0),box=document.getElementById('scanAuditBox');if(!box)return;
+  if(!id){box.innerHTML='<p class="muted">Sınav seçin.</p>';return}
+  try{const a=await api('GET',`/api/exams/${id}/scan-audit`);
+    const verdict=a.error_rate_percent==null?'Henüz sonuç yok':(a.meets_target?`Hedefte (%${a.error_rate_percent} ≤ %${a.target_error_percent})`:`Hedef aşıldı (%${a.error_rate_percent} > %${a.target_error_percent}) — okumaları gözden geçirin`);
+    box.innerHTML=`<div class="readiness-counts"><span>${a.sampled} örnek</span><span>${a.checked} kontrol edildi</span><span>${a.mismatches} hatalı</span><span><b>${esc(verdict)}</b></span></div>`+a.pending.map(p=>`<div class="record"><b>Sayfa ${p.page_no} · öğrenci ${esc(p.student_no||'?')}</b><small>Okunan: ${esc(Object.entries(p.answers||{}).slice(0,40).map(([k,v])=>k+':'+(v||'-')).join(' '))}</small><div class="row"><button class="ghost small" data-audit-view="${p.scan_item_id}">Görseli aç</button><button class="primary small" data-audit-ok="${p.scan_item_id}">Doğru okunmuş</button><button class="danger small" data-audit-bad="${p.scan_item_id}">Hatalı</button></div></div>`).join('');
+    box.querySelectorAll('[data-audit-view]').forEach(b=>b.addEventListener('click',()=>downloadApi(`/api/scan-items/${b.dataset.auditView}/review-preview`,'sayfa.jpg',true).catch(e=>toast(e.message,'error'))));
+    const judge=async(iid,ok)=>{try{await api('POST',`/api/scan-items/${iid}/audit-result`,{ok,note:''});await loadScanAudit()}catch(e){toast(e.message,'error')}};
+    box.querySelectorAll('[data-audit-ok]').forEach(b=>b.addEventListener('click',()=>judge(b.dataset.auditOk,true)));
+    box.querySelectorAll('[data-audit-bad]').forEach(b=>b.addEventListener('click',()=>judge(b.dataset.auditBad,false)));
+  }catch(e){box.innerHTML=`<p class="muted">${esc(e.message)}</p>`}
+}
+document.getElementById('scanAuditCard')?.addEventListener('toggle',e=>{if(e.target.open)loadScanAudit()});
+document.getElementById('scanAuditRefresh')?.addEventListener('click',loadScanAudit);
+document.getElementById('scanAuditDraw')?.addEventListener('click',async()=>{const id=Number(document.getElementById('scanExam').value);if(!id)return toast('Sınav seçin.','error');try{const r=await api('POST',`/api/exams/${id}/scan-audit/sample`,{percent:Number(document.getElementById('scanAuditPercent').value||10),minimum:5});toast(`${r.drawn} sayfa örneklendi.`);await loadScanAudit()}catch(e){toast(e.message,'error')}});
+document.getElementById('closurePackage')?.addEventListener('click',async()=>{const e=state.currentExam;if(!e)return;try{await downloadApi(`/api/exams/${e.id}/closure-package.zip`,`kapanis-paketi-sinav-${e.id}.zip`);toast('Kapanış paketi indirildi; içindeki SHA256SUMS.json bütünlük özetidir.')}catch(err){toast(err.message,'error')}});
+
+async function loadRetention(){
+  const box=document.getElementById('retentionBox');if(!box)return;
+  try{const r=await api('GET','/api/archive/retention');
+    box.innerHTML=`<p class="muted">Saklama süresi: ${r.scan_retention_days} gün · süresi dolan: <b>${r.expired_count}</b></p>`+(r.items.length?`<div class="tw"><table class="rt"><thead><tr><th>Sınav</th><th>Kilit tarihi</th><th>Dosya</th><th>Bitiş</th><th></th></tr></thead><tbody>${r.items.map(x=>`<tr><td>${esc(x.title)}</td><td>${esc(x.grade_locked_at.slice(0,10))}</td><td>${x.scan_files}</td><td>${esc(x.retention_until.slice(0,10))}</td><td>${x.expired?`<button class="danger small" data-purge="${x.exam_id}">Görselleri sil</button>`:'<span class="chip">süresi dolmadı</span>'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Saklanan tarama görseli yok.</p>');
+    box.querySelectorAll('[data-purge]').forEach(b=>b.addEventListener('click',async()=>{const d=await workflowForm({eyebrow:'KAYITLI SİLME',title:'Tarama görsellerini sil',description:'Geri alınamaz. Puanlar ve işlem kaydı korunur; silme denetim kaydına yazılır.',submitLabel:'Sil',fields:[{name:'reason',label:'Gerekçe',type:'textarea',required:true,rows:3,placeholder:'Örn. arşiv yönergesi gereği saklama süresi doldu'}]});if(!d)return;try{const r2=await api('POST',`/api/exams/${b.dataset.purge}/purge-scans`,{reason:d.reason});toast(`${r2.files_removed} dosya silindi.`);await loadRetention()}catch(e){toast(e.message,'error')}}));
+  }catch(e){box.innerHTML=`<p class="muted">${esc(e.message)}</p>`}
+}
+document.getElementById('retentionCard')?.addEventListener('toggle',e=>{if(e.target.open)loadRetention()});
 
 async function prepareScan(){
   try{await refreshCore();await loadScanContext();renderScanFileCount();}catch(e){toast(e.message,'error');}

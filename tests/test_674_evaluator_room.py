@@ -7,6 +7,7 @@ from openpyxl import Workbook
 from io import BytesIO
 
 from app.db import Base, engine, SessionLocal
+from sqlalchemy import select as select_
 from app.main import app
 
 Base.metadata.create_all(engine)
@@ -361,3 +362,69 @@ def test_versioned_thresholds_drive_po_target_and_lo_default():
     client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
     an = client.get(f"/api/exams/{eid}/analytics").json()
     assert an["program_outcomes"] and all(p["target_percent"] == 90 for p in an["program_outcomes"])
+
+
+def test_closure_package_scan_audit_and_retention():
+    import zipfile, json as _json
+    from io import BytesIO
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    assert client.get(f"/api/exams/{eid}/closure-package.zip").status_code == 409  # not locked yet
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
+    studs = client.get(f"/api/exams/{eid}/students").json()
+    for s in studs:
+        _post(f"/api/exams/{eid}/students/{s['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "B"}]})
+    assert client.post(f"/api/exams/{eid}/grade-lock", json={"note": ""}).status_code == 200
+    r = client.get(f"/api/exams/{eid}/closure-package.zip"); assert r.status_code == 200, r.text
+    z = zipfile.ZipFile(BytesIO(r.content)); names = set(z.namelist())
+    assert {"exam.json", "analytics.json", "responses.json", "grade-revisions.json", "audit-trail.json", "SHA256SUMS.json", "paper/booklet-A.pdf"} <= names
+    man = _json.loads(z.read("SHA256SUMS.json"))
+    import hashlib
+    assert man["files"]["responses.json"] == hashlib.sha256(z.read("responses.json")).hexdigest() and man["package_sha256"] == r.headers["x-dou-package-sha256"]
+    sa = client.get(f"/api/exams/{eid}/scan-audit").json()
+    assert sa["sampled"] == 0 and sa["error_rate_percent"] is None
+    assert client.post(f"/api/exams/{eid}/scan-audit/sample", json={"percent": 10}).json()["drawn"] == 0  # no accepted scans in this fixture
+    ret = client.get("/api/archive/retention").json()
+    assert ret["scan_retention_days"] >= 365
+    assert client.post(f"/api/exams/{eid}/purge-scans", json={"reason": "süre doldu"}).status_code == 409  # retention not reached
+
+
+def test_scan_audit_sampling_error_rate_and_purge_after_retention(monkeypatch):
+    import dataclasses
+    from datetime import datetime, timedelta, timezone
+    import app.archive_api as arch
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    with SessionLocal() as db:
+        from app import models as _m
+        sess = _m.ScanSession(exam_id=eid, source_name="t.pdf", source_sha256="x" * 64, status="completed", page_count=20, accepted_count=20)
+        db.add(sess); db.flush()
+        for i in range(20):
+            db.add(_m.ScanItem(session_id=sess.id, exam_id=eid, page_no=i + 1, status="accepted", page_kind="omr", page_fingerprint=f"fp{eid}-{i}", answers={"1": "A"}, student_no_detected="1", preview_name=None))
+        db.commit()
+    s = _post(f"/api/exams/{eid}/scan-audit/sample", {"percent": 25, "minimum": 3})
+    assert s["drawn"] == 5 and s["pool_left"] == 15
+    st = client.get(f"/api/exams/{eid}/scan-audit").json()
+    assert st["sampled"] == 5 and len(st["pending"]) == 5 and st["error_rate_percent"] is None
+    ids = [p["scan_item_id"] for p in st["pending"]]
+    for i, iid in enumerate(ids):
+        assert client.post(f"/api/scan-items/{iid}/audit-result", json={"ok": i != 0}).status_code == 200
+    assert client.post(f"/api/scan-items/{ids[0]}/audit-result", json={"ok": True}).status_code == 409  # already judged
+    st = client.get(f"/api/exams/{eid}/scan-audit").json()
+    assert st["checked"] == 5 and st["mismatches"] == 1 and st["error_rate_percent"] == 20.0 and st["meets_target"] is False
+    # retention: shrink the period to 0 days -> expired -> purge allowed and recorded
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
+    for x in client.get(f"/api/exams/{eid}/students").json():
+        _post(f"/api/exams/{eid}/students/{x['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "B"}]})
+    # a scan row with a preview file so the row counts as having files
+    from pathlib import Path
+    from app.config import settings as _s
+    Path(_s.scan_storage_path).mkdir(parents=True, exist_ok=True)
+    (Path(_s.scan_storage_path) / f"purge_{eid}.jpg").write_bytes(b"x")
+    with SessionLocal() as db:
+        from app import models as _m
+        it = db.scalar(select_(_m.ScanItem).where(_m.ScanItem.exam_id == eid)); it.preview_name = f"purge_{eid}.jpg"; db.commit()
+    assert client.post(f"/api/exams/{eid}/grade-lock", json={"note": ""}).status_code == 200
+    monkeypatch.setattr(arch, "settings", dataclasses.replace(arch.settings, scan_retention_days=0))
+    r = client.post(f"/api/exams/{eid}/purge-scans", json={"reason": "saklama süresi doldu"}); assert r.status_code == 200, r.text
+    assert r.json()["files_removed"] == 1 and not (Path(_s.scan_storage_path) / f"purge_{eid}.jpg").exists()

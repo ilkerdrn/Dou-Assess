@@ -63,6 +63,7 @@ from .program_review_api import router as program_review_router
 from .evaluator_room_api import router as evaluator_room_router
 from .student_portal_api import router as student_portal_router
 from .thresholds_api import router as thresholds_router
+from .archive_api import router as archive_router
 from .services.thresholds import active_threshold
 from .security import (
     add_security_event, allowed_host, enforce_production_security, production_security_issues, production_security_warnings,
@@ -97,6 +98,7 @@ app.include_router(program_review_router)
 app.include_router(evaluator_room_router)
 app.include_router(student_portal_router)
 app.include_router(thresholds_router)
+app.include_router(archive_router)
 
 
 @app.exception_handler(HTTPException)
