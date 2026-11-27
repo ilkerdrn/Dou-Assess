@@ -428,3 +428,48 @@ def test_scan_audit_sampling_error_rate_and_purge_after_retention(monkeypatch):
     monkeypatch.setattr(arch, "settings", dataclasses.replace(arch.settings, scan_retention_days=0))
     r = client.post(f"/api/exams/{eid}/purge-scans", json={"reason": "saklama süresi doldu"}); assert r.status_code == 200, r.text
     assert r.json()["files_removed"] == 1 and not (Path(_s.scan_storage_path) / f"purge_{eid}.jpg").exists()
+
+
+def test_obs_grade_export_po_formula_and_measure_excel_import():
+    from io import BytesIO
+    from openpyxl import Workbook, load_workbook
+    program, course, exam, q, ws, hdr = _setup()
+    cid, eid, pid = course["id"], exam["id"], program["id"]
+    assert client.get(f"/api/courses/{cid}/obs-grades.xlsx").status_code == 409  # no approved, weighted exam yet
+    f = client.get(f"/api/programs/{pid}/po-formula.md"); assert f.status_code == 200
+    assert "PÇ başarısı" in f.text and "PÇ1" in f.text and "ODA 101" in f.text
+    meas = _post(f"/api/courses/{cid}/assessment-measures", {"code": "ODEV1", "title": "Ödev 1", "measure_type": "assignment", "directness": "direct", "weight_percent": 20, "max_points": 100, "target_percent": 60})
+    mid = meas["id"]
+    tpl = client.get(f"/api/assessment-measures/{mid}/results-template.xlsx"); assert tpl.status_code == 200
+    wb = load_workbook(BytesIO(tpl.content)); sheet = wb["Puanlar"]
+    rows = list(sheet.iter_rows(values_only=True)); assert rows[0][0] == "ogrenci_no" and len(rows) == 3
+    sheet.cell(row=2, column=3, value=80); sheet.cell(row=3, column=3, value=150)  # second is out of range
+    buf = BytesIO(); wb.save(buf)
+    bad = client.post(f"/api/assessment-measures/{mid}/results-import", files={"file": ("p.xlsx", buf.getvalue(), "application/octet-stream")})
+    assert bad.status_code == 422 and bad.json()["error"]["details"], bad.text
+    sheet.cell(row=3, column=3, value=60); buf = BytesIO(); wb.save(buf)
+    assert client.post(f"/api/assessment-measures/{mid}/results-import?validate_only=true", files={"file": ("p.xlsx", buf.getvalue(), "application/octet-stream")}).json()["rows"] == 2
+    ok = client.post(f"/api/assessment-measures/{mid}/results-import", files={"file": ("p.xlsx", buf.getvalue(), "application/octet-stream")}); assert ok.status_code == 200, ok.text
+    assert ok.json()["imported"] == 2
+    summ = client.get(f"/api/assessment-measures/{mid}/summary").json()
+    assert summ["result_count"] == 2 if "result_count" in summ else True
+
+
+def test_obs_grade_export_positive_path():
+    from io import BytesIO
+    from openpyxl import load_workbook
+    program, course, exam, q, ws, hdr = _setup()
+    cid, eid = course["id"], exam["id"]
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
+    studs = client.get(f"/api/exams/{eid}/students").json()
+    _post(f"/api/exams/{eid}/students/{studs[0]['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "B"}]})
+    _post(f"/api/exams/{eid}/students/{studs[1]['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "A"}]})
+    with SessionLocal() as db:
+        from app import models as _m
+        e = db.get(_m.Exam, eid); e.status = "approved"; e.assessment_weight_percent = 100.0; db.commit()
+    r = client.get(f"/api/courses/{cid}/obs-grades.xlsx"); assert r.status_code == 200, r.text
+    wb = load_workbook(BytesIO(r.content)); rows = list(wb["OBS_Toplu_Not"].iter_rows(values_only=True))
+    assert rows[0][0] == "Öğrenci No" and rows[0][-2] == "Başarı Notu (100)"
+    finals = sorted(x[-2] for x in rows[1:]); assert finals == [0.0, 100.0]
+    assert {x[-1] for x in rows[1:]} == {"Geçti", "Kaldı"}
+    assert dict(wb["Bilgi"].iter_rows(values_only=True))["Ağırlıklar geçerli mi"] == "Evet"

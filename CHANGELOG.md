@@ -8,6 +8,7 @@
 - P1: persistent exam state bar (Taslak → Hazır → Basıldı → Puanlama → Onaylı, with what is locked); OBS vs Assess outcome diff report (`GET /api/courses/{id}/outcome-diff`, original OBS text recovered from the audit trail); grading completeness (`GET /api/exams/{id}/grading-progress`) separating "girilmedi" from a real 0.
 - Fast grading grid for rubric-based classic questions (student x criterion, all-or-nothing validation, blind-mode aware, unchanged rows skipped, revisions logged). Institution wording for "learning outcome" via `OUTCOME_TERM` (Öğrenim | Öğrenme | Kazanım).
 - P1: versioned success thresholds (migration 0045: LO default target + PO threshold per institution/program/year, history kept, applied to new outcomes and analytics); random sampling of auto-accepted OMR pages with error-rate vs `SCAN_TARGET_ERROR_PERCENT`; hash-sealed semester closure package per exam; scan retention overview and recorded purge (`SCAN_RETENTION_DAYS`, default 1460, admin only).
+- P1: OBS bulk-entry grade export (`GET /api/courses/{id}/obs-grades.xlsx`, layout must be confirmed against the OBS template), PÇ calculation formula document (`GET /api/programs/{id}/po-formula.md`), Excel template + validated all-or-nothing import for assignment/project/lab scores, `docs/KVKK-AI-OCR-DEGERLENDIRME.md` assessment template.
 - Demo scenario uses the real current term instead of 2099-2100 when that period is free.
 
 # 6.70 — Performance & Production Hardening
