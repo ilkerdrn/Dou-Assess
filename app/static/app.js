@@ -453,8 +453,19 @@ async function loadCourseStudents(){const id=Number(document.getElementById('cou
 document.getElementById('loadCourseStudents')?.addEventListener('click',loadCourseStudents);document.getElementById('courseStudentsCourse')?.addEventListener('change',e=>{state.selectedCourseId=Number(e.target.value||0);});
 
 function courseWorkspaceMeta(course){const p=state.programs.find(x=>x.id===course.program_id);return `${p?`${p.code} · `:''}${course.academic_year||''} ${course.term||''}`.trim();}
+async function loadObsSyncInfo(){
+  const info=document.getElementById('obsSyncInfo'),btn=document.getElementById('obsResyncBtn');if(!info||!btn)return;
+  try{const s=await api('GET','/api/auth/obs-sync-status');btn.classList.toggle('hidden',!s.enabled);
+    info.textContent=s.last_sync_at?`Son OBS senkronu: ${new Date(s.last_sync_at).toLocaleString('tr-TR')}${s.summary?` · ${s.summary.courses||0} yeni ders, ${s.summary.students||0} yeni öğrenci`:''}`:(s.enabled?'Henüz OBS senkronu yok; "OBS\'den getir" ile dersleri çekin.':'OBS bağlandığında ders atamaları otomatik güncellenir.');
+  }catch{}
+}
+document.getElementById('obsResyncBtn')?.addEventListener('click',async()=>{
+  const d=await workflowForm({eyebrow:'OBS',title:"OBS'den getir",description:'Derslerinizi ve öğrenci listelerinizi OBS\'den yeniden çeker. Şifreniz saklanmaz.',submitLabel:'Getir',fields:[{name:'u',label:'Sicil no',required:true},{name:'p',label:'OBS şifresi',type:'password',required:true}]});if(!d)return;
+  try{const r=await api('POST','/api/integrations/obs/resync',{username:d.u,password:d.p});toast(`OBS senkronu tamam: ${r.sync.courses||0} yeni ders, ${r.sync.students||0} yeni öğrenci.`);await prepareMyCourses();}catch(e){toast(e.message,'error');}
+});
+
 async function prepareMyCourses(){
-  await refreshCore();
+  await refreshCore();loadObsSyncInfo();
   const grid=document.getElementById('myCoursesGrid'),count=document.getElementById('myCoursesCount');if(!grid)return;
   if(count)count.textContent=`${state.courses.length} ders`;
   grid.innerHTML=state.courses.length?state.courses.map(c=>`<button type="button" class="course-workspace-card ${Number(state.selectedCourseId)===c.id?'active':''}" data-workspace-course="${c.id}"><span class="course-code">${esc(c.code)}</span><div><b>${esc(c.name)}</b><small>${esc(courseWorkspaceMeta(c))}</small></div><i>Dersi aç →</i></button>`).join(''):'<div class="empty-state"><b>Yetkili ders bulunamadı.</b><span>OBS veya akademik kapsam ataması tamamlandığında dersleriniz burada görünür.</span></div>';

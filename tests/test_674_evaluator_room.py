@@ -278,3 +278,19 @@ def test_answer_sheet_bubbles_follow_choice_count_and_rules_have_marking_instruc
     from io import BytesIO
     text = PdfReader(BytesIO(pdf)).pages[0].extract_text()
     assert "tamamen doldurun" in text
+
+
+def test_obs_resync_status_and_ownership_guard(monkeypatch):
+    import app.main as main_mod
+    from types import SimpleNamespace
+    me = client.get("/api/auth/me").json()["email"]
+    import dataclasses
+    monkeypatch.setattr(main_mod, "settings", dataclasses.replace(main_mod.settings, obs_proliz_enabled=True))
+    st = client.get("/api/auth/obs-sync-status").json()
+    assert st["enabled"] is True and st["last_sync_at"] is None
+    monkeypatch.setattr(main_mod, "teacher_login_and_sync", lambda db, u, p, d=None: (SimpleNamespace(id=1, email="someone.else@dogus.edu.tr"), {"courses": 1, "students": 2, "enrollments": 2, "donem_id": "1"}))
+    assert client.post("/api/integrations/obs/resync", json={"username": "S1", "password": "x"}).status_code == 403
+    monkeypatch.setattr(main_mod, "teacher_login_and_sync", lambda db, u, p, d=None: (SimpleNamespace(id=1, email=me), {"courses": 1, "students": 2, "enrollments": 2, "donem_id": "1"}))
+    r = client.post("/api/integrations/obs/resync", json={"username": "S1", "password": "x"}); assert r.status_code == 200, r.text
+    st = client.get("/api/auth/obs-sync-status").json()
+    assert st["last_sync_at"] and st["summary"]["students"] == 2

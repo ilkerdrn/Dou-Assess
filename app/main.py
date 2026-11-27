@@ -750,7 +750,7 @@ def obs_login(payload: ObsLoginRequest, db: Session = Depends(get_db)):
         with db.begin():
             user, stats = teacher_login_and_sync(db, username, payload.password, payload.donem_id)
             audit(db, "obs_login", "app_user", user.id, {"username": username, **{k: v for k, v in stats.items() if k != "donem_id"}, "donem_id": stats.get("donem_id")})
-            run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="success", summary=stats)
+            run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="success", summary={**stats, "user_email": user.email})
             db.add(run)
     except ObsLoginError as exc:
         db.rollback()
@@ -764,6 +764,44 @@ def obs_login(payload: ObsLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(502, str(exc)) from exc
     token = mint_obs_session_token(user)
     return {"access_token": token, "token_type": "bearer", "display_name": user.display_name, "email": user.email, "sync": stats}
+
+
+@app.get("/api/auth/obs-sync-status")
+def obs_sync_status(db: Session = Depends(get_db)):
+    """Last successful OBS sync of the signed-in user (login or manual re-sync) + whether re-sync is available."""
+    email = str(current_user().get("email") or "").lower()
+    last = None
+    for run in db.scalars(select(m.IntegrationSyncRun).where(m.IntegrationSyncRun.provider == "obs-proliz", m.IntegrationSyncRun.status == "success", m.IntegrationSyncRun.mode.in_(["login", "resync"])).order_by(m.IntegrationSyncRun.id.desc()).limit(200)).all():
+        if str((run.summary or {}).get("user_email") or "").lower() == email:
+            last = run; break
+    return {"enabled": bool(settings.obs_proliz_enabled), "last_sync_at": last.created_at.isoformat() if last and last.created_at else None,
+            "summary": ({k: v for k, v in (last.summary or {}).items() if k in ("courses", "students", "enrollments", "donem_id")} if last else None)}
+
+
+@app.post("/api/integrations/obs/resync")
+def obs_resync(payload: ObsLoginRequest, db: Session = Depends(get_db)):
+    """'OBS'den getir': re-pull the signed-in teacher's courses/rosters. Needs the OBS password again (never stored)."""
+    if not settings.obs_proliz_enabled:
+        raise HTTPException(503, "OBS_PROLIZ_ENABLED=false; Proliz entegrasyonu kapalı")
+    me = str(current_user().get("email") or "").lower()
+    if not me:
+        raise HTTPException(401, "Oturum bulunamadı")
+    username = payload.username.strip()
+    try:
+        db.rollback()
+        with db.begin():
+            user, stats = teacher_login_and_sync(db, username, payload.password, payload.donem_id)
+            if user.email.lower() != me:
+                raise ObsLoginError("Bu OBS hesabı oturum açmış kullanıcıya ait değil", status_code=403)
+            audit(db, "obs_resync", "app_user", user.id, {"username": username, **stats})
+            db.add(m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-resync-{username}", mode="resync", source_sha256="n/a", status="success", summary={**stats, "user_email": user.email}))
+    except ObsLoginError as exc:
+        db.rollback()
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    except obs_proliz.ProlizError as exc:
+        db.rollback()
+        raise HTTPException(502, str(exc)) from exc
+    return {"sync": stats}
 
 
 @app.get("/api/auth/me")
