@@ -81,6 +81,7 @@ class Settings:
     obs_writeback_enabled: bool = _bool("OBS_WRITEBACK_ENABLED", False)
     obs_results_endpoint: str = os.getenv("OBS_RESULTS_ENDPOINT", "").strip()
     obs_results_token: str = _secret("OBS_RESULTS_TOKEN", "")
+    outcome_term: str = os.getenv("OUTCOME_TERM", "Öğrenim").strip() or "Öğrenim"  # Öğrenim | Öğrenme | Kazanım (institution wording)
     student_link_secret: str = _secret("STUDENT_LINK_SECRET", "")
     student_appeal_days: int = int(os.getenv("STUDENT_APPEAL_DAYS", "7"))
     obs_results_timeout_seconds: int = int(os.getenv("OBS_RESULTS_TIMEOUT_SECONDS", "15"))

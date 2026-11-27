@@ -82,3 +82,20 @@ function toast(text,type='ok'){
 function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 
 
+
+/* Institution wording for "learning outcome": OUTCOME_TERM = Öğrenim | Öğrenme | Kazanım (default Öğrenim).
+   Applied to static text and to dynamically rendered content; no per-string edits needed. */
+(function(){
+  let term='Öğrenim';
+  const rx=/Öğrenim|Öğrenme(?= Çıktı)/g;
+  function fix(node){
+    if(term==='Öğrenim')return;
+    const w=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let n;const todo=[];
+    while((n=w.nextNode())){if(n.nodeValue&&(n.nodeValue.includes('Öğrenim')||n.nodeValue.includes('ÖĞRENİM')||n.nodeValue.includes('Öğrenme Çıktı')))todo.push(n)}
+    todo.forEach(t=>{t.nodeValue=t.nodeValue.replace(/Öğren(?:im|me) Çıktı(ları|sı)?/g,(m,suf)=>term==='Kazanım'?(suf==='ları'?'Kazanımlar':suf==='sı'?'Kazanımı':'Kazanım'):`${term} Çıktı${suf||''}`).replace(/Öğrenim(?! Çıktı)/g,term).replace(/ÖĞRENİM/g,term.toLocaleUpperCase('tr'))});
+  }
+  window.applyOutcomeTerm=function(t){term=['Öğrenim','Öğrenme','Kazanım'].includes(t)?t:'Öğrenim';fix(document.body)};
+  let busy=false;
+  new MutationObserver(ms=>{if(busy||term==='Öğrenim')return;busy=true;try{ms.forEach(m=>m.addedNodes.forEach(a=>{if(a.nodeType===1)fix(a);else if(a.nodeType===3&&a.parentNode)fix(a.parentNode)}))}finally{busy=false}}).observe(document.documentElement,{childList:true,subtree:true});
+  fetch('/api/auth/config').then(r=>r.ok?r.json():null).then(c=>{if(c&&c.outcome_term)window.applyOutcomeTerm(c.outcome_term)}).catch(()=>{});
+})();

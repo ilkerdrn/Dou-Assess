@@ -32,7 +32,7 @@ from . import models as m
 from .schemas import (
     ObsLoginRequest, AddBankQuestionRequest, AddBankQuestionsBatchRequest, QuestionReorderRequest, NormalizeQuestionPointsRequest, BulkEnrollRequest, CourseCreate, CourseUpdate, ExamCreate, ExamDuplicateRequest, ExamStatusUpdate, ExamUpdate, ImprovementCreate,
     LearningOutcomeCreate, LearningOutcomeUpdate, OutcomeMappingCreate, ProgramCreate, ProgramUpdate,
-    ProgramOutcomeCreate, ProgramOutcomeUpdate, QuestionBankCreate, QuestionBankUpdate, QuestionReviewRequest, BlueprintCreate, BlueprintStatusRequest, QuestionCreate, QuestionUpdate, ResponsesSubmit, StudentCreate, StudentUpdate, ScanReviewOut, ScanReviewResolve, AnswerKeyRegradeRequest, QuestionKeyException,
+    ProgramOutcomeCreate, ProgramOutcomeUpdate, QuestionBankCreate, QuestionBankUpdate, QuestionReviewRequest, BlueprintCreate, BlueprintStatusRequest, QuestionCreate, QuestionUpdate, ResponsesSubmit, StudentCreate, StudentUpdate, ScanReviewOut, ScanReviewResolve, AnswerKeyRegradeRequest, QuestionKeyException, ClassicGridSave,
     AccreditationProfileCreate, AccreditationPeriodCreate, AccreditationPeriodStatusUpdate, ImprovementUpdate,
     AppUserCreate, AppUserUpdate, UserRoleCreate, AcademicPeriodCreate, AcademicPeriodStatusUpdate, PilotFeedbackCreate, PilotFeedbackUpdate, ExamApprovalRequest, EvidenceUpdate, StudentAnonymizeRequest,
     AttendanceUpdate, GradeLockRequest, ExamIncidentCreate, ExamIncidentResolve, GradeAppealCreate, GradeAppealResolve,
@@ -3634,6 +3634,68 @@ def scan_reviews(exam_id: int, db: Session = Depends(get_db)):
         if item:
             out.append(_scan_review_out(item, review))
     return out
+
+
+def _grid_question(db: Session, exam_id: int, question_id: int) -> tuple[m.Exam, m.Question]:
+    exam = db.get(m.Exam, exam_id)
+    q = db.get(m.Question, question_id)
+    if not exam or not q or q.exam_id != exam_id:
+        raise HTTPException(404, "Soru bulunamadı")
+    if q.question_type != "classic" or not ((q.rubric or {}).get("criteria") or []):
+        raise HTTPException(409, "Hızlı giriş yalnız rubrikli klasik sorular içindir")
+    return exam, q
+
+
+@app.get("/api/exams/{exam_id}/questions/{question_id}/grid")
+def classic_grid(exam_id: int, question_id: int, db: Session = Depends(get_db)):
+    """Student x rubric-criterion grid for one classic question ('girilmedi' = no row)."""
+    require_exam_access(db, exam_id, write=False)
+    exam, q = _grid_question(db, exam_id, question_id)
+    annulled, _ = _key_policy(db, exam_id)
+    rows = db.scalars(select(m.ExamStudent).options(selectinload(m.ExamStudent.student)).where(m.ExamStudent.exam_id == exam_id, m.ExamStudent.attendance_status == "attended")).all()
+    resp = {r.exam_student_id: r for r in db.scalars(select(m.Response).where(m.Response.question_id == q.id)).all()}
+    return {"question": {"id": q.id, "order_no": q.order_no, "text": q.text, "points": q.points, "criteria": [{"id": str(c.get("id")), "label": c.get("label"), "max_points": c.get("max_points")} for c in q.rubric["criteria"]]},
+            "annulled": q.id in annulled, "editable": exam.status == "grading" and not exam.grade_locked_at and q.id not in annulled,
+            "rows": [{"student_id": es.student_id, "student_no": es.student.student_no, "name": es.student.full_name, "entered": es.id in resp,
+                      "rubric_scores": (resp[es.id].rubric_scores if es.id in resp else {}), "awarded": (resp[es.id].awarded_points if es.id in resp else None)} for es in sorted(rows, key=lambda x: x.student.student_no)]}
+
+
+@app.post("/api/exams/{exam_id}/questions/{question_id}/grid")
+def classic_grid_save(exam_id: int, question_id: int, data: ClassicGridSave, db: Session = Depends(get_db)):
+    require_exam_access(db, exam_id, write=True)
+    exam, q = _grid_question(db, exam_id, question_id)
+    if exam.status != "grading": raise HTTPException(409, "Puan girişi yalnızca değerlendirme (grading) durumunda yapılabilir")
+    if exam.grade_locked_at: raise HTTPException(409, "Puanlar kilitli")
+    if q.id in _key_policy(db, exam_id)[0]: raise HTTPException(409, "Bu soru iptal edildi; herkese tam puan verilmiştir")
+    criteria = {str(c.get("id")): (c.get("label"), float(c.get("max_points") or 0)) for c in q.rubric["criteria"]}
+    ess = {es.student_id: es for es in db.scalars(select(m.ExamStudent).where(m.ExamStudent.exam_id == exam_id)).all()}
+    errors, prepared = [], []
+    for row in data.rows:  # validate everything first: all-or-nothing
+        es = ess.get(row.student_id)
+        if not es: errors.append(f"Öğrenci {row.student_id} bu sınava kayıtlı değil"); continue
+        scores = {}
+        for cid, (label, mx) in criteria.items():
+            raw = row.rubric_scores.get(cid)
+            if raw is None: errors.append(f"Öğrenci {row.student_id}: '{label}' puanı eksik"); break
+            if raw < 0 or raw > mx: errors.append(f"Öğrenci {row.student_id}: '{label}' 0-{mx:g} arasında olmalı"); break
+            scores[cid] = round(float(raw), 4)
+        else:
+            prepared.append((es, scores))
+    if errors: raise HTTPException(422, {"message": "Puanlar kaydedilmedi", "errors": errors[:50]})
+    actor = current_user().get("email") or "system"; now = datetime.now(timezone.utc); saved = 0
+    existing = {r.exam_student_id: r for r in db.scalars(select(m.Response).where(m.Response.question_id == q.id)).all()}
+    for es, scores in prepared:
+        total = round(sum(scores.values()), 4); r = existing.get(es.id)
+        if r:
+            old, old_rub = r.awarded_points, dict(r.rubric_scores or {})
+            if old == total and old_rub == scores: continue
+            r.awarded_points = total; r.rubric_scores = scores; r.graded_by = actor; r.graded_at = now; r.revision_no = int(r.revision_no or 1) + 1
+            _log_grade_revision(db, r, old, old_rub, "grid", actor)
+        else:
+            db.add(m.Response(exam_student_id=es.id, question_id=q.id, answer_text=None, awarded_points=total, is_correct=None, rubric_scores=scores, graded_by=actor, graded_at=now, revision_no=1))
+        saved += 1
+    audit(db, "grade_grid", "question", q.id, {"saved": saved, "exam_id": exam_id}); _commit(db)
+    return {"saved": saved}
 
 
 @app.get("/api/exams/{exam_id}/grading-progress")

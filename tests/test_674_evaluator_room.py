@@ -316,3 +316,29 @@ def test_outcome_diff_report_and_grading_progress():
     _post(f"/api/exams/{eid}/students/{studs[0]['id']}/responses", {"responses": [{"question_id": q["id"], "answer_text": "A"}]})  # wrong answer = a real 0
     gp = client.get(f"/api/exams/{eid}/grading-progress").json()
     assert gp["entered"] == 1 and gp["missing"] == 1 and gp["questions"][0]["entered"] == 1
+
+
+def test_classic_grid_bulk_entry_validation_and_progress():
+    program, course, exam, q, ws, hdr = _setup()
+    eid = exam["id"]
+    assert client.patch(f"/api/exams/{eid}/questions/{q['id']}", json={"points": 60}).status_code == 200
+    qc = _post(f"/api/exams/{eid}/questions", {"order_no": 2, "question_type": "classic", "text": "Açıkla", "points": 40, "learning_outcome_code": "Ö1", "expected_answer": "x",
+                                               "rubric": {"criteria": [{"id": "a", "label": "A", "max_points": 25, "outcome_codes": ["Ö1"]}, {"id": "b", "label": "B", "max_points": 15, "outcome_codes": ["Ö1"]}]}})
+    url = f"/api/exams/{eid}/questions/{qc['id']}/grid"
+    client.post(f"/api/exams/{eid}/status", json={"status": "ready"}); client.post(f"/api/exams/{eid}/status", json={"status": "grading"})
+    g = client.get(url).json()
+    assert g["editable"] is True and len(g["rows"]) == 2 and all(not r["entered"] for r in g["rows"]) and [c["id"] for c in g["question"]["criteria"]] == ["a", "b"]
+    ids = [r["student_id"] for r in g["rows"]]
+    bad = client.post(url, json={"rows": [{"student_id": ids[0], "rubric_scores": {"a": 10, "b": 5}}, {"student_id": ids[1], "rubric_scores": {"a": 30, "b": 5}}]})
+    assert bad.status_code == 422  # all-or-nothing: nothing saved
+    assert not any(r["entered"] for r in client.get(url).json()["rows"])
+    ok = client.post(url, json={"rows": [{"student_id": ids[0], "rubric_scores": {"a": 10, "b": 5}}, {"student_id": ids[1], "rubric_scores": {"a": 25, "b": 0}}]}); assert ok.status_code == 200, ok.text
+    assert ok.json()["saved"] == 2
+    g = client.get(url).json()
+    assert {r["student_id"]: r["awarded"] for r in g["rows"]} == {ids[0]: 15.0, ids[1]: 25.0}
+    assert client.post(url, json={"rows": [{"student_id": ids[0], "rubric_scores": {"a": 10, "b": 5}}]}).json()["saved"] == 0  # unchanged -> no revision
+    mcq = client.get(f"/api/exams/{eid}/questions/{q['id']}/grid"); assert mcq.status_code == 409
+
+
+def test_outcome_term_is_configurable_via_auth_config():
+    assert client.get("/api/auth/config").json()["outcome_term"] in {"Öğrenim", "Öğrenme", "Kazanım"}

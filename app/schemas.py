@@ -379,6 +379,15 @@ class QuestionKeyException(BaseModel):
     reason: str = Field(default="", max_length=1000)
 
 
+class ClassicGridRow(BaseModel):
+    student_id: int
+    rubric_scores: dict[str, float]
+
+
+class ClassicGridSave(BaseModel):
+    rows: list[ClassicGridRow] = Field(min_length=1, max_length=2000)
+
+
 class AnswerKeyRegradeRequest(BaseModel):
     corrections: dict[int, str]
     reason: str = Field(default="", max_length=1000)

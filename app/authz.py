@@ -467,6 +467,7 @@ def auth_config() -> dict[str, Any]:
     entra_ready = bool(settings.entra_tenant_id and settings.entra_client_id and settings.entra_audience)
     return {
         "app_env": settings.app_env,
+        "outcome_term": settings.outcome_term if settings.outcome_term in {"Öğrenim", "Öğrenme", "Kazanım"} else "Öğrenim",
         "auth_required": settings.auth_required,
         "auth_provider": settings.auth_provider,
         "pilot_header": PILOT_HEADER if not settings.auth_required else None,

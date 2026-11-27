@@ -1441,6 +1441,25 @@ async function loadGradeCompleteness(){
 }
 document.getElementById('gradeStudent')?.addEventListener('change',loadGradeCompleteness);
 
+function fillGradeGridQuestions(){const sel=document.getElementById('gradeGridQuestion');if(!sel)return;const prev=sel.value;sel.innerHTML=gradeClassicQuestions().map(q=>`<option value="${q.id}">Soru ${q.order_no} (${q.points} puan)</option>`).join('');if(prev)sel.value=prev;}
+document.getElementById('gradeGridCard')?.addEventListener('toggle',e=>{if(e.target.open)fillGradeGridQuestions()});
+document.getElementById('gradeGridLoad')?.addEventListener('click',async()=>{
+  const id=Number(document.getElementById('gradeExam').value),qid=Number(document.getElementById('gradeGridQuestion').value),box=document.getElementById('gradeGridBox'),save=document.getElementById('gradeGridSave');
+  if(!id||!qid){box.innerHTML='<p class="muted">Rubrikli klasik soru seçin.</p>';save.classList.add('hidden');return}
+  try{const g=await api('GET',`/api/exams/${id}/questions/${qid}/grid`);const cr=g.question.criteria;const blind=gradeBlindEnabled();
+    box.innerHTML=`<table class="rt grade-grid" data-q="${qid}" data-exam="${id}"><thead><tr><th>#</th>${cr.map(c=>`<th>${esc(c.label)} <small>/${c.max_points}</small></th>`).join('')}<th>Toplam / ${g.question.points}</th></tr></thead><tbody>${g.rows.map((r,i)=>`<tr data-student="${r.student_id}"><td>${blind?`Aday ${String(i+1).padStart(3,'0')}`:`${esc(r.student_no)} · ${esc(r.name)}`} ${r.entered?'':'<span class="chip">girilmedi</span>'}</td>${cr.map(c=>`<td><input type="number" step="0.5" min="0" max="${c.max_points}" data-crit="${esc(c.id)}" value="${r.rubric_scores?.[c.id]??''}" ${g.editable?'':'disabled'}></td>`).join('')}<td class="grid-total">${r.awarded??'—'}</td></tr>`).join('')}</tbody></table>${g.annulled?'<p class="muted">Bu soru iptal edildi; herkese tam puan verildi.</p>':g.editable?'':'<p class="muted">Puan girişi şu an kapalı (durum veya kilit).</p>'}`;
+    save.classList.toggle('hidden',!g.editable);
+    box.querySelectorAll('tr[data-student]').forEach(tr=>tr.addEventListener('input',()=>{const v=[...tr.querySelectorAll('input')].map(i=>i.value);tr.querySelector('.grid-total').textContent=v.some(x=>x==='')?'—':v.reduce((a,x)=>a+Number(x),0)}));
+  }catch(e){toast(e.message,'error');}
+});
+document.getElementById('gradeGridSave')?.addEventListener('click',async()=>{
+  const t=document.querySelector('#gradeGridBox table.grade-grid');if(!t)return;const id=t.dataset.exam,qid=t.dataset.q;const rows=[];let empty=0;
+  t.querySelectorAll('tr[data-student]').forEach(tr=>{const sc={};let full=true;tr.querySelectorAll('input').forEach(i=>{if(i.value==='')full=false;else sc[i.dataset.crit]=Number(i.value)});if(full)rows.push({student_id:Number(tr.dataset.student),rubric_scores:sc});else if(Object.keys(sc).length)empty++;});
+  if(empty)return toast(`${empty} satır yarım doldurulmuş; tüm ölçütleri girin ya da satırı boş bırakın.`,'error');
+  if(!rows.length)return toast('Kaydedilecek dolu satır yok.','error');
+  try{const r=await api('POST',`/api/exams/${id}/questions/${qid}/grid`,{rows});toast(`${r.saved} öğrencinin puanı kaydedildi.`);document.getElementById('gradeGridLoad').click();loadGradeCompleteness();}catch(e){toast(e.message,'error');}
+});
+
 async function prepareGrade(){
   try{await refreshCore();await loadGradeStudents();renderGradeProgress();syncGradeModeUI();}catch(e){toast(e.message,'error');}
 }

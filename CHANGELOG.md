@@ -6,6 +6,7 @@
 - OBS: "OBS'den getir" re-sync (password not stored, ownership-checked) and last-sync status on Derslerim.
 - Mobile: 44px touch targets, checkbox/label alignment; no horizontal scroll at 360/390/414/768/1024 (verified in Chromium).
 - P1: persistent exam state bar (Taslak → Hazır → Basıldı → Puanlama → Onaylı, with what is locked); OBS vs Assess outcome diff report (`GET /api/courses/{id}/outcome-diff`, original OBS text recovered from the audit trail); grading completeness (`GET /api/exams/{id}/grading-progress`) separating "girilmedi" from a real 0.
+- Fast grading grid for rubric-based classic questions (student x criterion, all-or-nothing validation, blind-mode aware, unchanged rows skipped, revisions logged). Institution wording for "learning outcome" via `OUTCOME_TERM` (Öğrenim | Öğrenme | Kazanım).
 - Demo scenario uses the real current term instead of 2099-2100 when that period is free.
 
 # 6.70 — Performance & Production Hardening
