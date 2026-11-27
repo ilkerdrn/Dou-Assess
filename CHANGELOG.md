@@ -1,3 +1,12 @@
+## 6.71 (unreleased) — Demo/pilot P0 closure (migration 0044)
+- Learning outcomes: instructors manage their own course's outcomes; each carries a source label (OBS / added in Assess / OBS-modified); linked outcomes are deactivated instead of deleted and skipped by new exam snapshots; create/update/deactivate audit-logged with before/after.
+- New "Basım" screen: per-exam print summary (pages, sheets, booklet split), bulk and per-student PDFs, attendance/signature list PDF, "Yazdırdım" confirmation that freezes the questions (changes need a copied version).
+- Answer sheet: bubbles follow each question's real choice count (2–5); marking instruction added to the exam rules (TR/EN).
+- Menu follows the working order (1 Derslerim, 2 Soru Bankası, 3 Sınav Hazırla, 4 Basım, 5 Optik Okuma, 6 Değerlendirme) with numbered badges; header buttons are text-only.
+- OBS: "OBS'den getir" re-sync (password not stored, ownership-checked) and last-sync status on Derslerim.
+- Mobile: 44px touch targets, checkbox/label alignment; no horizontal scroll at 360/390/414/768/1024 (verified in Chromium).
+- Demo scenario uses the real current term instead of 2099-2100 when that period is free.
+
 # 6.70 — Performance & Production Hardening
 
 - Replaced Python/N+1 academic scope filtering with SQL-scoped program/course selectors.

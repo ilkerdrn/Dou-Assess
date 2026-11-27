@@ -1826,7 +1826,13 @@ def create_demo_scenario(db: Session = Depends(get_db)):
         year, term = active.academic_year, active.term
     else:
         # Demo data must never mutate or collide with a real locked/planned academic period.
-        year, term = "2099-2100", "Demo"
+        # Prefer the real current term (no 2099 placeholder in front of reviewers) when that period is free.
+        today = date.today()
+        start = today.year if today.month >= 8 else today.year - 1
+        cur_term = "Güz" if today.month >= 8 or today.month == 1 else "Bahar" if today.month <= 6 else "Yaz"
+        cur_year = f"{start}-{start + 1}"
+        taken = db.scalar(select(m.AcademicPeriod).where(m.AcademicPeriod.academic_year == cur_year, m.AcademicPeriod.term == cur_term))
+        year, term = (cur_year, cur_term) if not taken else ("2099-2100", "Demo")
         active = db.scalar(select(m.AcademicPeriod).where(m.AcademicPeriod.academic_year == year, m.AcademicPeriod.term == term))
         if not active:
             active=m.AcademicPeriod(academic_year=year, term=term, title="DOU Assess · Demo Dönemi", status="active"); db.add(active); db.flush()
