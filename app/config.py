@@ -90,6 +90,7 @@ class Settings:
     ai_scoring_api_key: str = _secret("AI_SCORING_API_KEY", "")
     student_link_secret: str = _secret("STUDENT_LINK_SECRET", "")
     student_appeal_days: int = int(os.getenv("STUDENT_APPEAL_DAYS", "7"))
+    student_link_view_days: int = int(os.getenv("STUDENT_LINK_VIEW_DAYS", "60"))
     obs_results_timeout_seconds: int = int(os.getenv("OBS_RESULTS_TIMEOUT_SECONDS", "15"))
 
     # Proliz OBS read-only academic data pull (DogusAPI, HTTP Basic Auth).
