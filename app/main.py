@@ -31,6 +31,7 @@ from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 from .db import engine, get_db, SessionLocal
 from . import models as m
 from .schemas import (
+    OutcomeMappingBulk,
     ObsLoginRequest, AddBankQuestionRequest, AddBankQuestionsBatchRequest, QuestionReorderRequest, NormalizeQuestionPointsRequest, BulkEnrollRequest, CourseCreate, CourseUpdate, ExamCreate, ExamDuplicateRequest, ExamStatusUpdate, ExamUpdate, ImprovementCreate,
     LearningOutcomeCreate, LearningOutcomeUpdate, OutcomeMappingCreate, ProgramCreate, ProgramUpdate,
     ProgramOutcomeCreate, ProgramOutcomeUpdate, QuestionBankCreate, QuestionBankUpdate, QuestionReviewRequest, BlueprintCreate, BlueprintStatusRequest, QuestionCreate, QuestionUpdate, ResponsesSubmit, StudentCreate, StudentUpdate, ScanReviewOut, ScanReviewResolve, AnswerKeyRegradeRequest, QuestionKeyException, ClassicGridSave,
@@ -1755,6 +1756,37 @@ def create_mapping(data: OutcomeMappingCreate, db: Session = Depends(get_db)):
         raise HTTPException(400, "ÖÇ ve PÇ aynı program/akademik yıl kapsamında olmalıdır")
     obj = m.OutcomeMapping(**data.model_dump()); db.add(obj); db.flush(); _commit(db)
     return {"id": obj.id, **data.model_dump()}
+
+
+@app.put("/api/outcome-mappings/bulk")
+def bulk_upsert_mappings(data: OutcomeMappingBulk, db: Session = Depends(get_db)):
+    """Toplu katkı düzenleme: tek işlemde en fazla 500 hücre; contribution=null eşleşmeyi kaldırır. Hepsi ya da hiçbiri."""
+    created = updated = removed = 0
+    checked: dict[int, m.Course] = {}
+    for it in data.items:
+        lo = db.get(m.LearningOutcome, it.learning_outcome_id)
+        po = db.get(m.ProgramOutcome, it.program_outcome_id)
+        if not lo or not po:
+            raise HTTPException(400, "ÖÇ veya PÇ bulunamadı")
+        if lo.course_id not in checked:
+            require_course_management(db, lo.course_id)
+            checked[lo.course_id] = db.get(m.Course, lo.course_id)
+        course = checked[lo.course_id]
+        if not course or po.program_id != course.program_id or po.academic_year != course.academic_year:
+            raise HTTPException(400, "ÖÇ ve PÇ aynı program/akademik yıl kapsamında olmalıdır")
+        existing = db.scalar(select(m.OutcomeMapping).where(m.OutcomeMapping.learning_outcome_id == lo.id, m.OutcomeMapping.program_outcome_id == po.id))
+        if it.contribution is None:
+            if existing:
+                db.delete(existing); removed += 1
+        elif existing:
+            if existing.contribution != it.contribution:
+                existing.contribution = it.contribution; updated += 1
+        else:
+            db.add(m.OutcomeMapping(learning_outcome_id=lo.id, program_outcome_id=po.id, contribution=it.contribution)); created += 1
+    db.flush()
+    audit(db, "bulk_update", "outcome_mapping", None, {"created": created, "updated": updated, "removed": removed, "count": len(data.items)})
+    _commit(db)
+    return {"created": created, "updated": updated, "removed": removed}
 
 
 @app.put("/api/outcome-mappings")

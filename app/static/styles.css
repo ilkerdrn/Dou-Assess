@@ -2193,3 +2193,9 @@ body.login-active{overflow:hidden!important}
 #page-data .academic-form .required-mark{margin-left:1px}
 #page-data .academic-form-actions{margin-top:6px}
 .field-label-text .required-mark{color:#a6253e;font-weight:900}
+
+/* Outcome matrix: bulk edit toolbar and selection boxes */
+.matrix-bulk{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fafafb}
+.matrix-bulk label{display:flex!important;flex-direction:row!important;gap:8px;align-items:center;font-size:12px;font-weight:700;margin:0}
+.matrix-bulk select{min-height:34px!important;width:auto!important}
+.outcome-matrix input.mx-row,.outcome-matrix input.mx-col{width:16px!important;height:16px!important;min-height:0!important;padding:0!important;margin:0 8px 0 0!important;border:0!important;background:none!important;box-shadow:none!important;accent-color:#a10d27;cursor:pointer;display:inline-block;vertical-align:middle}

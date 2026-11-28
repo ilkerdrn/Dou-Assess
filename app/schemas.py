@@ -108,6 +108,16 @@ class OutcomeMappingCreate(BaseModel):
     contribution: int = Field(ge=1, le=5)
 
 
+class OutcomeMappingBulkItem(BaseModel):
+    learning_outcome_id: int
+    program_outcome_id: int
+    contribution: Optional[int] = Field(default=None, ge=1, le=5)  # None = eşleşmeyi kaldır
+
+
+class OutcomeMappingBulk(BaseModel):
+    items: list[OutcomeMappingBulkItem] = Field(min_length=1, max_length=500)
+
+
 class ExamCreate(BaseModel):
     course_id: int
     title: str = Field(min_length=1, max_length=255)
