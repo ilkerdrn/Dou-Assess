@@ -1,5 +1,7 @@
 > Canonical build metadata is stored in `RELEASE.env`. `/api/health` and `/api/system/diagnostics` expose the active non-secret build/runtime state.
 
+> **6.70.8 friction closure:** Soru → sınav → puanlama → kalite akışlarında tıklama sayısı azaltıldı; seri giriş ve progressive form modeli eklendi.
+
 # DOU Assess — 6.70 PERFORMANCE & PRODUCTION HARDENING
 
 **Sürüm:** `6.70-production-hardening`  
@@ -9,6 +11,9 @@
 
 **Bugün sunucuya kurulum için ana doküman:** `PRODUCTION-DEPLOYMENT-6.54.md`
 
+
+
+> **6.70.7 usability acceptance:** Pilot UAT now reports Instructor, Program Head and Quality journeys separately. Use `ROLE-UAT-PLAYBOOK-6.70.7.md` for real-user observation.
 
 ## 6.70 Performance & Production Hardening
 

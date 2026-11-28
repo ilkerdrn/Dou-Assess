@@ -104,20 +104,62 @@ def build_uat_checks(db: Session, settings, version: str) -> dict:
     readiness = build_pilot_readiness(db, settings, version)
     exam_count = db.scalar(select(func.count()).select_from(m.Exam)) or 0
     approved = db.scalar(select(func.count()).select_from(m.Exam).where(m.Exam.status.in_(["approved", "archived"]))) or 0
+    grading_exam_count = db.scalar(select(func.count()).select_from(m.Exam).where(m.Exam.status == "grading")) or 0
     scan_sessions = db.scalar(select(func.count()).select_from(m.ScanSession)) or 0
     response_count = db.scalar(select(func.count()).select_from(m.Response)) or 0
     evidence_count = db.scalar(select(func.count()).select_from(m.EvidenceAsset)) or 0
+    quality_evidence_count = db.scalar(select(func.count()).select_from(m.QualityEvidenceAsset)) or 0
+    bank_question_count = db.scalar(select(func.count()).select_from(m.QuestionBank).where(m.QuestionBank.is_active.is_(True))) or 0
     improvements = db.scalar(select(func.count()).select_from(m.ImprovementAction)) or 0
+    quality_cycles = db.scalar(select(func.count()).select_from(m.QualityCycle)) or 0
+    program_reviews = db.scalar(select(func.count()).select_from(m.ProgramReview)) or 0
+    outcome_maps = db.scalar(select(func.count()).select_from(m.OutcomeMapping)) or 0
+
+    instructor_users = db.scalar(select(func.count(func.distinct(m.UserRoleAssignment.user_id))).where(m.UserRoleAssignment.role == "instructor")) or 0
+    program_leads = db.scalar(select(func.count(func.distinct(m.UserRoleAssignment.user_id))).where(m.UserRoleAssignment.role.in_(["program_head", "department_head", "faculty_admin"]))) or 0
+    quality_users = db.scalar(select(func.count(func.distinct(m.UserRoleAssignment.user_id))).where(m.UserRoleAssignment.role == "quality")) or 0
+
+    def journey(key: str, role: str, title: str, target_minutes: int, items: list[dict]) -> dict:
+        passed = sum(1 for item in items if item["status"] == "pass")
+        score = round(100 * passed / len(items)) if items else 100
+        blocking = any(item["status"] == "fail" for item in items)
+        return {
+            "key": key, "role": role, "title": title, "target_minutes": target_minutes,
+            "status": "blocked" if blocking else ("ready" if score == 100 else "attention"),
+            "score": score, "checks": items,
+        }
+
+    journeys = [
+        journey("instructor", "instructor", "Öğretim Elemanı Yolculuğu", 7, [
+            _check("role", "Rol ve ders erişimi", "pass" if instructor_users else "fail", f"{instructor_users} öğretim elemanı rolü tanımlı.", "Kullanıcı & Yetki"),
+            _check("bank", "Soru Bankası", "pass" if bank_question_count else "warn", f"{bank_question_count} aktif soru bankası kaydı var.", "Soru Bankası", False),
+            _check("exam", "Sınav hazırlama", "pass" if exam_count else "warn", f"{exam_count} sınav kaydı var.", "Sınav Hazırla", False),
+            _check("grade", "Değerlendirme", "pass" if response_count or grading_exam_count else "warn", f"{grading_exam_count} puanlama durumunda sınav · {response_count} cevap/puan.", "Değerlendirme", False),
+        ]),
+        journey("program_head", "program_head", "Program Başkanı Yolculuğu", 8, [
+            _check("role", "Program yönetim rolü", "pass" if program_leads else "fail", f"{program_leads} program/bölüm/fakülte yöneticisi tanımlı.", "Kullanıcı & Yetki"),
+            _check("mapping", "Çıktı haritası", "pass" if outcome_maps else "warn", f"{outcome_maps} ÖÇ↔PÇ eşleşmesi var.", "ÖÇ ↔ PÇ Haritası", False),
+            _check("review", "Program Review", "pass" if program_reviews else "warn", f"{program_reviews} Program Review kaydı var.", "Program Review", False),
+            _check("evidence", "Kanıt görünürlüğü", "pass" if evidence_count or quality_evidence_count else "warn", f"{evidence_count + quality_evidence_count} erişilebilir kanıt kaydı var.", "Kanıt Yönetimi", False),
+        ]),
+        journey("quality", "quality", "Kalite Kullanıcısı Yolculuğu", 8, [
+            _check("role", "Kalite rolü", "pass" if quality_users else "fail", f"{quality_users} kalite kullanıcısı tanımlı.", "Kullanıcı & Yetki"),
+            _check("cycle", "PUKÖ döngüsü", "pass" if quality_cycles else "warn", f"{quality_cycles} kalite/PUKÖ döngüsü var.", "Akreditasyon Merkezi", False),
+            _check("evidence", "Kalite kanıtı", "pass" if quality_evidence_count else "warn", f"{quality_evidence_count} kalite kanıtı var.", "Kanıt Yönetimi", False),
+            _check("improvement", "İyileştirme aksiyonu", "pass" if improvements else "warn", f"{improvements} iyileştirme aksiyonu var.", "Akreditasyon Merkezi", False),
+        ]),
+    ]
+
     checks = [
         _check("setup", "Kurumsal kurulum", "pass" if readiness["score"] == 100 else ("fail" if readiness["status"] == "blocked" else "warn"), f"Pilot hazırlık skoru %{readiness['score']}.", "Kurumsal Pilot"),
         _check("exam", "Sınav oluşturma akışı", "pass" if exam_count else "warn", f"{exam_count} sınav kaydı bulundu.", "Sınav Hazırla"),
         _check("approved", "Tamamlanmış sınav", "pass" if approved else "warn", f"{approved} onaylı/arşiv sınav bulundu.", "Değerlendirme"),
         _check("scan", "Optik okuma akışı", "pass" if scan_sessions else "warn", f"{scan_sessions} tarama oturumu bulundu.", "Optik Okuma"),
         _check("responses", "Puan/cevap verisi", "pass" if response_count else "warn", f"{response_count} soru cevabı/puanı bulundu.", "Değerlendirme"),
-        _check("evidence", "Akreditasyon kanıtı", "pass" if evidence_count else "warn", f"{evidence_count} kanıt dosyası bulundu.", "Kanıt Yönetimi"),
+        _check("evidence", "Akreditasyon kanıtı", "pass" if evidence_count or quality_evidence_count else "warn", f"{evidence_count + quality_evidence_count} kanıt kaydı bulundu.", "Kanıt Yönetimi"),
         _check("improvement", "İyileştirme döngüsü", "pass" if improvements else "warn", f"{improvements} iyileştirme aksiyonu bulundu.", "Akreditasyon Merkezi"),
     ]
     passes = sum(1 for x in checks if x["status"] == "pass")
     score = round(100 * passes / len(checks))
     status = "passed" if score == 100 else ("failed" if any(x["status"] == "fail" for x in checks) else "warning")
-    return {"status": status, "score": score, "checks": checks, "readiness": readiness}
+    return {"status": status, "score": score, "checks": checks, "journeys": journeys, "readiness": readiness}

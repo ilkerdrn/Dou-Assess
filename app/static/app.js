@@ -4,7 +4,7 @@ const pageMeta = {
   mycourses:['Derslerim','Dersinizi seçin; sınav, soru, değerlendirme, analiz ve iyileştirme işlemlerini aynı bağlamda yönetin.','Çalışma Alanım'],
   coursestudents:['Ders Öğrencileri','Seçili dersin öğrenci kapsamını sade bir listede görüntüleyin.','Benim Çalışma Alanım'],
   courseanalytics:['Ders Analizi','Dersin dönem ve yıllar arası başarı, Öğrenim Çıktısı ve risk eğilimlerini inceleyin.','Analiz'],
-  programanalytics:['Program Analizi','Program çıktıları, riskli dersler ve dönem trendlerini tek ekranda izleyin.','Analiz'],
+  programanalytics:['Program Workspace','Program çıktıları, ders performansı, Program Review, kanıt ve PUKÖ işlerini tek ekrandan yönetin.','Program Yönetimi'],
   studentcards:['Öğrenci Karneleri','Her öğrenci için bireysel ÖÇ, PÇ, ders gelişimi ve doğrulanabilir PDF karnesini görüntüleyin.','Analiz'],
   programs:['Programlar','Akademik program kapsamını yönetin.','Yönetim'],
   courses:['Dersler','Ders ve öğretim elemanı kapsamını yönetin.','Yönetim'],
@@ -132,10 +132,12 @@ function renderCurrentUserScope(){
   else scope.textContent=`Öğretim elemanı · ${courseCount} yetkili ders`;
 }
 function showLoginGate(){
+  document.body.classList.add('login-active');
   document.getElementById('loginGate')?.classList.remove('hidden');
   document.querySelector('.shell')?.classList.add('app-shell-hidden');
 }
 function enterApplication(){
+  document.body.classList.remove('login-active');
   document.getElementById('loginGate')?.classList.add('hidden');
   document.querySelector('.shell')?.classList.remove('app-shell-hidden');
 }
@@ -195,6 +197,8 @@ function showPage(name){
   document.getElementById(`page-${target}`).classList.add('active');
   document.getElementById('pageTitle').textContent=pageMeta[name][0];
   document.getElementById('pageSub').textContent=pageMeta[name][1];
+  announceA11y(`${pageMeta[name][0]} ekranı açıldı`);
+  document.getElementById('mainContent')?.focus({preventScroll:true});
   const breadcrumb=document.getElementById('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=`DOU Assess / ${pageMeta[name][2]||pageMeta[name][0]}${pageMeta[name][2]&&pageMeta[name][2]!==pageMeta[name][0]?` / ${pageMeta[name][0]}`:''}`;
   if(name==='mycourses') prepareMyCourses();
   if(name==='coursestudents') prepareCourseStudents();
@@ -219,7 +223,7 @@ function showPage(name){
   if(name==='grade') prepareGrade();
   if(name==='analytics') prepareAnalytics();
   if(name==='quality') prepareQuality();
-  if(name==='quality360') prepareQuality360();
+  if(name==='quality360'){prepareQuality360();setTimeout(()=>setQualityViewMode(qualityViewMode()),0);}
   if(name==='accreditation') prepareAccreditation();
   if(name==='evidence') prepareEvidence();
   if(name==='users') prepareUsers();
@@ -265,25 +269,49 @@ function refreshNavGroups(){
   if(activeGroup)setNavGroupOpen(activeGroup,true);
 }
 
-function commandItems(){
+function commandBaseItems(){
   const rows=[];
-  document.querySelectorAll('.sidebar button[data-page]').forEach(b=>{if(b.classList.contains('hidden'))return;const meta=pageMeta[b.dataset.page]||[b.textContent.trim(),'',''];rows.push({group:meta[2]||'Modül',title:meta[0],sub:meta[1],run:()=>showPage(b.dataset.page)});});
-  if(!isQualityOnly()){rows.push({group:'Hızlı İşlem',title:'Yeni sınav oluştur',sub:'Sınav Merkezi oluşturma formuna git',run:()=>{showPage('exams');setTimeout(()=>document.getElementById('examCreateCard')?.scrollIntoView({behavior:'smooth'}),60);}});rows.push({group:'Hızlı İşlem',title:'Yeni soru oluştur',sub:'Soru Havuzu editörünü aç',run:()=>{showPage('bank');setTimeout(()=>openNewBankQuestion().catch(e=>toast(e.message,'error')),120);}});}
-  rows.push({group:'Hızlı İşlem',title:'Öğrenim ve Program Çıktıları',sub:'Kazanım kataloğu ve katkı matrisi',run:()=>showPage('outcomes')});
-  rows.push({group:'Hızlı İşlem',title:'Optik & Kontrol',sub:'Toplu tarama ve istisna kuyruğu',run:()=>showPage('scan')});
-  (state.exams||[]).slice(0,8).forEach(exam=>rows.push({group:'Son Sınavlar',title:exam.title,sub:`${exam.exam_type} · ${examStatusLabel(exam.status)} · #${exam.id}`,run:()=>{showPage('exams');setTimeout(()=>openExam(exam.id),60);}}));
+  document.querySelectorAll('.sidebar button[data-page]').forEach(b=>{if(b.classList.contains('hidden'))return;const meta=pageMeta[b.dataset.page]||[b.textContent.trim(),'',''];rows.push({group:meta[2]||'Modül',title:meta[0],sub:meta[1],keywords:`${b.dataset.page||''}`,run:()=>showPage(b.dataset.page)});});
+  if(!isQualityOnly()){
+    rows.push({group:'Hızlı İşlem',title:'Yeni sınav oluştur',sub:'Sınav Merkezi oluşturma formuna git',keywords:'sınav ekle oluştur',run:()=>{showPage('exams');setTimeout(()=>document.getElementById('examCreateCard')?.scrollIntoView({behavior:'smooth'}),60);}});
+    rows.push({group:'Hızlı İşlem',title:'Yeni soru oluştur',sub:'Soru Havuzu editörünü aç',keywords:'soru ekle banka havuz',run:()=>{showPage('bank');setTimeout(()=>openNewBankQuestion().catch(e=>toast(e.message,'error')),120);}});
+    rows.push({group:'Hızlı İşlem',title:'Değerlendirmeye devam et',sub:'Puanlama bekleyen sınavları aç',keywords:'puan not değerlendir',run:()=>showPage('grade')});
+  }
+  if(canAccreditation()){
+    rows.push({group:'Hızlı İşlem',title:'Açık PUKÖ işleri',sub:'Kalite360 PUKÖ çalışma alanını aç',keywords:'puko iyileştirme kalite',run:()=>{showPage('quality360');setTimeout(()=>setQ360Workspace('cycle'),120);}});
+    rows.push({group:'Hızlı İşlem',title:'Kanıt Merkezi',sub:'Kanıt ara, ilişkilendir veya doğrula',keywords:'evidence belge kanıt',run:()=>showPage('evidencehub')});
+  }
+  (state.courses||[]).slice(0,40).forEach(c=>rows.push({group:'Dersler',title:`${c.code} · ${c.name}`,sub:`${c.academic_year||''} ${c.term||''}`.trim()||'Ders çalışma alanı',keywords:`${c.code} ${c.name} ders`,run:()=>{showPage('mycourses');setTimeout(()=>openCourseActionPanel(c.id),80);}}));
+  if(canAccreditation()||isAdmin())(state.programs||[]).slice(0,30).forEach(p=>rows.push({group:'Programlar',title:`${p.code} · ${p.name}`,sub:p.department||p.faculty||'Program çalışma alanı',keywords:`${p.code} ${p.name} program`,run:()=>{showPage('programanalytics');setTimeout(()=>{const s=document.getElementById('programAnalyticsProgram');if(s){s.value=String(p.id);document.getElementById('loadProgramAnalytics')?.click();}},120);}}));
+  (state.exams||[]).slice(0,30).forEach(exam=>rows.push({group:'Sınavlar',title:exam.title,sub:`${exam.course_code||''} ${exam.exam_type||''} · ${examStatusLabel(exam.status)} · #${exam.id}`.trim(),keywords:`sınav ${exam.course_code||''} ${exam.exam_type||''}`,run:()=>{showPage('exams');setTimeout(()=>openExam(exam.id),60);}}));
   return rows;
 }
+function commandItems(){return [...commandBaseItems(),...(state.commandRemoteRows||[])];}
+function commandHaystack(x){return `${x.title||''} ${x.sub||''} ${x.group||''} ${x.keywords||''}`.toLocaleLowerCase('tr-TR');}
 function renderCommandPalette(){
-  const q=(document.getElementById('commandSearch')?.value||'').trim().toLocaleLowerCase('tr-TR');const items=commandItems().filter(x=>!q||`${x.title} ${x.sub} ${x.group}`.toLocaleLowerCase('tr-TR').includes(q));state.commandRows=items;state.commandIndex=Math.min(state.commandIndex,Math.max(0,items.length-1));
-  const list=document.getElementById('commandList');if(!list)return;list.innerHTML=items.length?items.map((x,i)=>`<button type="button" class="command-item ${i===state.commandIndex?'active':''}" data-command-index="${i}"><span>${esc(x.group)}</span><div><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></div><i>↵</i></button>`).join(''):'<div class="empty-state"><b>Sonuç bulunamadı</b><span>Başka bir ifade deneyin.</span></div>';
+  const q=(document.getElementById('commandSearch')?.value||'').trim().toLocaleLowerCase('tr-TR');const items=commandItems().filter(x=>!q||commandHaystack(x).includes(q));state.commandRows=items;state.commandIndex=Math.min(state.commandIndex,Math.max(0,items.length-1));
+  const list=document.getElementById('commandList');if(!list)return;list.innerHTML=items.length?items.slice(0,50).map((x,i)=>`<button type="button" class="command-item ${i===state.commandIndex?'active':''}" data-command-index="${i}"><span>${esc(x.group)}</span><div><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></div><i>↵</i></button>`).join(''):`<div class="empty-state guided-empty"><div class="empty-visual">⌕</div><b>Sonuç bulunamadı</b><span>Öğrenci adı/no, ders kodu, sınav adı veya işlem yazın.</span><small>Örnek: “BLP103”, “yeni soru”, “12345678”</small></div>`;
 }
-function openCommandPalette(){state.commandIndex=0;document.getElementById('commandPalette')?.classList.remove('hidden');const input=document.getElementById('commandSearch');if(input){input.value='';renderCommandPalette();setTimeout(()=>input.focus(),30);}}
+let commandSearchTimer=null;
+async function loadCommandRemoteResults(q){
+  state.commandRemoteRows=[];
+  if(!q||q.length<2||isQualityOnly()){renderCommandPalette();return;}
+  try{
+    const r=await api('GET',`/api/students?q=${encodeURIComponent(q)}&limit=8&offset=0`);const rows=Array.isArray(r)?r:(r.items||[]);
+    state.commandRemoteRows=rows.map(s=>({group:'Öğrenciler',title:`${s.student_no} · ${s.full_name}`,sub:'Öğrenci karnesini aç',keywords:`${s.student_no} ${s.full_name} öğrenci`,run:()=>openStudentFromCommand(s)}));
+  }catch{state.commandRemoteRows=[];}
+  renderCommandPalette();
+}
+async function openStudentFromCommand(student){
+  showPage('studentcards');
+  setTimeout(async()=>{const q=document.getElementById('studentCardSearch'),sel=document.getElementById('studentCardStudent');if(q)q.value=student.student_no||student.full_name||'';try{await loadStudentCardCandidates();if(sel){sel.value=String(student.id);await loadStudentCard();}}catch(e){toast(e.message,'error');}},160);
+}
+function openCommandPalette(){state.commandIndex=0;state.commandRemoteRows=[];document.getElementById('commandPalette')?.classList.remove('hidden');const input=document.getElementById('commandSearch');if(input){input.value='';renderCommandPalette();setTimeout(()=>input.focus(),30);}}
 function closeCommandPalette(){document.getElementById('commandPalette')?.classList.add('hidden');}
 function runCommand(index){const item=state.commandRows[index];if(!item)return;closeCommandPalette();item.run();}
 document.getElementById('commandBtn')?.addEventListener('click',openCommandPalette);
 document.getElementById('commandClose')?.addEventListener('click',closeCommandPalette);
-document.getElementById('commandSearch')?.addEventListener('input',()=>{state.commandIndex=0;renderCommandPalette();});
+document.getElementById('commandSearch')?.addEventListener('input',e=>{state.commandIndex=0;clearTimeout(commandSearchTimer);const q=e.target.value.trim();state.commandRemoteRows=[];renderCommandPalette();commandSearchTimer=setTimeout(()=>loadCommandRemoteResults(q),220);});
 document.getElementById('commandList')?.addEventListener('click',e=>{const b=e.target.closest('[data-command-index]');if(b)runCommand(Number(b.dataset.commandIndex));});
 document.getElementById('commandPalette')?.addEventListener('click',e=>{if(e.target.id==='commandPalette')closeCommandPalette();});
 document.addEventListener('keydown',e=>{
@@ -317,6 +345,7 @@ function dashboardPersona(){
 function renderDashboardPersona(d){
   const p=dashboardPersona();document.getElementById('dashboardRoleBadge').textContent=p.badge;document.getElementById('dashboardGreeting').textContent=p.title;document.getElementById('dashboardRoleCopy').textContent=p.copy;
   const instructor=!canAccreditation()&&!isAdmin();
+  const dashPage=document.getElementById('page-dashboard');if(dashPage)dashPage.dataset.persona=instructor?'academic':'management';
   document.getElementById('dashNewExam')?.classList.toggle('hidden',!instructor&&isQualityOnly());
   document.getElementById('dashOpenBank')?.classList.toggle('hidden',isQualityOnly());
   document.getElementById('dashOpenScan')?.classList.toggle('hidden',isQualityOnly());
@@ -363,6 +392,7 @@ async function renderActionCenter(d){
     if(!rows.length)rows.push({priority:'info',title:'Kalite iş kuyruğu temiz',text:'Mevcut görünümde kritik kalite açığı veya açık iyileştirme görünmüyor.',page:'quality360'});
   }
   const order={critical:0,high:1,medium:2,info:3};rows.sort((a,b)=>(order[a.priority]??9)-(order[b.priority]??9));
+  renderDashboardNextAction(rows);
   const list=document.getElementById('dashboardActionCenter');const badge=document.getElementById('actionCenterCount');
   const actionable=rows.filter(x=>x.priority!=='info').length;if(badge)badge.textContent=`${actionable} iş`;
   if(list)list.innerHTML=rows.slice(0,10).map(x=>`<button class="action-center-row priority-${x.priority}" type="button" data-action-call="${x.exam_id?`continueExamFromDashboard(${x.exam_id})`:`showPage('${x.page}')`}"><span class="action-priority">${actionPriorityLabel(x.priority)}</span><div><b>${esc(x.title)}</b><small>${esc(x.text)}</small></div><i>→</i></button>`).join('');
@@ -381,7 +411,7 @@ async function loadDashboard(){
     ];
     document.getElementById('stats').innerHTML=items.map((x,i)=>`<div class="stat modern-stat"><span class="stat-index">${String(i+1).padStart(2,'0')}</span><b>${x[1]}</b><span>${x[0]}</span><small>${x[2]}</small></div>`).join('');
     const recent=[...state.exams].sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,6);
-    document.getElementById('dashboardExamList').innerHTML=recent.length?recent.map(e=>`<button class="dashboard-exam-row" data-action-call="continueExamFromDashboard(${e.id})"><span class="exam-row-code">#${e.id}</span><span class="exam-row-main"><b>${esc(e.title)}</b><small>${esc(e.course_code||'')} ${esc(e.exam_type||'')}</small></span><span class="badge ${statusClass(e.status)}">${esc(statusLabel(e.status))}</span><span class="exam-row-arrow">→</span></button>`).join(''):'<div class="empty-state"><b>Henüz sınav yok.</b><span>Yeni sınav oluşturarak başlayın.</span></div>';
+    document.getElementById('dashboardExamList').innerHTML=recent.length?recent.map(e=>`<button class="dashboard-exam-row" data-action-call="continueExamFromDashboard(${e.id})"><span class="exam-row-code">#${e.id}</span><span class="exam-row-main"><b>${esc(e.title)}</b><small>${esc(e.course_code||'')} ${esc(e.exam_type||'')}</small></span><span class="badge ${statusClass(e.status)}">${esc(statusLabel(e.status))}</span><span class="exam-row-arrow">→</span></button>`).join(''):'<div class="empty-state guided-empty"><div class="empty-visual">S</div><b>Henüz sınavınız yok</b><span>İlk sınavı oluşturmak için yalnız ders, sınav türü ve tarih yeterli.</span><button type="button" class="primary small" data-empty-action="new-exam">+ İlk sınavı oluştur</button></div>';
     const draft=state.exams.filter(e=>e.status==='draft').length,grading=state.exams.filter(e=>e.status==='grading').length,ready=state.exams.filter(e=>e.status==='ready').length;
     const attention=instructor?[
       {n:draft,title:'Taslak sınav',text:draft?'Soruları veya son kontrolü tamamlayın.':'Bekleyen taslak yok.',page:'exams'},
@@ -443,7 +473,7 @@ async function prepareMyCourses(){
   await refreshCore();
   const grid=document.getElementById('myCoursesGrid'),count=document.getElementById('myCoursesCount');if(!grid)return;
   if(count)count.textContent=`${state.courses.length} ders`;
-  grid.innerHTML=state.courses.length?state.courses.map(c=>`<button type="button" class="course-workspace-card ${Number(state.selectedCourseId)===c.id?'active':''}" data-workspace-course="${c.id}"><span class="course-code">${esc(c.code)}</span><div><b>${esc(c.name)}</b><small>${esc(courseWorkspaceMeta(c))}</small></div><i>Dersi aç →</i></button>`).join(''):'<div class="empty-state"><b>Yetkili ders bulunamadı.</b><span>OBS veya akademik kapsam ataması tamamlandığında dersleriniz burada görünür.</span></div>';
+  grid.innerHTML=state.courses.length?state.courses.map(c=>`<button type="button" class="course-workspace-card ${Number(state.selectedCourseId)===c.id?'active':''}" data-workspace-course="${c.id}"><span class="course-code">${esc(c.code)}</span><div><b>${esc(c.name)}</b><small>${esc(courseWorkspaceMeta(c))}</small></div><i>Dersi aç →</i></button>`).join(''):'<div class="empty-state guided-empty"><div class="empty-visual">D</div><b>Henüz size atanmış ders yok</b><span>Ders ataması tamamlandığında burada doğrudan çalışmaya başlayabilirsiniz.</span><button type="button" class="ghost small" data-empty-action="help">Ne yapmalıyım?</button></div>';
   if(state.selectedCourseId)openCourseActionPanel(state.selectedCourseId,false);
 }
 function openCourseActionPanel(courseId,scroll=true){const c=state.courses.find(x=>x.id===Number(courseId));if(!c)return;state.selectedCourseId=c.id;const panel=document.getElementById('courseActionPanel');panel?.classList.remove('hidden');document.getElementById('courseActionTitle').textContent=`${c.code} · ${c.name}`;document.getElementById('courseActionMeta').textContent=courseWorkspaceMeta(c);document.querySelectorAll('[data-workspace-course]').forEach(x=>x.classList.toggle('active',Number(x.dataset.workspaceCourse)===c.id));if(scroll)panel?.scrollIntoView({behavior:'smooth',block:'nearest'});}
@@ -458,10 +488,37 @@ async function prepareCourseAnalytics(){await refreshCore();const sel=document.g
 async function loadCourseAnalytics(){const id=Number(document.getElementById('courseAnalyticsCourse')?.value||0);if(!id)return;state.selectedCourseId=id;const box=document.getElementById('courseAnalyticsResult');if(box)box.innerHTML='<div class="loading-state">Ders analizi hazırlanıyor…</div>';try{renderCourseAnalytics(await api('GET',`/api/courses/${id}/analytics-overview`));}catch(e){if(box)box.innerHTML=`<div class="empty-state"><b>Analiz hazırlanamadı.</b><span>${esc(e.message)}</span></div>`;}}
 document.getElementById('loadCourseAnalytics')?.addEventListener('click',loadCourseAnalytics);document.getElementById('courseAnalyticsCourse')?.addEventListener('change',e=>{state.selectedCourseId=Number(e.target.value||0);});document.getElementById('courseAnalyticsResult')?.addEventListener('click',e=>{const b=e.target.closest('[data-open-analysis-exam]');if(!b)return;showPage('analytics');setTimeout(()=>{const sel=document.getElementById('analyticsExam');if(sel){sel.value=b.dataset.openAnalysisExam;document.getElementById('loadAnalytics')?.click();}},80);});
 
-function renderProgramAnalytics(d){state.programAnalytics=d;const box=document.getElementById('programAnalyticsResult');if(!box)return;const s=d.summary||{},program=(d.programs||[])[0]||{},po=program.program_outcomes||[],risks=(d.risk_courses||[]).slice(0,8),trend=d.trend||[];box.innerHTML=`<div class="analysis-kpi-grid program"><article><span>Ders</span><b>${s.course_count||0}</b><small>${s.measured_course_count||0} ölçülen ders</small></article><article><span>Ölçüm kapsamı</span><b>%${Number(s.measurement_percent||0).toFixed(0)}</b><small>${s.critical_course_count||0} dikkat isteyen ders</small></article><article><span>Program Çıktısı ortalaması</span><b>%${Number(s.program_outcome_average||0).toFixed(1)}</b><small>Hedef %${Number(s.program_outcome_target_average||0).toFixed(1)}</small></article><article><span>Açık PUKÖ</span><b>${s.open_action_count||0}</b><small>${s.uncovered_gap_count||0} aksiyonsuz açık</small></article></div><div class="analysis-two-col"><section class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM ÇIKTILARI</span><h3>Program Çıktısı hedef karşılama</h3></div></div><div class="outcome-analysis-list">${po.length?po.map(x=>`<div class="outcome-analysis-row ${x.status==='achieved'?'good':'risk'}"><div><b>${esc(x.code)}</b><small>${esc(x.description||'')}</small></div><strong>%${Number(x.attainment_percent||0).toFixed(1)}</strong>${pctBar(x.attainment_percent,x.target_percent)}<span>${x.course_count||0} ders · hedef %${Number(x.target_percent||0).toFixed(0)}</span></div>`).join(''):'<div class="empty-state"><span>Program çıktısı ölçümü henüz yok.</span></div>'}</div></section><section class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM TRENDİ</span><h3>Dönemler arası gelişim</h3></div></div><div class="trend-list">${trend.length?trend.map(x=>`<div><span>${esc(x.label)}</span><b>%${Number(x.program_outcome_average||0).toFixed(1)}</b>${pctBar(x.program_outcome_average,70)}<small>Ölçüm %${Number(x.measurement_percent||0).toFixed(0)} · Öğrenim Çıktısı %${Number(x.learning_outcome_achievement_percent||0).toFixed(0)}</small></div>`).join(''):'<div class="empty-state"><span>Trend verisi bulunamadı.</span></div>'}</div></section></div><section class="card"><div class="section-head"><div><span class="eyebrow">ÖNCELİKLİ DERSLER</span><h3>Nereden başlamalıyız?</h3></div></div><div class="risk-course-list">${risks.length?risks.map(x=>`<button type="button" data-program-risk-course="${x.course_id}"><span class="risk-dot ${esc(x.risk_level)}"></span><div><b>${esc(x.course_code)} · ${esc(x.course_name)}</b><small>${x.official_exam_count||0} resmî sınav · ${x.gap_count||0} çıktı açığı</small></div><strong>${x.risk_level==='no_data'?'Ölçülmedi':`${Number(x.max_gap_points||0).toFixed(0)} puan açık`}</strong></button>`).join(''):'<div class="empty-state"><span>Riskli ders bulunmuyor.</span></div>'}</div></section>`;}
-async function prepareProgramAnalytics(){if(!hasAnyRole('admin','quality','program_head','department_head','faculty_admin')){toast('Program analizi yönetim rolü gerektirir.','error');showPage('mycourses');return;}await refreshCore();if(document.getElementById('programAnalyticsProgram')?.value)await loadProgramAnalytics();}
-async function loadProgramAnalytics(){const id=Number(document.getElementById('programAnalyticsProgram')?.value||0);if(!id)return;const box=document.getElementById('programAnalyticsResult');if(box)box.innerHTML='<div class="loading-state">Program analizi hazırlanıyor…</div>';try{renderProgramAnalytics(await api('GET',`/api/programs/${id}/analytics-overview`));}catch(e){if(box)box.innerHTML=`<div class="empty-state"><b>Program analizi hazırlanamadı.</b><span>${esc(e.message)}</span></div>`;}}
-document.getElementById('loadProgramAnalytics')?.addEventListener('click',loadProgramAnalytics);document.getElementById('programAnalyticsResult')?.addEventListener('click',e=>{const b=e.target.closest('[data-program-risk-course]');if(!b)return;state.selectedCourseId=Number(b.dataset.programRiskCourse);showPage('courseanalytics');setTimeout(()=>{const sel=document.getElementById('courseAnalyticsCourse');if(sel){sel.value=String(state.selectedCourseId);document.getElementById('loadCourseAnalytics')?.click();}},80);});
+function renderProgramAnalytics(d){
+  state.programAnalytics=d;const box=document.getElementById('programAnalyticsResult');if(!box)return;
+  const s=d.summary||{},program=(d.programs||[])[0]||{},po=program.program_outcomes||[],risks=(d.risk_courses||[]).slice(0,8),trend=d.trend||[];
+  const measured=Number(s.measurement_percent||0),gaps=Number(s.uncovered_gap_count||0),critical=Number(s.critical_course_count||0),poAvg=Number(s.program_outcome_average||0),poTarget=Number(s.program_outcome_target_average||0);
+  const tone=gaps>0||critical>2?'risk':(measured<100||critical>0||poAvg<poTarget)?'watch':'good';
+  const decision=document.getElementById('programWorkspaceDecision');if(decision){
+    let title='Program dengeli ilerliyor',copy='Ölçüm kapsamı ve program çıktıları hedefe yakın. Program Review ve kanıt zincirini güncel tutun.',action='programreview',cta='Program Review’u aç';
+    if(measured<100){title='Önce ölçülmeyen dersleri tamamlayın';copy=`Ölçüm kapsamı %${measured.toFixed(0)}. Program kararları için tüm derslerin ölçüm zincirini tamamlayın.`;action='courses';cta='Riskli dersleri gör';}
+    else if(critical>0){title='Riskli derslere odaklanın';copy=`${critical} ders dikkat istiyor. En büyük çıktı açığından başlayın.`;action='courses';cta='Öncelikli dersleri aç';}
+    else if(gaps>0){title='Aksiyonsuz açıkları PUKÖ’ye bağlayın';copy=`${gaps} çıktı açığı henüz iyileştirme aksiyonuna bağlı değil.`;action='quality';cta='PUKÖ işlerini aç';}
+    decision.className=`program-workspace-decision card ${tone}`;decision.innerHTML=`<div><span class="eyebrow">ŞİMDİ NE YAPMALIYIM?</span><h3>${esc(title)}</h3><p>${esc(copy)}</p></div><button type="button" class="primary" data-program-workspace-go="${action}">${esc(cta)}</button>`;
+  }
+  box.innerHTML=`<div class="analysis-kpi-grid program"><article><span>Ölçüm kapsamı</span><b>%${measured.toFixed(0)}</b><small>${s.measured_course_count||0}/${s.course_count||0} ders</small></article><article><span>PÇ ortalaması</span><b>%${poAvg.toFixed(1)}</b><small>Hedef %${poTarget.toFixed(1)}</small></article><article><span>Riskli ders</span><b>${critical}</b><small>${s.course_count||0} ders içinde</small></article><article><span>Açık PUKÖ</span><b>${s.open_action_count||0}</b><small>${gaps} aksiyonsuz açık</small></article></div><div class="analysis-two-col"><section class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM ÇIKTILARI</span><h3>Hedef karşılama</h3></div></div><div class="outcome-analysis-list">${po.length?po.map(x=>`<div class="outcome-analysis-row ${x.status==='achieved'?'good':'risk'}"><div><b>${esc(x.code)}</b><small>${esc(x.description||'')}</small></div><strong>%${Number(x.attainment_percent||0).toFixed(1)}</strong>${pctBar(x.attainment_percent,x.target_percent)}<span>${x.course_count||0} ders · hedef %${Number(x.target_percent||0).toFixed(0)}</span></div>`).join(''):'<div class="empty-state"><span>Program çıktısı ölçümü henüz yok.</span></div>'}</div></section><section class="card"><div class="section-head"><div><span class="eyebrow">DÖNEM TRENDİ</span><h3>Program gelişimi</h3></div></div><div class="trend-list">${trend.length?trend.map(x=>`<div><span>${esc(x.label)}</span><b>%${Number(x.program_outcome_average||0).toFixed(1)}</b>${pctBar(x.program_outcome_average,70)}<small>Ölçüm %${Number(x.measurement_percent||0).toFixed(0)}</small></div>`).join(''):'<div class="empty-state"><span>Trend verisi bulunamadı.</span></div>'}</div></section></div><section class="card" class="program-workspace-risk-courses"><div class="section-head"><div><span class="eyebrow">ÖNCELİKLİ DERSLER</span><h3>Nereden başlamalıyız?</h3></div></div><div class="risk-course-list">${risks.length?risks.map(x=>`<button type="button" data-program-risk-course="${x.course_id}"><span class="risk-dot ${esc(x.risk_level)}"></span><div><b>${esc(x.course_code)} · ${esc(x.course_name)}</b><small>${x.official_exam_count||0} resmî sınav · ${x.gap_count||0} çıktı açığı</small></div><strong>${x.risk_level==='no_data'?'Ölçülmedi':`${Number(x.max_gap_points||0).toFixed(0)} puan açık`}</strong></button>`).join(''):'<div class="empty-state"><span>Riskli ders bulunmuyor.</span></div>'}</div></section>`;
+}
+function renderProgramWorkspaceReview(rows){
+  const box=document.getElementById('programWorkspaceReview');if(!box)return;const latest=(rows||[])[0];
+  if(!latest){box.innerHTML=`<div class="section-head"><div><span class="eyebrow">PROGRAM REVIEW</span><h3>Henüz değerlendirme başlatılmamış</h3><p class="muted">Periyodik program değerlendirmesini başlatarak kanıt ve reviewer zincirini yönetin.</p></div><button type="button" class="primary small" data-program-workspace-go="programreview">Program Review başlat</button></div>`;return;}
+  box.innerHTML=`<div class="section-head"><div><span class="eyebrow">SON PROGRAM REVIEW</span><h3>${esc(latest.title||'Program Review')}</h3><p class="muted">${esc(latest.academic_year||'')} · Sürüm ${esc(latest.review_no||1)} · ${esc(programReviewStatusLabel(latest.status))}</p></div><button type="button" class="ghost small" data-program-workspace-go="programreview">Review’u aç →</button></div><div class="program-review-mini"><span>Durum</span><b>${esc(programReviewStatusLabel(latest.status))}</b>${latest.final_sha256?`<small>Final snapshot mühürlü · ${esc(latest.final_sha256.slice(0,12))}…</small>`:'<small>Final snapshot henüz oluşturulmadı.</small>'}</div>`;
+}
+async function prepareProgramAnalytics(){if(!hasAnyRole('admin','quality','program_head','department_head','faculty_admin')){toast('Program çalışma alanı yönetim rolü gerektirir.','error');showPage('mycourses');return;}await refreshCore();if(document.getElementById('programAnalyticsProgram')?.value)await loadProgramAnalytics();}
+async function loadProgramAnalytics(){const id=Number(document.getElementById('programAnalyticsProgram')?.value||0);if(!id)return;state.programWorkspaceProgramId=id;const box=document.getElementById('programAnalyticsResult');if(box)box.innerHTML='<div class="loading-state">Program çalışma alanı hazırlanıyor…</div>';try{const [analytics,reviews]=await Promise.all([api('GET',`/api/programs/${id}/analytics-overview`),api('GET',`/api/programs/${id}/program-reviews`)]);renderProgramAnalytics(analytics);renderProgramWorkspaceReview(reviews);}catch(e){if(box)box.innerHTML=`<div class="empty-state"><b>Program çalışma alanı hazırlanamadı.</b><span>${esc(e.message)}</span></div>`;}}
+document.getElementById('loadProgramAnalytics')?.addEventListener('click',loadProgramAnalytics);
+function openProgramWorkspaceTarget(target){const pid=Number(state.programWorkspaceProgramId||document.getElementById('programAnalyticsProgram')?.value||0);if(!pid)return toast('Önce program seçin.','error');
+  if(target==='courses'){document.querySelector('.program-workspace-risk-courses')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if(target==='programreview'){showPage('programreview');setTimeout(()=>{const s=document.getElementById('programReviewProgram');if(s){s.value=String(pid);s.dispatchEvent(new Event('change'));}},120);return;}
+  if(target==='evidencehub'){showPage('evidencehub');setTimeout(()=>{const s=document.getElementById('evidenceHubProgram');if(s){s.value=String(pid);document.getElementById('evidenceHubSearch')?.click();}},120);return;}
+  if(target==='quality'){showPage('quality');setTimeout(()=>{const s=document.getElementById('qualityProgram');if(s){s.value=String(pid);s.dispatchEvent(new Event('change'));}},160);return;}
+  if(target==='accreditation'){showPage('accreditation');setTimeout(()=>{const s=document.getElementById('accredProgram');if(s)s.value=String(pid);},160);return;}
+  if(target==='outcomes'){showPage('curriculummap');setTimeout(()=>{const s=document.getElementById('curriculumMapProgram');if(s){s.value=String(pid);s.dispatchEvent(new Event('change'));}},160);}
+}
+document.getElementById('page-programanalytics')?.addEventListener('click',e=>{const go=e.target.closest('[data-program-workspace-go]');if(go){openProgramWorkspaceTarget(go.dataset.programWorkspaceGo);return;}const b=e.target.closest('[data-program-risk-course]');if(!b)return;state.selectedCourseId=Number(b.dataset.programRiskCourse);showPage('courseanalytics');setTimeout(()=>{const sel=document.getElementById('courseAnalyticsCourse');if(sel){sel.value=String(state.selectedCourseId);document.getElementById('loadCourseAnalytics')?.click();}},80);});
 
 function academicProgramName(programId){const p=state.programs.find(x=>x.id===Number(programId));return p?`${p.code} · ${p.name}`:'Program';}
 function academicDefaultYear(){const first=state.courses[0]?.academic_year;if(first)return first;const y=new Date().getFullYear();return `${y}-${y+1}`;}
@@ -758,7 +815,7 @@ async function preparePilotOps(){
   }catch(e){toast(e.message,'error');}
 }
 function pilotCheckIcon(status){return status==='pass'?'✓':status==='fail'?'!':'•';}
-function pilotActionPage(action){return ({'Kurumsal Pilot':'import','Kullanıcı & Yetki':'users','Öğrenim Çıktısı ↔ Program Çıktısı Haritası':'outcomes','Optik Okuma':'scan','Sınav Hazırla':'exams','Değerlendirme':'grade','Kanıt Yönetimi':'evidence','Akreditasyon Merkezi':'accreditation','Sistem & Güvenlik':'security'})[action]||'';}
+function pilotActionPage(action){return ({'Kurumsal Pilot':'import','Kullanıcı & Yetki':'users','Öğrenim Çıktısı ↔ Program Çıktısı Haritası':'outcomes','ÖÇ ↔ PÇ Haritası':'outcomes','Optik Okuma':'scan','Sınav Hazırla':'exams','Soru Bankası':'bank','Değerlendirme':'grade','Kanıt Yönetimi':'evidencehub','Program Review':'programreview','Akreditasyon Merkezi':'quality360','Sistem & Güvenlik':'security'})[action]||'';}
 window.pilotGoAction=function(action){const page=pilotActionPage(action);if(page)showPage(page);};
 function renderPilotReadiness(data){
   const score=document.getElementById('pilotReadinessScore');if(!score)return;
@@ -771,11 +828,17 @@ function renderPilotIssues(rows){
   const box=document.getElementById('pilotIssueCenter');if(!box)return;
   box.innerHTML=rows.length?rows.slice(0,15).map(x=>`<div class="pilot-issue ${esc(x.severity)}"><span></span><div><b>${esc(x.title)}</b><small>${esc(x.message)}</small></div><em>${esc(x.action||x.source||'')}</em></div>`).join(''):'<div class="empty-state"><b>Açık operasyonel sorun yok.</b><span>Pilot hazırlık kontrolleri temiz.</span></div>';
 }
+function renderPilotRoleJourneys(journeys=[]){
+  const root=document.getElementById('pilotRoleJourneys');if(!root)return;
+  root.innerHTML=journeys.length?journeys.map(j=>`<article class="uat-role-card ${esc(j.status||'attention')}"><div class="uat-role-head"><div><b>${esc(j.title||j.role||'Rol yolculuğu')}</b><small>Hedef: ${Number(j.target_minutes||8)} dk içinde tamamla</small></div><span class="uat-role-score">%${Number(j.score||0)}</span></div><div class="uat-role-steps">${(j.checks||[]).map(c=>`<div class="uat-role-step ${esc(c.status)}"><i>${pilotCheckIcon(c.status)}</i><span><b>${esc(c.label)}</b><small>${esc(c.detail||'')}</small>${pilotActionPage(c.action)?`<button class="ghost tiny" type="button" data-uat-action="${esc(c.action)}">${esc(c.action)} →</button>`:''}</span></div>`).join('')}</div></article>`).join(''):'<div class="empty-state compact"><b>Rol bazlı UAT henüz çalıştırılmadı.</b><span>UAT çalıştırıldığında öğretim elemanı, program başkanı ve kalite yolculukları ayrı görünür.</span></div>';
+}
 function renderPilotUatRuns(rows){
   const box=document.getElementById('pilotUatHistory');if(!box)return;
   box.innerHTML=rows.length?`<div class="uat-run-list">${rows.map(x=>`<div class="uat-run"><span class="uat-dot ${esc(x.status)}"></span><div><b>UAT #${x.id} · %${x.score}</b><small>${esc((x.created_at||'').replace('T',' ').slice(0,19))} · ${esc(x.created_by||'system')}</small></div><em>${esc(({passed:'Geçti',warning:'Uyarı',failed:'Başarısız'})[x.status]||x.status)}</em></div>`).join('')}</div>`:'<p class="muted">Henüz UAT koşusu yok.</p>';
   const first=rows[0];const summary=document.getElementById('pilotUatSummary');if(summary)summary.innerHTML=first?`<div class="uat-score"><b>%${first.score}</b><span>Son UAT</span></div><div class="uat-check-mini">${(first.checks||[]).map(c=>`<span class="${esc(c.status)}">${pilotCheckIcon(c.status)} ${esc(c.label)}</span>`).join('')}</div>`:'<div class="empty-state"><b>İlk UAT&apos;ı çalıştırın.</b><span>Sistem mevcut veriyi değiştirmeden tüm pilot zincirini kontrol eder.</span></div>';
+  renderPilotRoleJourneys(first?.summary?.journeys||[]);
 }
+document.getElementById('pilotRoleJourneys')?.addEventListener('click',e=>{const b=e.target.closest('[data-uat-action]');if(b)pilotGoAction(b.dataset.uatAction);});
 function renderPilotBackup(readiness){
   const box=document.getElementById('pilotBackupStatus');if(!box)return;const b=readiness.backup,r=readiness.restore;
   box.innerHTML=`<div class="backup-state ${b?'ok':'warn'}"><span>BACKUP</span><b>${b?esc((b.created_at||'').replace('T',' ').slice(0,19)):'Henüz yok'}</b><small>${b?esc(b.backup_zip||'Doğrulandı'):'Backup-Pilot.ps1 çalıştırın'}</small></div><div class="backup-state ${r?'ok':'warn'}"><span>RESTORE TESTİ</span><b>${r?esc((r.created_at||'').replace('T',' ').slice(0,19)):'Henüz yok'}</b><small>${r?'SHA256 doğrulandı':'Restore-Pilot.ps1 ile test edin'}</small></div>`;
@@ -837,10 +900,12 @@ document.querySelectorAll('#examPresetButtons button').forEach(b=>b.addEventList
 ['examSearch','examStatusFilter','examCourseFilter','examTypeFilter'].forEach(id=>document.getElementById(id)?.addEventListener(id==='examSearch'?'input':'change',loadExams));
 document.getElementById('examFocusCreate')?.addEventListener('click',()=>document.getElementById('examCreateCard')?.scrollIntoView({behavior:'smooth',block:'start'}));
 
+let examCreateNextStep=1;
+document.getElementById('examForm')?.addEventListener('click',e=>{const b=e.target.closest?.('[data-exam-create-next]');if(b)examCreateNextStep=Number(b.dataset.examCreateNext||1);});
 document.getElementById('examForm').addEventListener('submit',async ev=>{
   ev.preventDefault();const weightRaw=document.getElementById('examWeight').value;
   const body={course_id:Number(document.getElementById('examCourse').value),title:document.getElementById('examTitle').value.trim(),exam_type:document.getElementById('examType').value.trim()||'Sınav',exam_date:document.getElementById('examDate').value||null,start_time:document.getElementById('examStartTime').value||null,location:document.getElementById('examLocation').value.trim(),duration_minutes:Number(document.getElementById('examDuration').value||50),assessment_weight_percent:weightRaw===''?null:Number(weightRaw),booklet_count:Number(document.getElementById('examBookletCount').value||4),paper_size:document.getElementById('examPaperSize').value,paper_orientation:document.getElementById('examPaperOrientation').value,omr_mode:document.getElementById('examOmrMode').value,duplex_print:document.getElementById('examDuplex').checked,instructions:document.getElementById('examInstructions').value,staff_notes:document.getElementById('examStaffNotes').value,sync_students:true};
-  try{const exam=await api('POST','/api/exams',body);if(!exam.id)throw new Error('Backend sınav ID döndürmedi.');toast(`Sınav #${exam.id} oluşturuldu. Detayları ve Öğrenim ve Program Çıktıları snapshot’ını kontrol edin.`);await loadExams();await openExam(exam.id);setExamWizardStep(1);}catch(e){toast(e.message,'error');}
+  try{const nextStep=examCreateNextStep||1;examCreateNextStep=1;const exam=await api('POST','/api/exams',body);if(!exam.id)throw new Error('Backend sınav ID döndürmedi.');toast(nextStep===3?`Sınav #${exam.id} oluşturuldu. Sorulara geçebilirsiniz.`:`Sınav #${exam.id} oluşturuldu. Detayları ve Öğrenim ve Program Çıktıları snapshot’ını kontrol edin.`);await loadExams();await openExam(exam.id);setExamWizardStep(nextStep);}catch(e){examCreateNextStep=1;toast(e.message,'error');}
 });
 function renderExamDetailStrip(exam){const snap=exam.paper_snapshot||{},box=document.getElementById('examDetailStrip');if(!box)return;const rows=[['Ders',`${snap.course_code||''} · ${snap.course_name||''}`],['Tarih / Saat',`${exam.exam_date||'—'}${exam.start_time?` · ${exam.start_time}`:''}`],['Salon',exam.location||'—'],['Süre',`${exam.duration_minutes} dk`],['Ders etkisi',exam.assessment_weight_percent==null?'—':`%${exam.assessment_weight_percent}`],['Kitapçık',String(exam.booklet_count||4)]];box.innerHTML=rows.map(x=>`<div><small>${esc(x[0])}</small><b>${esc(x[1])}</b></div>`).join('');}
 function renderExamWorkspaceSummary(summary){
@@ -1121,7 +1186,7 @@ function renderBankRows(rows){
   const editable=!isQualityOnly();
   document.getElementById('bankResultCount').textContent=`${rows.length} soru · sayfa ${Math.floor(state.bankOffset/state.bankLimit)+1}`;
   renderBankStats(rows);renderBankScope(rows);
-  if(!rows.length){box.innerHTML='<div class="empty-state bank-empty"><b>Bu filtrelerde soru bulunamadı.</b><span>Filtreleri temizleyin veya yetkili olduğunuz bir derse yeni soru ekleyin.</span></div>';return;}
+  if(!rows.length){box.innerHTML=`<div class="empty-state bank-empty guided-empty"><div class="empty-visual">?</div><b>${(document.getElementById('bankSearch')?.value||'').trim()?'Aramanızla eşleşen soru yok':'Bu kapsamda henüz soru yok'}</b><span>Yeni soru oluşturabilir veya filtreleri temizleyip tüm soru havuzunu görebilirsiniz.</span><div class="actions"><button type="button" class="primary small" data-empty-action="new-question">+ Yeni soru oluştur</button><button type="button" class="ghost small" data-empty-action="clear-bank">Filtreleri temizle</button></div></div>`;return;}
   const grouped=new Map();
   rows.forEach(x=>{const key=String(x.course_id);if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(x);});
   box.innerHTML=[...grouped.entries()].map(([courseId,items])=>{
@@ -1192,7 +1257,7 @@ function closeBankEditor(){setBankEditorOpen(false);}
 function resetBankEditor(){
   state.bankEditId=null;
   document.getElementById('bankEditorTitle').textContent='Yeni soru';
-  document.getElementById('saveBank').textContent='Soru havuzuna kaydet';
+  document.getElementById('saveBank').textContent='Kaydet';document.getElementById('saveBankAndNew')?.classList.remove('hidden');
   document.getElementById('cancelBankEdit').classList.add('hidden');
   document.getElementById('bankType').value='mcq';document.getElementById('bankPoints').value=10;document.getElementById('bankAnswerLines').value=8;document.getElementById('bankTopic').value='';document.getElementById('bankUnit').value='';document.getElementById('bankDifficulty').value='medium';document.getElementById('bankBloom').value='';document.getElementById('bankReviewer').value='';document.getElementById('bankRubric').value='';document.getElementById('bankImage').value='';setQuestionImagePreview('bankImagePreview','');
   if(document.getElementById('bankLoSelect'))setSelectedValues(document.getElementById('bankLoSelect'),[]);syncBankOutcomePicker([]);
@@ -1263,6 +1328,8 @@ document.getElementById('bankType').addEventListener('change',syncBankTypeUI);do
 document.getElementById('bankEditorClose')?.addEventListener('click',()=>{resetBankEditor();closeBankEditor();});
 document.getElementById('bankEditorBackdrop')?.addEventListener('click',()=>{resetBankEditor();closeBankEditor();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('bank-editor-open')){resetBankEditor();closeBankEditor();}});
+let bankSaveContinue=false;
+document.getElementById('saveBankAndNew')?.addEventListener('click',()=>{bankSaveContinue=true;document.getElementById('bankForm')?.requestSubmit();});
 document.getElementById('bankForm').addEventListener('submit',async ev=>{
   ev.preventDefault();const type=document.getElementById('bankType').value;
   try{
@@ -1272,13 +1339,17 @@ document.getElementById('bankForm').addEventListener('submit',async ev=>{
     if(!body.text)return toast('Soru metni zorunludur.','error');
     if(type==='mcq'){const keys=Object.keys(body.choices||{});if(keys.length<2)return toast('Çoktan seçmeli soruda en az iki seçenek doldurun.','error');if(!keys.includes(body.correct_answer))return toast('Doğru cevap, doldurduğunuz seçeneklerden biri olmalıdır.','error');}
     if(type==='classic'&&body.rubric?.criteria?.length){const total=body.rubric.criteria.reduce((a,x)=>a+Number(x.max_points||0),0);if(Math.abs(total-body.default_points)>.01)return toast(`Rubrik toplamı (${total}) soru puanına (${body.default_points}) eşit olmalıdır.`,'error');}
-    if(state.bankEditId){await api('PATCH',`/api/question-bank/${state.bankEditId}`,body);toast('Havuz sorusu güncellendi.');}else{await api('POST','/api/question-bank',body);toast('Soru ders havuzuna kaydedildi.');}document.getElementById('bankFilterCourse').value=String(body.course_id);resetBankEditor();closeBankEditor();await loadBank();
-  }catch(e){toast(e.message,'error');}
+    const continueNew=bankSaveContinue&&!state.bankEditId;bankSaveContinue=false;
+    if(state.bankEditId){await api('PATCH',`/api/question-bank/${state.bankEditId}`,body);toast('Havuz sorusu güncellendi.');}else{await api('POST','/api/question-bank',body);toast(continueNew?'Soru kaydedildi. Yeni soru için form hazır.':'Soru ders havuzuna kaydedildi.');}
+    document.getElementById('bankFilterCourse').value=String(body.course_id);await loadBank();
+    if(continueNew){const keepCourse=body.course_id;resetBankEditor();fillSelects();const course=document.getElementById('bankCourse');if(course&&[...course.options].some(o=>Number(o.value)===keepCourse))course.value=String(keepCourse);setBankEditorOpen(true);await updateBankCourseContext();document.getElementById('bankText')?.focus();}
+    else{resetBankEditor();closeBankEditor();}
+  }catch(e){bankSaveContinue=false;toast(e.message,'error');}
 });
 window.editBank=async function(id){
   const x=(state.bankRows||[]).find(v=>v.id===id);if(!x)return;state.bankEditId=id;
   document.getElementById('bankEditorTitle').textContent='Soruyu düzenle';document.getElementById('bankCourse').value=String(x.course_id);await updateBankCourseContext(questionOutcomeCodes(x));
-  document.getElementById('bankType').value=x.question_type;document.getElementById('bankPoints').value=x.default_points;document.getElementById('bankAnswerLines').value=x.answer_lines||8;document.getElementById('bankTopic').value=x.topic||'';document.getElementById('bankUnit').value=x.unit||'';document.getElementById('bankDifficulty').value=x.difficulty||'medium';document.getElementById('bankBloom').value=x.bloom_level||'';document.getElementById('bankReviewer').value=x.reviewer||'';document.getElementById('bankRubric').value=formatRubric(x.rubric);document.getElementById('bankImage').value='';setQuestionImagePreview('bankImagePreview',x.image_data||'');document.getElementById('bankText').value=x.text;document.getElementById('bankCorrect').value=x.correct_answer||'A';document.getElementById('bankTags').value=(x.tags||[]).join(', ');fillChoices('bank',x.choices);syncBankTypeUI();document.getElementById('saveBank').textContent='Değişiklikleri kaydet';document.getElementById('cancelBankEdit').classList.remove('hidden');setBankEditorOpen(true);
+  document.getElementById('bankType').value=x.question_type;document.getElementById('bankPoints').value=x.default_points;document.getElementById('bankAnswerLines').value=x.answer_lines||8;document.getElementById('bankTopic').value=x.topic||'';document.getElementById('bankUnit').value=x.unit||'';document.getElementById('bankDifficulty').value=x.difficulty||'medium';document.getElementById('bankBloom').value=x.bloom_level||'';document.getElementById('bankReviewer').value=x.reviewer||'';document.getElementById('bankRubric').value=formatRubric(x.rubric);document.getElementById('bankImage').value='';setQuestionImagePreview('bankImagePreview',x.image_data||'');document.getElementById('bankText').value=x.text;document.getElementById('bankCorrect').value=x.correct_answer||'A';document.getElementById('bankTags').value=(x.tags||[]).join(', ');fillChoices('bank',x.choices);syncBankTypeUI();document.getElementById('saveBank').textContent='Değişiklikleri kaydet';document.getElementById('saveBankAndNew')?.classList.add('hidden');document.getElementById('cancelBankEdit').classList.remove('hidden');setBankEditorOpen(true);
 };
 window.archiveBank=async function(id){if(!confirm('Soruyu aktif havuzdan arşivlemek istiyor musunuz?'))return;try{await api('DELETE',`/api/question-bank/${id}`);toast('Soru arşivlendi.');await loadBank();}catch(e){toast(e.message,'error');}};
 
@@ -1344,7 +1415,7 @@ document.getElementById('uploadScan').addEventListener('click',async()=>{const i
 document.getElementById('runRegrade').addEventListener('click',async()=>{const id=Number(document.getElementById('scanExam').value),qid=Number(document.getElementById('regradeQuestion').value),ans=document.getElementById('regradeAnswer').value;if(!id||!qid)return toast('Sınav ve soru ID girin.','error');try{const r=await api('POST',`/api/exams/${id}/answer-key/regrade`,{corrections:{[qid]:ans},reason:document.getElementById('regradeReason').value});toast(`${r.affected_responses} cevap yeniden puanlandı.`);await loadScanContext();}catch(e){toast(e.message,'error');}});
 
 async function prepareGrade(){
-  try{await refreshCore();await loadGradeStudents();renderGradeProgress();syncGradeModeUI();}catch(e){toast(e.message,'error');}
+  try{await refreshCore();renderGradeQueue();const grading=gradeQueueRows().filter(x=>x.status==='grading');const examSel=document.getElementById('gradeExam');if(grading.length===1&&examSel&&[...examSel.options].some(o=>Number(o.value)===Number(grading[0].id)))examSel.value=String(grading[0].id);await loadGradeStudents();renderGradeProgress();syncGradeModeUI();if(grading.length===1&&Number(examSel?.value||0)===Number(grading[0].id))await loadCurrentGrade();}catch(e){toast(e.message,'error');}
 }
 function gradeMode(){return document.getElementById('gradeMode')?.value||'student';}
 function gradeBlindEnabled(){return !!document.getElementById('gradeBlind')?.checked;}
@@ -1413,19 +1484,23 @@ function renderAnalytics(a){
   const poAchieved=(a.program_outcomes||[]).filter(x=>x.status==='achieved').length;
   const evidenceRows=sel.min?[{slot:'MIN',...sel.min},{slot:'AVG',...sel.average},{slot:'MAX',...sel.max}]:[];
   const hardest=[...(a.question_analysis||[])].sort((x,y)=>Number(x.attainment_percent)-Number(y.attainment_percent)).slice(0,5);
+  const loRisk=(a.learning_outcomes||[]).filter(x=>x.status!=='achieved').length,poRisk=(a.program_outcomes||[]).filter(x=>x.status!=='achieved').length,questionRisk=Number(a.problem_question_count||0);
+  const decisionTone=Number(a.pass_percent||0)<50||loRisk>2?'risk':(loRisk||poRisk||questionRisk)?'watch':'good';
+  const decisionTitle=decisionTone==='risk'?'Müdahale gerekiyor':decisionTone==='watch'?'Birkaç alan izlenmeli':'Sınav sonuçları dengeli';
+  const decisionCopy=decisionTone==='good'?`Öğrenim ve Program Çıktıları hedefleri genel olarak karşılanıyor.`:`${loRisk} Öğrenim Çıktısı, ${poRisk} Program Çıktısı ve ${questionRisk} soru inceleme adayı.`;
   document.getElementById('analyticsResult').innerHTML=`
     <div class="analytics-sticky-tabs card">
       <div class="analytics-tabs" role="tablist"><button class="active" data-analytics-tab="overview">Genel Bakış</button><button data-analytics-tab="lo">Öğrenim Çıktısı</button><button data-analytics-tab="po">Program Çıktısı</button><button data-analytics-tab="students">Öğrenciler <span>${a.student_count}</span></button><button data-analytics-tab="questions">Sorular <span>${(a.question_analysis||[]).length}</span></button><button data-analytics-tab="evidence">Kanıt</button></div>
     </div>
     <div class="analytics-panel-view active" data-analytics-panel="overview">
-      <div class="analytics-kpi-grid">
-        <article><span>Sınıf ortalaması</span><b>${a.class_average} / ${a.total_possible_points}</b><small>%${a.class_average_percent}</small></article>
-        <article><span>Medyan</span><b>${a.median_score}</b><small>orta öğrenci</small></article>
-        <article><span>Standart sapma</span><b>${a.standard_deviation}</b><small>not yayılımı</small></article>
-        <article><span>Başarı ≥ %${a.pass_threshold_percent??50}</span><b>%${a.pass_percent}</b><small>${a.pass_count}/${a.student_count} öğrenci</small></article><article><span>Cronbach Alpha</span><b>${a.reliability?.cronbach_alpha??'—'}</b><small>${esc(a.reliability?.interpretation||'veri yetersiz')}</small></article><article><span>KR-20</span><b>${a.reliability?.kr20??'—'}</b><small>${a.problem_question_count||0} problemli soru</small></article>
-        <article><span>Başarılı Öğrenim Çıktısı</span><b>${achieved}/${(a.learning_outcomes||[]).length}</b><small>hedef üstü kazanım</small></article>
-        <article><span>Başarılı Program Çıktısı</span><b>${poAchieved}/${(a.program_outcomes||[]).length}</b><small>program çıktısı</small></article>
+      <div class="analytics-decision-brief ${decisionTone}"><div><span class="eyebrow">YÖNETİCİ ÖZETİ</span><h3>${decisionTitle}</h3><p>${decisionCopy}</p></div><div class="analytics-decision-actions">${loRisk?'<button class="ghost small" data-analytics-tab="lo">ÖÇ açıklarını gör</button>':''}${questionRisk?'<button class="ghost small" data-analytics-tab="questions">Soruları incele</button>':''}<button class="ghost small" data-analytics-tab="students">Öğrencileri gör</button></div></div>
+      <div class="analytics-kpi-grid analytics-kpi-primary">
+        <article><span>Sınıf ortalaması</span><b>%${a.class_average_percent}</b><small>${a.class_average} / ${a.total_possible_points}</small></article>
+        <article><span>Başarı ≥ %${a.pass_threshold_percent??50}</span><b>%${a.pass_percent}</b><small>${a.pass_count}/${a.student_count} öğrenci</small></article>
+        <article><span>Başarılı Öğrenim Çıktısı</span><b>${achieved}/${(a.learning_outcomes||[]).length}</b><small>${loRisk} gelişim odağı</small></article>
+        <article><span>Başarılı Program Çıktısı</span><b>${poAchieved}/${(a.program_outcomes||[]).length}</b><small>${poRisk} gelişim odağı</small></article>
       </div>
+      <details class="analytics-technical-details"><summary>Teknik ölçüm ayrıntıları <span>Medyan · sapma · güvenirlik</span></summary><div class="analytics-kpi-grid compact"><article><span>Medyan</span><b>${a.median_score}</b><small>orta öğrenci</small></article><article><span>Standart sapma</span><b>${a.standard_deviation}</b><small>not yayılımı</small></article><article><span>Cronbach Alpha</span><b>${a.reliability?.cronbach_alpha??'—'}</b><small>${esc(a.reliability?.interpretation||'veri yetersiz')}</small></article><article><span>KR-20</span><b>${a.reliability?.kr20??'—'}</b><small>${a.problem_question_count||0} problemli soru</small></article></div></details>
       <div class="analytics-chart-grid">
         <article class="analytics-section-card"><div class="section-head"><div><span class="eyebrow">NOT DAĞILIMI</span><h3>Sınıf başarı dağılımı</h3></div><span class="badge">${a.student_count} öğrenci</span></div>${analyticsDistributionChart(a.score_distribution)}</article>
         <article class="analytics-section-card"><div class="section-head"><div><span class="eyebrow">Öğrenim Çıktısı PERFORMANSI</span><h3>Hedefe karşı kazanım</h3></div></div>${analyticsOutcomeChart(a.learning_outcomes)}</article>
@@ -1511,14 +1586,15 @@ async function loadQualityDashboard(){
 }
 function renderQualityDashboard(){
   const d=state.qualityDashboard;if(!d)return;const s=d.summary||{};
+  const tone=Number(s.uncovered_gap_count||0)>0||Number(s.critical_course_count||0)>2?'risk':(Number(s.gap_count||0)>0||Number(s.measurement_percent||0)<100)?'watch':'good';
+  const qDecision=document.getElementById('qualityDecisionSummary');if(qDecision){const title=tone==='risk'?'Önce açıkları kapatın':tone==='watch'?'Kalite görünümü izleme gerektiriyor':'Seçili kapsam iyi durumda';const copy=tone==='risk'?`${s.uncovered_gap_count||0} aksiyonsuz açık ve ${s.critical_course_count||0} riskli ders var.`:tone==='watch'?`Ölçüm kapsamı %${Number(s.measurement_percent||0).toLocaleString('tr-TR')}; ${s.gap_count||0} hedef altı ölçüm izleniyor.`:'Ölçüm ve çıktı hedefleri seçili kapsamda dengeli ilerliyor.';qDecision.className=`quality-decision-brief card ${tone}`;qDecision.innerHTML=`<div><span class="eyebrow">KALİTE KARARI</span><h3>${title}</h3><p>${copy}</p></div><div><b>${s.uncovered_gap_count||0}</b><span>aksiyonsuz açık</span></div>`;}
   document.getElementById('qualityKpis').innerHTML=[
     qualityKpi('Ölçüm kapsamı',`%${Number(s.measurement_percent||0).toLocaleString('tr-TR')}`,`${s.measured_course_count||0}/${s.course_count||0} ders`),
-    qualityKpi('Öğrenim Çıktısı başarı',`%${Number(s.learning_outcome_achievement_percent||0).toLocaleString('tr-TR')}`,`${s.gap_count||0} hedef altı ölçüm`,s.gap_count?'warn':''),
-    qualityKpi('Program Çıktısı ortalaması',`%${Number(s.program_outcome_average||0).toLocaleString('tr-TR')}`,`Hedef ort. %${Number(s.program_outcome_target_average||0).toLocaleString('tr-TR')}`),
-    qualityKpi('Resmî sınav',s.official_exam_count||0,`${s.exam_count||0} toplam sınav`),
+    qualityKpi('Öğrenim Çıktısı başarı',`%${Number(s.learning_outcome_achievement_percent||0).toLocaleString('tr-TR')}`,`${s.gap_count||0} hedef altı`,s.gap_count?'warn':''),
     qualityKpi('Aksiyonsuz açık',s.uncovered_gap_count||0,`${s.open_action_count||0} açık aksiyon`,s.uncovered_gap_count?'danger':''),
     qualityKpi('Riskli ders',s.critical_course_count||0,`${s.critical_program_count||0} program dikkat`,s.critical_course_count?'danger':'')
   ].join('');
+  const next=document.getElementById('qualityNextSteps');if(next)next.innerHTML=`<button class="quality-next-action" data-action-call="document.getElementById('qualityRisks')?.scrollIntoView({behavior:'smooth',block:'start'})"><span>1</span><div><b>Riskli dersleri kapat</b><small>${s.critical_course_count||0} ders öncelikli</small></div><i>→</i></button><button class="quality-next-action" data-action-call="showPage('quality360')"><span>2</span><div><b>PUKÖ aksiyonlarını yönet</b><small>${s.uncovered_gap_count||0} açık aksiyon bekliyor</small></div><i>→</i></button><button class="quality-next-action" data-action-call="showPage('evidencehub')"><span>3</span><div><b>Kanıtları tamamla</b><small>Eksik ölçümlere kanıt bağla</small></div><i>→</i></button>`;
   const scope=document.getElementById('qualityScopeBadge');if(scope)scope.textContent=`${d.filters?.academic_year||'—'} ${d.filters?.term||''} · ${s.program_count||0} program`;
   renderQualityHeatmap();renderQualityRisks();renderQualityTrend();
 }
@@ -1587,13 +1663,23 @@ async function loadAccredDashboard(){
     const s=d.summary;const pct=s.exam_count?Math.round((s.complete_exam_count/s.exam_count)*100):(s.ready?100:0);document.getElementById('accredProgressFill').style.width=`${Math.min(100,pct)}%`;document.getElementById('accredProgressText').innerHTML=`<b>%${pct}</b> paket hazırlığı · ${s.complete_exam_count}/${s.exam_count} sınav tamam`;
     document.getElementById('accredContext').innerHTML=`<span>${esc(d.program?.code||'')} · ${esc(d.program?.name||'')}</span><span>${esc(d.period.academic_year)} · ${esc(d.period.term)}</span><span>${esc(d.profile.name)} · ${esc(d.profile.version)}</span>`;
     document.getElementById('accredSummary').innerHTML=`<div class="accred-summary modern-accred-summary"><div class="metric"><span>Ders</span><div>${s.course_count}</div></div><div class="metric"><span>Sınav</span><div>${s.exam_count}</div></div><div class="metric ok-metric"><span>Tamamlanan</span><div>${s.complete_exam_count}</div></div><div class="metric ${s.warning_count?'warn-metric':'ok-metric'}"><span>Açık uyarı</span><div>${s.warning_count}</div></div><div class="metric"><span>Genel durum</span><div class="${s.ready?'pill-ok':'pill-warn'}">${s.ready?'PAKETE HAZIR':'ÇALIŞILIYOR'}</div></div></div>`;
-    renderAccredKpis(d);renderAccredMatrix(d);renderAccredGaps(d);renderAccredRepresentatives(d);renderAccredActions(d);
+    renderAccredKpis(d);renderAccredDecision(d);renderAccredMatrix(d);renderAccredGaps(d);renderAccredRepresentatives(d);renderAccredActions(d);
     document.getElementById('accredCourses').innerHTML=d.courses.length?d.courses.map(c=>{const cp=c.exam_count?Math.round(c.complete_exam_count/c.exam_count*100):0;const loPct=c.lo_measurement_count?Math.round(c.lo_achieved_count/c.lo_measurement_count*100):0;return `<div class="accred-course modern-course-row ${c.measurement_status==='no_exam'?'course-unmeasured':''}"><div class="course-circle">${c.exam_count?`${cp}%`:'—'}</div><div class="course-row-main"><b>${esc(c.course_code)} · ${esc(c.course_name)}</b><span>${esc(c.instructor||'Öğretim elemanı atanmadı')} · ${c.exam_count} sınav · Öğrenim Çıktısı başarı %${loPct}</span><div class="mini-progress"><span style="width:${cp}%"></span></div></div><span class="${c.measurement_status==='no_exam'||c.warning_count?'pill-warn':'pill-ok'}">${c.measurement_status==='no_exam'?'ölçüm yok':c.warning_count?`${c.warning_count} eksik`:'tamam'}</span></div>`}).join(''):'<div class="empty-state"><b>Ders bulunamadı.</b><span>Programın bu akademik yıl/dönem derslerini kontrol edin.</span></div>';
     renderAccredExams(d.exams);
   }catch(e){toast(e.message,'error');}
 }
 
 function accredPct(value){return Number.isFinite(Number(value))?Number(value).toFixed(1):'0.0';}
+function renderAccredDecision(d){
+  const s=d.summary||{},box=document.getElementById('accredDecision');if(!box)return;
+  let title='Dönem paketi hazır',text='Zorunlu ölçüm, aksiyon ve temsilî kanıt kontrolleri tamamlandı.',action='download',label='Paketi indir',tone='good';
+  if(Number(s.unmeasured_course_count||0)>0){title=`${s.unmeasured_course_count} ders henüz ölçülmedi`;text='Önce dönem kapsamındaki derslerde sınav ölçümünü tamamlayın veya eksik sınavları dönemle eşitleyin.';action='sync';label='Sınavları eşitle';tone='warn';}
+  else if(Number(s.uncovered_gap_count||0)>0){title=`${s.uncovered_gap_count} Öğrenim Çıktısı açığı aksiyonsuz`;text='Hedef altında kalan çıktıları sorumlu ve terminli iyileştirme aksiyonuna bağlayın.';action='gaps';label='Açıkları göster';tone='warn';}
+  else if(Number(s.representative_evidence_percent||0)<100){title='Temsilî öğrenci kanıtları eksik';text=`MIN/AVG/MAX kanıt tamlığı %${accredPct(s.representative_evidence_percent)}. Dondurulmamış seçimleri ve eksik cevap kağıtlarını tamamlayın.`;action='representatives';label='MIN/AVG/MAX hazırla';tone='warn';}
+  else if(Number(s.warning_count||0)>0){title=`${s.warning_count} kontrol kaldı`;text='Sınav bazlı kontrol listesindeki eksikleri kapatın; ardından dönemi hazır olarak işaretleyin.';action='exams';label='Kontrol listesini aç';tone='warn';}
+  box.className=`accred-decision-brief card ${tone}`;box.innerHTML=`<div><span class="eyebrow">ŞİMDİ NE YAPMALI?</span><h3>${esc(title)}</h3><p>${esc(text)}</p></div><button class="${tone==='good'?'primary':'ghost'}" type="button" data-accred-next="${action}">${esc(label)} →</button>`;
+}
+
 function renderAccredKpis(d){
   const s=d.summary;const rows=[
     ['Öğrenim Çıktısı başarı oranı',`%${accredPct(s.lo_achievement_percent)}`,`${s.lo_achieved_count}/${s.lo_measurement_count} ölçüm`,'target'],
@@ -1642,6 +1728,7 @@ async function addImprovement(examId){const outcome_code=document.getElementById
 async function saveImprovement(id){try{await api('PATCH',`/api/improvements/${id}`,{owner:document.getElementById(`imp-owner-${id}`).value,due_date:document.getElementById(`imp-due-${id}`).value||null,status:document.getElementById(`imp-status-${id}`).value});toast('İyileştirme güncellendi.');await loadAccredDashboard();}catch(e){toast(e.message,'error');}}
 function openEvidenceExam(examId){showPage('evidence');document.getElementById('evidenceExam').value=String(examId);loadEvidenceStudents();loadEvidenceList();}
 
+document.getElementById('accredDecision')?.addEventListener('click',e=>{const b=e.target.closest('[data-accred-next]');if(!b)return;const a=b.dataset.accredNext;if(a==='download')document.getElementById('accredDownload')?.click();else if(a==='sync')document.getElementById('accredSync')?.click();else if(a==='representatives')document.getElementById('accredFreezeAll')?.click();else if(a==='gaps'){document.querySelector('.accred-advanced-details')?.setAttribute('open','');document.getElementById('accredGaps')?.scrollIntoView({behavior:'smooth',block:'center'});}else if(a==='exams'){document.querySelector('.accred-advanced-details')?.setAttribute('open','');document.getElementById('accredExams')?.scrollIntoView({behavior:'smooth',block:'start'});}});
 document.getElementById('accredLoad').addEventListener('click',loadAccredDashboard);
 document.getElementById('accredPeriodSelect').addEventListener('change',loadAccredDashboard);
 document.getElementById('accredSync').addEventListener('click',async()=>{const id=Number(document.getElementById('accredPeriodSelect').value);if(!id)return;try{const r=await api('POST',`/api/accreditation/periods/${id}/sync-exams`,{});toast(`${r.added} yeni sınav bağlandı.`);await loadAccredDashboard();}catch(e){toast(e.message,'error');}});
@@ -1893,36 +1980,50 @@ document.getElementById('q360InfraForm')?.addEventListener('submit',e=>{e.preven
 document.getElementById('q360CycleForm')?.addEventListener('submit',e=>{e.preventDefault();q360Json('/api/quality360/quality-cycles',{program_id:q360ProgramId(),academic_year:q360Year(),criterion_code:document.getElementById('q360CycleCriterion').value,title:document.getElementById('q360CycleTitle').value.trim(),plan_text:document.getElementById('q360CyclePlan').value,do_text:document.getElementById('q360CycleDo').value,check_text:document.getElementById('q360CycleCheck').value,act_text:document.getElementById('q360CycleAct').value,owner:document.getElementById('q360CycleOwner')?.value.trim()||'Program Başkanı',due_date:document.getElementById('q360CycleDue')?.value||null,status:document.getElementById('q360CycleStatus').value,evidence_refs:[]},e.currentTarget)});
 document.getElementById('q360GovForm')?.addEventListener('submit',async e=>{e.preventDefault();try{await api('POST','/api/quality360/governance',{program_id:q360ProgramId(),body_type:document.getElementById('q360GovBody').value,meeting_date:document.getElementById('q360GovMeetingDate')?.value||null,meeting_no:document.getElementById('q360GovMeeting').value.trim(),decision_no:document.getElementById('q360GovDecision').value.trim(),subject:document.getElementById('q360GovSubject').value.trim(),decision_text:document.getElementById('q360GovText').value.trim(),related_criterion:'',status:'implemented',evidence_ref:''});e.currentTarget.reset();toast('Kurul kararı kaydedildi.');await Promise.all([loadQuality360(),loadQualityCalendar(),loadQ360GovernanceActions()]);}catch(err){toast(err.message,'error')}});
 document.getElementById('q360CalendarForm')?.addEventListener('submit',async e=>{e.preventDefault();const start=document.getElementById('q360CalendarStart').value;if(!start)return;try{await api('POST','/api/quality360/calendar',{program_id:q360ProgramId(),academic_year:q360Year(),event_type:document.getElementById('q360CalendarType').value,title:document.getElementById('q360CalendarTitle').value.trim(),start_date:start,due_date:document.getElementById('q360CalendarDue').value||null,owner:document.getElementById('q360CalendarOwner').value.trim(),owner_role:document.getElementById('q360CalendarOwnerRole').value.trim(),criterion_code:document.getElementById('q360CalendarCriterion').value.trim(),status:document.getElementById('q360CalendarStatus').value,evidence_required:document.getElementById('q360CalendarEvidence').value.trim(),related_entity_type:'',related_entity_id:null,notes:document.getElementById('q360CalendarNotes').value.trim()});e.currentTarget.reset();toast('Kalite takvimine eklendi.');await loadQualityCalendar();}catch(err){toast(err.message,'error')}});
-document.getElementById('q360EvidenceForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=document.getElementById('q360EvidenceFile').files[0];if(!f)return;const fd=new FormData();fd.append('file',f);fd.append('criterion_code',document.getElementById('q360EvidenceCriterion').value);fd.append('category',document.getElementById('q360EvidenceCategory').value);fd.append('description',document.getElementById('q360EvidenceDescription').value);try{await api('POST',`/api/quality360/programs/${q360ProgramId()}/evidence`,fd);e.currentTarget.reset();toast('Kalite kanıtı yüklendi.');await loadQuality360();}catch(err){toast(err.message,'error')}});
+let q360EvidenceThenCycle=false;
+document.getElementById('q360EvidenceThenCycle')?.addEventListener('click',()=>{q360EvidenceThenCycle=true;document.getElementById('q360EvidenceForm')?.requestSubmit();});
+document.getElementById('q360EvidenceForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=document.getElementById('q360EvidenceFile').files[0];if(!f)return;const thenCycle=q360EvidenceThenCycle;q360EvidenceThenCycle=false;const criterion=document.getElementById('q360EvidenceCriterion').value;const fd=new FormData();fd.append('file',f);fd.append('criterion_code',criterion);fd.append('category',document.getElementById('q360EvidenceCategory').value);fd.append('description',document.getElementById('q360EvidenceDescription').value);try{await api('POST',`/api/quality360/programs/${q360ProgramId()}/evidence`,fd);e.currentTarget.reset();toast(thenCycle?'Kanıt yüklendi. PUKÖ başlangıç formu açıldı.':'Kalite kanıtı yüklendi.');await loadQuality360();if(thenCycle){setQ360Workspace('cycle');setTimeout(()=>{const sel=document.getElementById('q360CycleCriterion');if(sel&&criterion&&[...sel.options].some(o=>o.value===criterion))sel.value=criterion;document.getElementById('q360CycleTitle')?.focus();},80);}}catch(err){q360EvidenceThenCycle=false;toast(err.message,'error')}});
 document.getElementById('q360EvidenceList')?.addEventListener('click',e=>{const b=e.target.closest('[data-q360-evidence-download]');if(!b)return;downloadApi(`/api/quality360/evidence/${b.dataset.q360EvidenceDownload}/download`,b.dataset.name).catch(err=>toast(err.message,'error'));});
 
 document.getElementById('createDemoScenario')?.addEventListener('click',async()=>{if(!confirm('Demo programı, 30 öğrenci ve örnek sınavlar oluşturulsun mu?'))return;const btn=document.getElementById('createDemoScenario');btn.disabled=true;btn.textContent='Hazırlanıyor…';try{const r=await api('POST','/api/pilot/demo-scenario',{});toast(r.message||'Demo hazır.');await refreshCore();await preparePilotOps();if(r.completed_exam_id){showPage('analytics');setTimeout(()=>{const sel=document.getElementById('analyticsExam');if(sel){sel.value=String(r.completed_exam_id);sel.dispatchEvent(new Event('change'));}},250);}}catch(e){toast(e.message,'error');}finally{btn.disabled=false;btn.textContent='Demo senaryosunu hazırla';}});
 
-function onboardingKey(){return `douOnboarding615:${state.currentUser?.email||'user'}`;}
+function onboardingKey(){return `douOnboarding6706:${state.currentUser?.email||'user'}`;}
 function onboardingSlides(){
   if(isQualityOnly())return [
-    ['Kalite görünümünüz hazır','Ana ekranda hedef altı çıktılar, açık aksiyonlar ve tarama istisnaları önceliklendirilir.','Yönetim & Kalite'],
-    ['Program Çıktısı’den soruya inin','Heatmap hücresinden riskli ders → Öğrenim Çıktısı → soru seviyesine kadar kök nedeni görün.','quality'],
-    ['Kanıt zincirini kapatın','MIN/AVG/MAX, iyileştirme aksiyonları ve dönem kanıt ZIP’i Akreditasyon Merkezi’nde.','accreditation'],
-    ['Pilot notunu bırakın','Bir ekran zor gelirse Pilot Geri Bildirim alanına doğrudan kaydedin.','feedback']
+    ['Bugünkü işleri görün','Önce açık kalite aksiyonlarını ve yaklaşan terminleri kontrol edin.','dashboard','Ana Sayfayı aç'],
+    ['Program durumunu inceleyin','Standart görünümde PUKÖ, takvim ve kanıtlar önde; ayrıntılar Uzman Görünümde.','quality360','Kalite ekranını aç'],
+    ['Kanıtı eksik olduğu yerde tamamlayın','Kanıt Merkezi ile arayın; Program Review veya ilgili kriterden doğrudan ilişkilendirin.','evidencehub','Kanıt Merkezini aç'],
+    ['İşiniz bittiğinde geri bildirim bırakın','Anlaşılmayan bir alan varsa ekran bağlamıyla birlikte doğrudan bize iletin.','feedback','Geri Bildirimi aç']
   ];
   if(hasAnyRole('program_head','department_head','faculty_admin','admin'))return [
-    ['Rol bazlı ana ekran','Yalnız yönetim için anlamlı KPI ve iş kuyruğu öne çıkarılır.','dashboard'],
-    ['Kaliteyi aşağı doğru inceleyin','Program → Program Çıktısı → ders → Öğrenim Çıktısı → soru zincirinde sorunun kaynağına inin.','quality'],
-    ['Pilot hazırlığını doğrulayın','Kurumsal Pilot alanında UAT, backup, OBS ve sağlık kontrollerini takip edin.','import'],
-    ['Geri bildirimi kapatın','Pilot kullanıcı notlarını inceleyin, karar notuyla çözüldü durumuna alın.','feedback']
+    ['Ana Sayfadan başlayın','Sistem rolünüze göre sadece bekleyen işleri ve kritik açıkları öne çıkarır.','dashboard','Ana Sayfayı aç'],
+    ['Program ve ders akışını izleyin','Program → ders → sınav → öğrenci zincirinde ilgili çalışma alanına doğrudan gidin.','programanalytics','Program analizini aç'],
+    ['Kaliteyi standart görünümde yönetin','Günlük kalite işleri sade görünür; framework ve ziyaret ayrıntıları Uzman Görünümde kalır.','quality360','Kalite ekranını aç'],
+    ['Kanıt ve review kapanışını yapın','Kanıt Merkezi ve Program Review ile eksik belge ve reviewer işlerini tamamlayın.','programreview','Program Review aç']
   ];
   return [
-    ['Dersinizden başlayın','Ana ekran yalnız sizin ders, sınav ve bekleyen işlerinizi gösterir.','dashboard'],
-    ['Soru havuzunu yeniden kullanın','Soruları ders bazında biriktirin; birden fazla soruyu tek seferde sınava alın.','bank'],
-    ['Kağıdı okutun, yalnız istisnayı kontrol edin','Toplu taramada sistem güvenli cevapları işler; belirsizleri size gösterir.','scan'],
-    ['Analizi otomatik alın','Sınav onaylandığında Öğrenim ve Program Çıktıları sonuçları ve Excel raporu hazır olur.','analytics']
+    ['Dersinizi açın','Günlük işiniz Derslerim ekranından başlar. Ders seçince Soru, Sınav, Değerlendirme ve Sonuçlar aynı bağlamda açılır.','mycourses','Derslerimi aç'],
+    ['Soruyu oluşturun veya bulun','Soru Bankasında ders filtresi otomatik gelir; yeni soru ekleyebilir veya mevcut soruyu tekrar kullanabilirsiniz.','bank','Soru Bankasını aç'],
+    ['Sınavı dört adımda hazırlayın','Detaylar → Çıktılar → Sorular → Son Kontrol. Baskı ve optik ayarlar Gelişmiş altında kalır.','exams','Sınavları aç'],
+    ['Puanlayın ve sonucu görün','Değerlendirme Merkezi yalnız bekleyen sınavları öne çıkarır; tamamlayınca sonuç analizine geçebilirsiniz.','grade','Değerlendirmeyi aç']
   ];
 }
-function renderOnboarding(){const slides=onboardingSlides(),i=Math.max(0,Math.min(state.onboardingStep,slides.length-1)),x=slides[i];document.getElementById('onboardingBody').innerHTML=`<div class="onboarding-number">0${i+1}</div><h2 id="onboardingTitle">${esc(x[0])}</h2><p>${esc(x[1])}</p><button class="onboarding-link ghost" data-action-call="closeOnboarding();showPage('${x[2]}')">Bu ekranı aç →</button>`;document.getElementById('onboardingProgress').textContent=`${i+1} / ${slides.length}`;document.getElementById('onboardingPrev').disabled=i===0;document.getElementById('onboardingNext').textContent=i===slides.length-1?'Başla':'Devam';}
-function openOnboarding(force=false){if(!force&&localStorage.getItem(onboardingKey())==='done')return;state.onboardingStep=0;document.getElementById('onboardingModal').classList.remove('hidden');renderOnboarding();}
+function renderOnboarding(){
+  const slides=onboardingSlides(),i=Math.max(0,Math.min(state.onboardingStep,slides.length-1)),x=slides[i];
+  document.getElementById('onboardingBody').innerHTML=`<div class="onboarding-number">0${i+1}</div><h2 id="onboardingTitle">${esc(x[0])}</h2><p>${esc(x[1])}</p><button class="onboarding-link ghost" data-action-call="closeOnboarding();showPage('${x[2]}')">${esc(x[3]||'Bu ekranı aç')} →</button>`;
+  document.getElementById('onboardingProgress').textContent=`${i+1} / ${slides.length}`;
+  document.getElementById('onboardingPrev').disabled=i===0;
+  document.getElementById('onboardingNext').textContent=i===slides.length-1?'Başla':'Devam';
+}
+/* 6.70.11.3: onboarding is manual-only; login/refresh never blocks the application. */
+function openOnboarding(force=false){
+  if(!force&&localStorage.getItem(onboardingKey())==='done')return;
+  state.onboardingStep=0;document.getElementById('onboardingModal').classList.remove('hidden');renderOnboarding();announceA11y('Hızlı başlangıç rehberi açıldı');
+}
 window.closeOnboarding=function(){localStorage.setItem(onboardingKey(),'done');document.getElementById('onboardingModal').classList.add('hidden');};
-document.getElementById('onboardingClose')?.addEventListener('click',closeOnboarding);document.getElementById('onboardingPrev')?.addEventListener('click',()=>{state.onboardingStep=Math.max(0,state.onboardingStep-1);renderOnboarding();});document.getElementById('onboardingNext')?.addEventListener('click',()=>{const n=onboardingSlides().length;if(state.onboardingStep>=n-1){closeOnboarding();return;}state.onboardingStep++;renderOnboarding();});
+document.getElementById('onboardingClose')?.addEventListener('click',closeOnboarding);
+document.getElementById('onboardingPrev')?.addEventListener('click',()=>{state.onboardingStep=Math.max(0,state.onboardingStep-1);renderOnboarding();});
+document.getElementById('onboardingNext')?.addEventListener('click',()=>{const n=onboardingSlides().length;if(state.onboardingStep>=n-1){closeOnboarding();showPage(isQualityOnly()?'quality360':'mycourses');return;}state.onboardingStep++;renderOnboarding();});
 
 document.addEventListener('keydown',e=>{if(e.altKey&&e.key.toLowerCase()==='n'){e.preventDefault();showPage('exams');}if(e.altKey&&e.key.toLowerCase()==='s'){e.preventDefault();showPage('scan');}if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){const active=currentPageName();if(active==='bank'){e.preventDefault();document.getElementById('bankSearch')?.focus();}}});
 
@@ -1952,7 +2053,7 @@ async function loadIdentity(){
   state.currentUser=await api('GET','/api/auth/me');
   document.getElementById('currentUserName').textContent=state.currentUser.display_name||state.currentUser.email;
   document.getElementById('currentUserRoles').textContent=(state.currentUser.roles||[]).map(x=>x.role_label||x.role).join(' · ')||'Rol atanmamış';
-  renderCurrentUserScope();applyRoleUI();enterApplication();setTimeout(()=>openOnboarding(false),350);return true;
+  renderCurrentUserScope();applyRoleUI();enterApplication();return true;
 }
 
 /* Backward UI contract markers retained for regression compatibility:
@@ -2020,6 +2121,7 @@ function applyRoleUI(){
   const profileCard=document.getElementById('accredProfileForm')?.closest('.card');if(profileCard)profileCard.classList.toggle('hidden',!hasAnyRole('admin','quality'));
   const demoCard=document.getElementById('demoScenarioCard');if(demoCard)demoCard.classList.toggle('hidden',!admin||state.authConfig?.app_env==='production');
   refreshNavGroups();
+  renderMobileQuickNav();
 }
 
 
@@ -2114,10 +2216,43 @@ document.getElementById('curriculumMapMatrix')?.addEventListener('change',async 
   }catch(err){toast(err.message,'error');await loadCurriculumMapWorkspace();}
 });
 
-document.getElementById('pilotUserSelect').addEventListener('change',e=>{localStorage.setItem('douPilotUser',e.target.value);localStorage.setItem('douPilotSession','1');location.reload();});
-document.getElementById('loginPilotBtn')?.addEventListener('click',()=>{const email=document.getElementById('loginPilotUser')?.value;if(!email)return;localStorage.setItem('douPilotUser',email);localStorage.setItem('douPilotSession','1');location.reload();});
-document.getElementById('loginPilotUser')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPilotBtn')?.click();});
-document.getElementById('logoutBtn')?.addEventListener('click',()=>{localStorage.removeItem('douPilotSession');sessionStorage.removeItem('douEntraAccessToken');location.reload();});
+async function completePilotLogin(email){
+  const chosen=String(email||'').trim();
+  if(!chosen)throw new Error('Lütfen bir akademik kullanıcı seçin.');
+  localStorage.setItem('douPilotUser',chosen);
+  localStorage.removeItem('douPilotSession');
+  state.currentUser=await api('GET','/api/auth/me');
+  if(!state.currentUser?.email)throw new Error('Kullanıcı oturumu doğrulanamadı.');
+  localStorage.setItem('douPilotSession','1');
+  const currentName=document.getElementById('currentUserName');if(currentName)currentName.textContent=state.currentUser.display_name||state.currentUser.email;
+  const currentRoles=document.getElementById('currentUserRoles');if(currentRoles)currentRoles.textContent=(state.currentUser.roles||[]).map(x=>x.role_label||x.role).join(' · ')||'Rol atanmamış';
+  const sideSelect=document.getElementById('pilotUserSelect');if(sideSelect)sideSelect.value=chosen;
+  renderCurrentUserScope();applyRoleUI();enterApplication();
+  await checkReady();
+  await refreshCore().catch(()=>{});
+  await refreshNotificationBadge().catch(()=>{});
+  showPage(isQualityOnly()?'quality360':'dashboard');
+}
+function setLoginBusy(busy,message=null){
+  const box=document.getElementById('pilotLoginBox'),btn=document.getElementById('loginPilotBtn');
+  box?.classList.toggle('is-busy',!!busy);
+  if(btn){btn.disabled=!!busy;btn.firstChild.textContent=busy?'Giriş yapılıyor… ':'Sisteme giriş yap ';}
+  const err=document.getElementById('pilotLoginError');
+  if(err&&message!==null){err.textContent=message||'';err.classList.toggle('show',!!message);}
+}
+document.getElementById('pilotUserSelect')?.addEventListener('change',async e=>{
+  try{setLoginBusy(true);await completePilotLogin(e.target.value);}
+  catch(err){localStorage.removeItem('douPilotSession');showLoginGate();setLoginBusy(false,err.message||'Pilot kullanıcı girişi başarısız.');}
+  finally{setLoginBusy(false);}
+});
+document.getElementById('loginPilotBtn')?.addEventListener('click',async()=>{
+  const email=document.getElementById('loginPilotUser')?.value;
+  try{setLoginBusy(true);await completePilotLogin(email);}
+  catch(err){localStorage.removeItem('douPilotSession');showLoginGate();setLoginBusy(false,err.message||'Pilot kullanıcı girişi başarısız.');}
+  finally{setLoginBusy(false);}
+});
+document.getElementById('loginPilotUser')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('loginPilotBtn')?.click();}});
+document.getElementById('logoutBtn')?.addEventListener('click',()=>{localStorage.removeItem('douPilotSession');localStorage.removeItem('douPilotUser');sessionStorage.removeItem('douEntraAccessToken');showLoginGate();location.reload();});
 document.getElementById('entraLoginBtn')?.addEventListener('click',()=>startEntraLogin().catch(e=>toast(e.message,'error')));
 
 function studentCardStatusLabel(status){return status==='achieved'?'Hedef sağlandı':status==='not_measured'?'Ölçülmedi':'Gelişim gerekli';}
@@ -2160,6 +2295,7 @@ async function loadStudentCard(){
       <article><span>ÖLÇÜLEN ÖÇ</span><b>${measuredLo}</b><small>${riskLo?`${riskLo} gelişim odağı`:'Riskli ÖÇ yok'}</small></article>
       <article><span>ÖLÇÜLEN PÇ</span><b>${measuredPo}</b><small>${riskPo?`${riskPo} gelişim odağı`:'Riskli PÇ yok'}</small></article>
       <article><span>DERS KAPSAMI</span><b>${card.course_count||0}</b><small>sonuçlandırılmış ölçüm</small></article>`;
+    const decision=document.getElementById('studentCardDecision');if(decision){const tone=(riskLo||riskPo)?'risk':card.graduate_ready?'good':'watch';const title=tone==='risk'?'Gelişim planı gerekiyor':tone==='good'?'Öğrenci hedeflerde ilerliyor':'Ölçüm kapsamı tamamlanıyor';const copy=tone==='risk'?`${riskLo} Öğrenim Çıktısı ve ${riskPo} Program Çıktısı hedef altında. Önce aşağıdaki gelişim odağından başlayın.`:tone==='good'?'Program çıktıları hedefte. Dönemsel gelişimi izlemeye devam edin.':'Henüz mezuniyet kararı için yeterli doğrudan ölçüm yok.';decision.className=`student-decision-brief card ${tone}`;decision.innerHTML=`<div><span class="eyebrow">SONRAKİ ADIM</span><h3>${title}</h3><p>${copy}</p></div><div class="student-decision-actions"><button type="button" class="primary small" data-student-action="focus">${tone==='risk'?'Gelişim odağını gör':'Ders gelişimini gör'}</button><button type="button" class="ghost small" data-student-action="pdf">PDF karnesi</button></div>`;}
     const po=document.getElementById('studentCardPO');if(po)po.innerHTML=(card.program_outcomes||[]).map(studentCardOutcomeRow).join('')||'<div class="empty-state"><b>PÇ ölçümü yok.</b><span>ÖÇ→PÇ eşleştirmesi ve onaylı sınav verisi bekleniyor.</span></div>';
     const strong=s.strongest,weak=s.weakest;
     const focus=document.getElementById('studentCardFocus');if(focus)focus.innerHTML=`<div class="student-focus-grid">
@@ -2180,6 +2316,8 @@ async function loadStudentCard(){
 document.getElementById('studentCardLoad')?.addEventListener('click',loadStudentCard);
 let studentCardSearchTimer=null;document.getElementById('studentCardSearch')?.addEventListener('input',()=>{clearTimeout(studentCardSearchTimer);studentCardSearchTimer=setTimeout(async()=>{await loadStudentCardCandidates();if(document.getElementById('studentCardStudent')?.value)await loadStudentCard();},250);});
 document.getElementById('studentCardStudent')?.addEventListener('change',loadStudentCard);
+document.getElementById('studentCardDecision')?.addEventListener('click',e=>{const b=e.target.closest('[data-student-action]');if(!b)return;if(b.dataset.studentAction==='focus')document.getElementById('studentCardFocus')?.scrollIntoView({behavior:'smooth',block:'center'});if(b.dataset.studentAction==='pdf')document.getElementById('studentCardPdf')?.click();});
+
 document.getElementById('studentCardPdf')?.addEventListener('click',async()=>{const id=Number(document.getElementById('studentCardStudent')?.value||0),year=(document.getElementById('studentCardYear')?.value||'').trim();if(!id)return;try{await downloadApi(`/api/compliance/students/${id}/outcome-card.pdf${year?`?academic_year=${encodeURIComponent(year)}`:''}`,`DOU-Student-Outcome-Card-${id}.pdf`);}catch(e){toast(e.message,'error')}});
 document.getElementById('studentCardFreeze')?.addEventListener('click',async()=>{const id=Number(document.getElementById('studentCardStudent')?.value||0),year=(document.getElementById('studentCardYear')?.value||'').trim();if(!id||!year)return toast('Öğrenci ve akademik yıl seçin.','error');try{const x=await api('POST',`/api/compliance/students/${id}/outcome-snapshots`,{academic_year:year,snapshot_type:'graduation',freeze:true});toast(`Mezuniyet karnesi donduruldu · v${x.version_no}`);}catch(e){toast(e.message,'error')}});
 
@@ -2276,6 +2414,10 @@ document.getElementById('refreshOperations')?.addEventListener('click',prepareOp
 document.getElementById('runSchedulerNow')?.addEventListener('click',async()=>{try{const r=await api('POST','/api/operations/scheduler/run',{});toast(`Scheduler tamamlandı · ${r.notifications?.created||0} bildirim`);await prepareOperations();}catch(e){toast(e.message,'error');}});
 document.getElementById('queueBackupNow')?.addEventListener('click',async()=>{const box=document.getElementById('operationsSummary');try{const j=await api('POST','/api/operations/jobs/backup',{});toast(`Backup işi #${j.id} kuyruğa alındı.`);await pollOperationalJob(j.id,box,()=>toast('Backup ve doğrulaması tamamlandı.'));await prepareOperations();}catch(e){toast(e.message,'error');await prepareOperations();}});
 
+// 6.70.5 — Guided empty states
+function clearBankFilters(){['bankSearch','bankFilterOutcome'].forEach(id=>{const x=document.getElementById(id);if(x)x.value='';});['bankFilterProgram','bankFilterCourse','bankFilterType','bankFilterReview'].forEach(id=>{const x=document.getElementById(id);if(x)x.value='';});state.bankOffset=0;loadBank().catch(e=>toast(e.message,'error'));}
+document.addEventListener('click',e=>{const b=e.target.closest?.('[data-empty-action]');if(!b)return;const a=b.dataset.emptyAction;if(a==='new-question'){showPage('bank');setTimeout(()=>openNewBankQuestion().catch(err=>toast(err.message,'error')),80);}else if(a==='new-exam'){showPage('exams');setTimeout(()=>document.getElementById('examCreateCard')?.scrollIntoView({behavior:'smooth',block:'start'}),80);}else if(a==='open-exams')showPage('exams');else if(a==='clear-bank')clearBankFilters();else if(a==='help')document.getElementById('guideBtn')?.click();});
+
 // 6.68 — User-facing notification center
 function notificationSeverityClass(value){const v=String(value||'').toLowerCase();if(['critical','danger','error'].includes(v))return 'critical';if(['success','ready','ok'].includes(v))return 'success';if(['info','notice'].includes(v))return 'info';return 'warning';}
 function notificationTime(value){if(!value)return '';try{return new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeStyle:'short'}).format(new Date(value));}catch{return String(value);}}
@@ -2289,18 +2431,25 @@ async function loadNotifications(){
   try{
     const r=await api('GET','/api/operations/notifications?limit=80&offset=0');const items=r.items||[];
     if(count)count.textContent=`${r.total||0} aktif bildirim`;
-    list.innerHTML=items.length?items.map(n=>`<button type="button" class="notification-row ${notificationSeverityClass(n.severity)} ${n.status==='unread'?'unread':''}" data-notification-id="${Number(n.id)}" data-notification-url="${esc(n.action_url||'')}"><i class="notification-dot"></i><span class="notification-copy"><b>${esc(n.title||'Bildirim')}</b><span>${esc(n.body||'')}</span><small>${esc(notificationTime(n.created_at))}${n.status==='unread'?' · Okunmadı':' · Okundu'}</small></span><span class="notification-open">Aç →</span></button>`).join(''):'<div class="empty-state"><b>Aktif bildirim yok</b><span>Yaklaşan termin veya gecikmiş aksiyon oluştuğunda burada görünecek.</span></div>';
+    list.innerHTML=items.length?items.map(n=>`<button type="button" class="notification-row ${notificationSeverityClass(n.severity)} ${n.status==='unread'?'unread':''}" data-notification-id="${Number(n.id)}" data-notification-url="${esc(n.action_url||'')}" data-notification-source="${esc(n.source_entity_type||'')}" data-notification-source-id="${Number(n.source_entity_id||0)}" data-notification-program-id="${Number(n.program_id||0)}"><i class="notification-dot"></i><span class="notification-copy"><b>${esc(n.title||'Bildirim')}</b><span>${esc(n.body||'')}</span><small>${esc(notificationTime(n.created_at))}${n.status==='unread'?' · Okunmadı':' · Okundu'}</small></span><span class="notification-open">İşe git →</span></button>`).join(''):'<div class="empty-state guided-empty"><div class="empty-visual">✓</div><b>Şu anda bekleyen bildirim yok</b><span>Yaklaşan termin veya gecikmiş aksiyon olduğunda burada doğrudan işe giden bağlantı göreceksiniz.</span></div>';
     await refreshNotificationBadge();
   }catch(e){list.innerHTML=`<p class="muted">${esc(e.message)}</p>`;if(count)count.textContent='Bildirimler alınamadı';}
 }
 async function openNotificationCenter(){document.getElementById('notificationModal')?.classList.remove('hidden');await loadNotifications();}
 function closeNotificationCenter(){document.getElementById('notificationModal')?.classList.add('hidden');}
-function openNotificationAction(url){const raw=String(url||'');const hash=raw.includes('#')?raw.split('#').pop():'';if(hash&&pageMeta[hash])showPage(hash);}
+function openNotificationAction(url,sourceType='',sourceId=0,programId=0){
+  const type=String(sourceType||'');
+  if(type==='quality_cycle'||type==='quality_calendar_event'||type==='accreditation_document_request'||type==='accreditation_finding'){
+    showPage('quality360');setTimeout(()=>{const p=document.getElementById('q360Program');if(p&&programId&&[...p.options].some(o=>Number(o.value)===Number(programId)))p.value=String(programId);const tab=type==='quality_cycle'?'cycle':type==='quality_calendar_event'?'calendar':type==='accreditation_document_request'||type==='accreditation_finding'?'readiness':'overview';setQ360Workspace(tab);if(programId)document.getElementById('q360Load')?.click();},140);return;
+  }
+  if(type==='assessment_plan_item'){showPage('assessmentassurance');setTimeout(()=>{const p=document.getElementById('assessmentAssuranceProgram');if(p&&programId)p.value=String(programId);document.getElementById('assessmentAssuranceProgram')?.dispatchEvent(new Event('change'));},140);return;}
+  const raw=String(url||'');const hash=raw.includes('#')?raw.split('#').pop().split('?')[0]:'';if(hash&&pageMeta[hash])showPage(hash);
+}
 document.getElementById('notificationBtn')?.addEventListener('click',openNotificationCenter);
 document.getElementById('notificationClose')?.addEventListener('click',closeNotificationCenter);
 document.getElementById('notificationModal')?.addEventListener('click',e=>{if(e.target.id==='notificationModal')closeNotificationCenter();});
 document.getElementById('notificationReadAll')?.addEventListener('click',async()=>{try{const r=await api('POST','/api/operations/notifications/read-all',{});toast(`${r.updated||0} bildirim okundu olarak işaretlendi.`);await loadNotifications();}catch(e){toast(e.message,'error');}});
-document.getElementById('notificationList')?.addEventListener('click',async e=>{const row=e.target.closest('[data-notification-id]');if(!row)return;const id=Number(row.dataset.notificationId||0),url=row.dataset.notificationUrl||'';try{if(row.classList.contains('unread'))await api('PATCH',`/api/operations/notifications/${id}/read`,{});}catch{}closeNotificationCenter();openNotificationAction(url);await refreshNotificationBadge();});
+document.getElementById('notificationList')?.addEventListener('click',async e=>{const row=e.target.closest('[data-notification-id]');if(!row)return;const id=Number(row.dataset.notificationId||0),url=row.dataset.notificationUrl||'',source=row.dataset.notificationSource||'',sourceId=Number(row.dataset.notificationSourceId||0),programId=Number(row.dataset.notificationProgramId||0);try{if(row.classList.contains('unread'))await api('PATCH',`/api/operations/notifications/${id}/read`,{});}catch{}closeNotificationCenter();openNotificationAction(url,source,sourceId,programId);await refreshNotificationBadge();});
 
 document.getElementById('runEvidenceIntegrityScan')?.addEventListener('click',async()=>{
   const box=document.getElementById('evidenceIntegrityStatus');const btn=document.getElementById('runEvidenceIntegrityScan');
@@ -2344,13 +2493,26 @@ async function createDefaultProgramReviewTemplate(){
 }
 async function prepareEvidenceHub(reset=false){
   if(!canAccreditation()){toast('Kanıt Merkezi kalite veya program yönetimi rolü gerektirir.','error');showPage('dashboard');return;}
-  try{if(!state.programs.length)await refreshCore();fillProgramSelect(document.getElementById('evidenceHubProgram'),true);if(reset)state.evidenceHubOffset=0;renderEvidenceHubTarget();await loadEvidenceHub();}catch(e){toast(e.message,'error');}
+  try{if(!state.programs.length)await refreshCore();fillProgramSelect(document.getElementById('evidenceHubProgram'),true);if(reset)state.evidenceHubOffset=0;renderEvidenceHubTarget();await Promise.all([loadEvidenceHub(),loadEvidenceHubSummary()]);}catch(e){toast(e.message,'error');}
 }
 function renderEvidenceHubTarget(){const box=document.getElementById('evidenceHubTarget');if(!box)return;const t=state.evidenceHubTargetSection;if(!t){box.classList.add('hidden');box.textContent='';return;}box.classList.remove('hidden');box.innerHTML=`<b>Kanıt bağlama hedefi:</b> ${esc(t.title)} <button type="button" class="ghost tiny" data-evidence-clear-target>Hedefi kaldır</button>`;}
 function evidenceHubQueryString(){const params=new URLSearchParams();const program=document.getElementById('evidenceHubProgram')?.value,source=document.getElementById('evidenceHubSource')?.value,integrity=document.getElementById('evidenceHubIntegrity')?.value,tag=(document.getElementById('evidenceHubTag')?.value||'').trim(),q=(document.getElementById('evidenceHubQuery')?.value||'').trim();if(program)params.set('program_id',program);if(source)params.set('source_type',source);if(integrity)params.set('integrity_status',integrity);if(tag)params.set('tag',tag);if(q)params.set('q',q);params.set('limit',String(state.evidenceHubLimit));params.set('offset',String(state.evidenceHubOffset));return params.toString();}
+function evidenceIntegrityLabel(value){return ({verified:'Doğrulanmış',unchecked:'Kontrol bekliyor',mismatch:'Hash uyuşmazlığı',missing:'Dosya eksik'})[value]||value||'Kontrol bekliyor';}
+async function loadEvidenceHubSummary(){
+  const pid=document.getElementById('evidenceHubProgram')?.value||'';const r=await api('GET',`/api/evidence-hub/summary${pid?`?program_id=${encodeURIComponent(pid)}`:''}`);
+  state.evidenceHubSummary=r;const total=Number(r.total||0),verified=Number(r.verified||0),attention=Number(r.attention||0),used=Number(r.used_in_review||0),dup=Number(r.duplicate_groups||0);
+  const k=document.getElementById('evidenceHubKpis');if(k)k.innerHTML=`<article><span>Toplam kanıt</span><b>${total}</b><small>Tüm yetkili kaynaklar</small></article><article class="good"><span>Doğrulanmış</span><b>${verified}</b><small>${total?Math.round(verified/total*100):0}% bütünlük onaylı</small></article><article class="${attention?'warn':'good'}"><span>Dikkat isteyen</span><b>${attention}</b><small>${Number(r.missing||0)} dosya eksik · ${Number(r.mismatch||0)} hash sorunu</small></article><article><span>Review'da kullanılan</span><b>${used}</b><small>${dup} duplicate SHA grubu</small></article>`;
+  const box=document.getElementById('evidenceHubDecision');if(!box)return;
+  let title='Kanıt havuzu sağlıklı',text='Dosya bütünlüğü açısından acil kontrol gerektiren kayıt görünmüyor.',cta='Program Review’u aç',target='programreview',tone='good';
+  if(Number(r.missing||0)>0||Number(r.mismatch||0)>0){title=`${Number(r.missing||0)+Number(r.mismatch||0)} kritik kanıt sorunu`;text='Dosyası eksik veya SHA-256 bütünlüğü bozuk kayıtları önce kontrol edin.';cta='Sorunlu kanıtları göster';target='attention';tone='warn';}
+  else if(Number(r.unchecked||0)>0){title=`${r.unchecked} kanıt kontrol bekliyor`;text='Yeni yüklenen kanıtların bütünlük durumunu doğrulayın ve uygun ölçüt/etiket ile ilişkilendirin.';cta='Kontrol bekleyenleri göster';target='unchecked';tone='warn';}
+  else if(total>0&&used===0){title='Kanıt var, kullanım bağlantısı yok';text='Kanıtları Program Review bölümlerine veya ilgili kalite ölçütlerine bağlayarak izlenebilirliği tamamlayın.';cta='Program Review’u aç';target='programreview';tone='warn';}
+  box.className=`evidence-decision-brief card ${tone}`;box.innerHTML=`<div><span class="eyebrow">KANIT KARARI</span><h3>${esc(title)}</h3><p>${esc(text)}</p></div><button class="${tone==='good'?'primary':'ghost'}" type="button" data-evidence-decision="${esc(target)}">${esc(cta)} →</button>`;
+}
+
 async function loadEvidenceHub(){
   const r=await api('GET',`/api/evidence-hub?${evidenceHubQueryString()}`);state.evidenceHubTotal=Number(r.total||0);const items=r.items||[],box=document.getElementById('evidenceHubList'),count=document.getElementById('evidenceHubCount');if(count)count.textContent=`${state.evidenceHubTotal} kanıt · ${state.evidenceHubOffset+1}-${Math.min(state.evidenceHubOffset+items.length,state.evidenceHubTotal)}`;
-  if(box)box.innerHTML=items.length?items.map(x=>`<article class="evidence-hub-row"><div><h4>${esc(x.title)}</h4><p>${esc(x.description||x.context||'')}</p><div class="evidence-hub-meta"><span class="evidence-hub-chip">${esc(evidenceSourceLabel(x.source_type))}</span>${x.category?`<span class="evidence-hub-chip">${esc(x.category)}</span>`:''}<span class="evidence-hub-chip ${x.integrity_status==='verified'?'good':x.integrity_status==='mismatch'||x.integrity_status==='missing'?'bad':''}">${esc(x.integrity_status||'unchecked')}</span><span class="evidence-hub-chip">${Number(x.review_usage_count||0)} review kullanımı</span>${(x.tags||[]).map(t=>`<span class="evidence-hub-chip">#${esc(t.label)}</span>`).join('')}</div></div><div class="evidence-hub-actions"><button type="button" class="ghost tiny" data-evidence-detail="${esc(x.source_type)}:${Number(x.source_id)}">Detay</button>${x.download_url?`<button type="button" class="ghost tiny" data-evidence-download="${esc(x.download_url)}">Aç</button>`:''}${state.evidenceHubTargetSection?`<button type="button" class="primary tiny" data-evidence-link="${esc(x.source_type)}:${Number(x.source_id)}">Bölüme bağla</button>`:''}</div></article>`).join(''):'<div class="empty-state"><b>Kanıt bulunamadı</b><span>Filtreleri değiştirip tekrar arayın.</span></div>';
+  if(box)box.innerHTML=items.length?items.map(x=>`<article class="evidence-hub-row"><div><h4>${esc(x.title)}</h4><p>${esc(x.description||x.context||'')}</p><div class="evidence-hub-meta"><span class="evidence-hub-chip">${esc(evidenceSourceLabel(x.source_type))}</span>${x.category?`<span class="evidence-hub-chip">${esc(x.category)}</span>`:''}<span class="evidence-hub-chip ${x.integrity_status==='verified'?'good':x.integrity_status==='mismatch'||x.integrity_status==='missing'?'bad':''}">${esc(evidenceIntegrityLabel(x.integrity_status))}</span><span class="evidence-hub-chip">${Number(x.review_usage_count||0)} review kullanımı</span>${(x.tags||[]).map(t=>`<span class="evidence-hub-chip">#${esc(t.label)}</span>`).join('')}</div></div><div class="evidence-hub-actions"><button type="button" class="ghost tiny" data-evidence-detail="${esc(x.source_type)}:${Number(x.source_id)}">Detay</button>${x.download_url?`<button type="button" class="ghost tiny" data-evidence-download="${esc(x.download_url)}">Aç</button>`:''}${state.evidenceHubTargetSection?`<button type="button" class="primary tiny" data-evidence-link="${esc(x.source_type)}:${Number(x.source_id)}">Bölüme bağla</button>`:''}</div></article>`).join(''):'<div class="empty-state"><b>Kanıt bulunamadı</b><span>Filtreleri değiştirip tekrar arayın.</span></div>';
   const page=Math.floor(state.evidenceHubOffset/state.evidenceHubLimit)+1,totalPages=Math.max(1,Math.ceil(state.evidenceHubTotal/state.evidenceHubLimit));const info=document.getElementById('evidenceHubPageInfo');if(info)info.textContent=`${page} / ${totalPages}`;const prev=document.getElementById('evidenceHubPrev'),next=document.getElementById('evidenceHubNext');if(prev)prev.disabled=state.evidenceHubOffset<=0;if(next)next.disabled=state.evidenceHubOffset+state.evidenceHubLimit>=state.evidenceHubTotal;
 }
 async function showEvidenceHubDetail(sourceType,sourceId){const d=await api('GET',`/api/evidence-hub/item/${encodeURIComponent(sourceType)}/${Number(sourceId)}`);state.evidenceHubCurrent={sourceType,sourceId,detail:d};const e=d.evidence||{},box=document.getElementById('evidenceHubDetail');if(!box)return;box.innerHTML=`<h4>${esc(e.title||'Kanıt')}</h4><div class="kv"><span>Kaynak</span><b>${esc(evidenceSourceLabel(sourceType))} #${Number(sourceId)}</b></div><div class="kv"><span>Bağlam</span><b>${esc(e.context||'—')}</b></div><div class="kv"><span>SHA-256</span><b><code>${esc(e.sha256||'—')}</code></b></div><div class="kv"><span>Bütünlük</span><b>${esc(e.integrity_status||'unchecked')}</b></div><div class="evidence-detail-tags">${(d.tags||[]).map(t=>`<span class="evidence-hub-chip">#${esc(t.label)} <button type="button" class="icon-x" data-evidence-delete-tag="${Number(t.id)}">×</button></span>`).join('')||'<span class="muted">Etiket yok.</span>'}</div><div class="row"><input data-evidence-new-tag placeholder="Yeni etiket"><button type="button" class="ghost small" data-evidence-add-tag>Etiket ekle</button></div><h4>Kullanım zinciri</h4><div class="evidence-detail-usage">${(d.program_review_usage||[]).length?(d.program_review_usage||[]).map(u=>`<div><b>${esc(u.review_title)}</b><span>${esc(u.section_title)} · ${esc(programReviewStatusLabel(u.status))}</span></div>`).join(''):'<div class="muted">Henüz Program Review bölümünde kullanılmıyor.</div>'}</div>`;}
@@ -2365,17 +2527,19 @@ document.getElementById('programReviewList')?.addEventListener('click',e=>{const
 document.getElementById('programReviewSections')?.addEventListener('click',async e=>{const card=e.target.closest('[data-pr-section]');if(!card)return;const sid=Number(card.dataset.prSection),rid=Number(state.currentProgramReview?.review?.id||0);try{if(e.target.closest('[data-pr-save]')){await api('PATCH',`/api/program-review-sections/${sid}`,{narrative:card.querySelector('[data-pr-narrative]')?.value||'',contributor_email:card.querySelector('[data-pr-contributor]')?.value||'',reviewer_email:card.querySelector('[data-pr-reviewer]')?.value||'',due_date:card.querySelector('[data-pr-due]')?.value||null});toast('Bölüm kaydedildi.');await loadProgramReview(rid);}else if(e.target.closest('[data-pr-submit]')){await api('POST',`/api/program-review-sections/${sid}/submit`,{});toast('Bölüm reviewer incelemesine gönderildi.');await loadProgramReview(rid);}else{const review=e.target.closest('[data-pr-review]');if(review){await api('POST',`/api/program-review-sections/${sid}/review`,{decision:review.dataset.decision,note:card.querySelector('[data-pr-review-note]')?.value||''});toast(review.dataset.decision==='approve'?'Bölüm onaylandı.':'Revizyon istendi.');await loadProgramReview(rid);return;}const add=e.target.closest('[data-pr-add-evidence]');if(add){const sec=(state.currentProgramReview?.sections||[]).find(x=>Number(x.id)===sid);state.evidenceHubTargetSection={id:sid,reviewId:rid,title:sec?.title||`Bölüm #${sid}`};showPage('evidencehub');return;}const unlink=e.target.closest('[data-pr-unlink]');if(unlink){if(!confirm('Kanıt bağlantısı kaldırılsın mı?'))return;await api('DELETE',`/api/program-review-evidence-links/${Number(unlink.dataset.prUnlink)}`);toast('Kanıt bağlantısı kaldırıldı.');await loadProgramReview(rid);}}}catch(err){toast(err.message,'error');}});
 document.getElementById('programReviewFinalize')?.addEventListener('click',async()=>{const id=Number(state.currentProgramReview?.review?.id||0);if(!id)return;if(!confirm('Tüm onaylı bölümler immutable final snapshot olarak mühürlensin mi?'))return;try{await api('POST',`/api/program-reviews/${id}/finalize`,{});toast('Program Review final snapshot ile mühürlendi.');await loadProgramReview(id);}catch(e){toast(e.message,'error');}});
 document.getElementById('programReviewProgress')?.addEventListener('click',async e=>{const b=e.target.closest('[data-pr-verify-final]');if(!b)return;try{const r=await api('GET',`/api/program-reviews/${Number(b.dataset.prVerifyFinal)}/final-snapshot`);toast(r.integrity_status==='verified'?'Final snapshot SHA doğrulandı.':'Final snapshot SHA uyuşmuyor!',r.integrity_status==='verified'?'ok':'error');}catch(err){toast(err.message,'error');}});
-document.getElementById('evidenceHubSearch')?.addEventListener('click',()=>{state.evidenceHubOffset=0;loadEvidenceHub().catch(e=>toast(e.message,'error'));});
-document.getElementById('evidenceHubProgram')?.addEventListener('change',()=>{state.evidenceHubOffset=0;loadEvidenceHub().catch(e=>toast(e.message,'error'));});
+document.getElementById('evidenceHubSearch')?.addEventListener('click',()=>{state.evidenceHubOffset=0;Promise.all([loadEvidenceHub(),loadEvidenceHubSummary()]).catch(e=>toast(e.message,'error'));});
+document.getElementById('evidenceHubProgram')?.addEventListener('change',()=>{state.evidenceHubOffset=0;Promise.all([loadEvidenceHub(),loadEvidenceHubSummary()]).catch(e=>toast(e.message,'error'));});
 document.getElementById('evidenceHubPrev')?.addEventListener('click',()=>{state.evidenceHubOffset=Math.max(0,state.evidenceHubOffset-state.evidenceHubLimit);loadEvidenceHub().catch(e=>toast(e.message,'error'));});
 document.getElementById('evidenceHubNext')?.addEventListener('click',()=>{if(state.evidenceHubOffset+state.evidenceHubLimit<state.evidenceHubTotal){state.evidenceHubOffset+=state.evidenceHubLimit;loadEvidenceHub().catch(e=>toast(e.message,'error'));}});
 document.getElementById('evidenceHubList')?.addEventListener('click',async e=>{const detail=e.target.closest('[data-evidence-detail]'),link=e.target.closest('[data-evidence-link]'),download=e.target.closest('[data-evidence-download]');try{if(detail){const [t,id]=detail.dataset.evidenceDetail.split(':');await showEvidenceHubDetail(t,Number(id));}else if(link){const [t,id]=link.dataset.evidenceLink.split(':');await linkEvidenceToReview(t,Number(id));}else if(download){await downloadApi(download.dataset.evidenceDownload,'evidence',true);}}catch(err){toast(err.message,'error');}});
 document.getElementById('evidenceHubTarget')?.addEventListener('click',e=>{if(e.target.closest('[data-evidence-clear-target]')){state.evidenceHubTargetSection=null;renderEvidenceHubTarget();loadEvidenceHub().catch(err=>toast(err.message,'error'));}});
 document.getElementById('evidenceHubDetail')?.addEventListener('click',async e=>{const cur=state.evidenceHubCurrent;if(!cur)return;try{if(e.target.closest('[data-evidence-add-tag]')){const label=(document.getElementById('evidenceHubDetail')?.querySelector('[data-evidence-new-tag]')?.value||'').trim();if(!label)return toast('Etiket yazın.','error');await api('POST',`/api/evidence-hub/item/${cur.sourceType}/${cur.sourceId}/tags`,{label});toast('Etiket eklendi.');await showEvidenceHubDetail(cur.sourceType,cur.sourceId);await loadEvidenceHub();}const del=e.target.closest('[data-evidence-delete-tag]');if(del){await api('DELETE',`/api/evidence-hub/tags/${Number(del.dataset.evidenceDeleteTag)}`);toast('Etiket kaldırıldı.');await showEvidenceHubDetail(cur.sourceType,cur.sourceId);await loadEvidenceHub();}}catch(err){toast(err.message,'error');}});
+document.getElementById('evidenceHubDecision')?.addEventListener('click',e=>{const b=e.target.closest('[data-evidence-decision]');if(!b)return;const t=b.dataset.evidenceDecision;if(t==='programreview'){showPage('programreview');return;}const integrity=document.getElementById('evidenceHubIntegrity');if(t==='attention'){const r=state.evidenceHubSummary||{};integrity.value=Number(r.mismatch||0)>0?'mismatch':Number(r.missing||0)>0?'missing':'unchecked';state.evidenceHubOffset=0;loadEvidenceHub().catch(err=>toast(err.message,'error'));}else if(t==='unchecked'){integrity.value='unchecked';state.evidenceHubOffset=0;loadEvidenceHub().catch(err=>toast(err.message,'error'));}});
+document.querySelector('.evidence-quick-filters')?.addEventListener('click',e=>{const b=e.target.closest('[data-evidence-health]');if(!b)return;const v=b.dataset.evidenceHealth,sel=document.getElementById('evidenceHubIntegrity');if(v==='verified')sel.value='verified';else if(v==='all')sel.value='';else{const r=state.evidenceHubSummary||{};sel.value=Number(r.mismatch||0)>0?'mismatch':Number(r.missing||0)>0?'missing':'unchecked';}state.evidenceHubOffset=0;loadEvidenceHub().catch(err=>toast(err.message,'error'));});
 document.getElementById('evidenceHubDuplicates')?.addEventListener('click',async()=>{try{const pid=document.getElementById('evidenceHubProgram')?.value;const r=await api('GET',`/api/evidence-hub/duplicates/sha256${pid?`?program_id=${encodeURIComponent(pid)}`:''}`);const box=document.getElementById('evidenceHubDetail');box.innerHTML=`<h4>Duplicate SHA-256 grupları</h4><p class="muted">Aynı içerik hash'ine sahip ${Number(r.duplicate_groups||0)} grup.</p>${(r.items||[]).length?(r.items||[]).map(g=>`<div class="duplicate-group"><b>${Number(g.count)} kayıt</b><code>${esc(g.sha256)}</code>${(g.items||[]).map(i=>`<div>${esc(evidenceSourceLabel(i.source_type))} #${Number(i.source_id)} · ${esc(i.title)}</div>`).join('')}</div>`).join(''):'<div class="empty-state"><b>Duplicate kanıt yok</b><span>Aynı SHA-256 ile tekrar kayıt tespit edilmedi.</span></div>'}`;}catch(e){toast(e.message,'error');}});
 
 syncQuestionTypeUI();syncBankTypeUI();
-(async()=>{try{await handleEntraCallback();const entered=await loadIdentity();if(!entered)return;await checkReady();await refreshCore().catch(()=>{});await refreshNotificationBadge().catch(()=>{});showPage(isQualityOnly()?'quality360':'dashboard');}catch(e){showLoginGate();toast(e.message,'error');document.getElementById('readyText').textContent='Kimlik doğrulama gerekli';}})();
+(async()=>{try{await handleEntraCallback();const entered=await loadIdentity();if(!entered)return;await checkReady();await refreshCore().catch(()=>{});await refreshNotificationBadge().catch(()=>{});showPage(isQualityOnly()?'quality360':'dashboard');}catch(e){showLoginGate();toast(e.message,'error');const ready=document.getElementById('readyText');if(ready)ready.textContent=state.authConfig?'Giriş tamamlanamadı':'Kimlik yapılandırması yüklenemedi';const err=document.getElementById('pilotLoginError');if(err){err.textContent=e.message||'Giriş tamamlanamadı.';err.classList.add('show');}}})();
 
 // 6.20 contextual guide + Excel Data Center
 const GUIDE_PAGES={
@@ -2412,10 +2576,19 @@ function openGuide(){
   const page=currentPageName(),g=GUIDE_PAGES[page]||GUIDE_PAGES.dashboard,p=guidePersona();
   document.getElementById('guideTitle').textContent=g.title;
   document.getElementById('guideRoleFlow').innerHTML=`<b>${esc(p.name)} · önerilen akış</b><div class="guide-flow-steps">${p.steps.map((x,i)=>`<span>${i+1}. ${esc(x)}</span>`).join('')}</div>`;
-  document.getElementById('guideContent').innerHTML=`<h4>Bu ekranda izlenecek yol</h4><ol>${g.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol><div class="guide-tip"><b>İpucu</b><br>${esc(g.tip)}</div>`;
+  const uat=state.authConfig?.app_env!=='production'?`<div class="guide-uat-box"><b>Pilot kullanılabilirlik testi</b><p>Bu ekranı ilk kez kullanıyormuş gibi görevi tamamlayın. Takıldığınız noktayı ekran adıyla birlikte tek tıkla kaydedin.</p><div class="guide-uat-actions"><button type="button" class="ghost small" data-guide-uat="restart">Hızlı başlangıcı yeniden göster</button><button type="button" class="primary small" data-guide-uat="feedback">Bu ekranda sürtünme bildir</button></div></div>`:'';
+  document.getElementById('guideContent').innerHTML=`<h4>Bu ekranda izlenecek yol</h4><ol>${g.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol><div class="guide-tip"><b>İpucu</b><br>${esc(g.tip)}</div>${uat}`;
   document.getElementById('guideDrawer')?.classList.remove('hidden');document.getElementById('guideBackdrop')?.classList.remove('hidden');
 }
 function closeGuide(){document.getElementById('guideDrawer')?.classList.add('hidden');document.getElementById('guideBackdrop')?.classList.add('hidden');}
+
+async function openQuickFrictionFeedback(){
+  const page=currentPageName(),meta=pageMeta[page]||[page];
+  const data=await workflowForm({eyebrow:'PİLOT UAT',title:'Bu ekranda nerede zorlandınız?',description:`Ekran: ${meta[0]||page}. Kısa ve somut yazın; teknik terim kullanmanız gerekmez.`,submitLabel:'Geri bildirimi kaydet',fields:[{name:'rating',label:'Kullanım kolaylığı',type:'select',options:[['5','5 · Çok kolay'],['4','4 · Kolay'],['3','3 · Orta'],['2','2 · Zor'],['1','1 · Çok zor']],value:'3'},{name:'message',label:'Takıldığınız nokta / öneri',type:'textarea',rows:4,required:true,placeholder:'Örn. Yeni sınav oluştururken hangi butona basacağımı bulamadım.'}]});
+  if(!data)return;
+  try{await api('POST','/api/feedback',{category:'usability',rating:Number(data.rating||3),page:meta[0]||page,message:(data.message||'').trim()});toast('Kullanılabilirlik notu kaydedildi. Teşekkürler.');closeGuide();}catch(e){toast(e.message,'error');}
+}
+document.getElementById('guideDrawer')?.addEventListener('click',e=>{const b=e.target.closest('[data-guide-uat]');if(!b)return;if(b.dataset.guideUat==='feedback')openQuickFrictionFeedback();if(b.dataset.guideUat==='restart'){closeGuide();openOnboarding(true);}});
 document.getElementById('guideBtn')?.addEventListener('click',openGuide);document.getElementById('guideClose')?.addEventListener('click',closeGuide);document.getElementById('guideBackdrop')?.addEventListener('click',closeGuide);
 
 let excelCatalog=[],excelSelected=null;
@@ -2808,3 +2981,136 @@ async function updateAcceptanceGate(key,status){
   if(status==='passed'&&!evidence.trim())return toast('PASS için kanıt / ticket / rapor referansı girin.','error');
   await api('PATCH',`/api/production-acceptance/${encodeURIComponent(key)}`,{status,evidence_ref:evidence,note});toast('Kabul kapısı güncellendi.');await loadProductionAcceptance();
 }
+
+/* =========================================================
+   6.70.4 USABILITY CLOSURE
+   Task-first dashboard, course quick actions, grade queue,
+   and Standard/Expert quality views.
+========================================================= */
+function renderDashboardNextAction(rows=[]){
+  const box=document.getElementById('dashboardNextAction');
+  if(!box)return;
+  const actionable=(rows||[]).find(x=>x.priority!=='info') || (rows||[])[0];
+  if(!actionable){
+    box.innerHTML='<div><span class="eyebrow">ŞİMDİ NE YAPMALIYIM?</span><h3>Bugün için bekleyen iş yok</h3><p class="muted">Derslerinizi açabilir veya yeni bir sınav hazırlayabilirsiniz.</p></div><button class="primary" type="button" data-action-call="showPage(\'mycourses\')">Derslerimi aç →</button>';
+    return;
+  }
+  const action=actionable.exam_id?`continueExamFromDashboard(${Number(actionable.exam_id)})`:`showPage('${String(actionable.page||'mycourses')}')`;
+  box.innerHTML=`<div><span class="eyebrow">ŞİMDİ NE YAPMALIYIM?</span><h3>${esc(actionable.title||'Sıradaki iş')}</h3><p class="muted">${esc(actionable.text||'')}</p></div><button class="primary" type="button" data-action-call="${action}">Devam et →</button>`;
+}
+
+function openSelectedCourseQuickAction(action){
+  if(!state.selectedCourseId)return;
+  const fake={dataset:{courseAction:action}};
+  const button=document.querySelector(`#courseActionPanel [data-course-action="${CSS.escape(action)}"]`);
+  if(button){button.click();return;}
+  if(action==='bank'){showPage('bank');setTimeout(()=>{const f=document.getElementById('bankFilterCourse');if(f){f.value=String(state.selectedCourseId);f.dispatchEvent(new Event('change'));}},80);}
+  if(action==='exams'){showPage('exams');setTimeout(()=>{const f=document.getElementById('examCourseFilter');if(f){f.value=String(state.selectedCourseId);f.dispatchEvent(new Event('change'));}},80);}
+  if(action==='grade')showPage('grade');
+  if(action==='courseanalytics'){showPage('courseanalytics');setTimeout(()=>{const sel=document.getElementById('courseAnalyticsCourse');if(sel){sel.value=String(state.selectedCourseId);document.getElementById('loadCourseAnalytics')?.click();}},80);}
+}
+document.getElementById('courseWorkspaceOverview')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-course-quick]');if(!b)return;
+  openSelectedCourseQuickAction(b.dataset.courseQuick);
+});
+
+function gradeQueueRows(){
+  const exams=(state.exams||[]).filter(x=>['grading','ready'].includes(x.status));
+  return exams.sort((a,b)=>{
+    const ap=a.status==='grading'?0:1,bp=b.status==='grading'?0:1;
+    return ap-bp || Number(b.id)-Number(a.id);
+  });
+}
+function renderGradeQueue(){
+  const root=document.getElementById('gradeQueue'),badge=document.getElementById('gradeQueueCount');
+  if(!root)return;
+  const rows=gradeQueueRows();
+  if(badge)badge.textContent=`${rows.length} bekleyen`;
+  root.innerHTML=rows.length?rows.map(exam=>`<button type="button" class="grade-queue-card ${exam.status==='grading'?'active-work':''}" data-grade-exam="${exam.id}"><span class="grade-queue-status">${exam.status==='grading'?'Puanlama':'Hazır'}</span><div><b>${esc(exam.course_code||'Ders')} · ${esc(exam.title||'Sınav')}</b><small>${esc(exam.exam_type||'')} · ${exam.status==='grading'?'Değerlendirmeye devam edin':'Değerlendirme moduna alınabilir'}</small></div><i>→</i></button>`).join(''):'<div class="empty-state compact guided-empty"><div class="empty-visual">✓</div><b>Şu anda puanlama bekleyen sınav yok</b><span>Hazır bir sınavı değerlendirme durumuna alın veya sınavlarınıza geri dönün.</span><button type="button" class="ghost small" data-empty-action="open-exams">Sınavları aç</button></div>';
+}
+document.getElementById('gradeQueue')?.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-grade-exam]');if(!b)return;
+  const id=Number(b.dataset.gradeExam),exam=(state.exams||[]).find(x=>x.id===id);
+  const select=document.getElementById('gradeExam');if(!select)return;
+  select.value=String(id);
+  if(exam?.status==='ready')toast('Bu sınav hazır durumda. Puan girişi için önce değerlendirme durumuna alın.','error');
+  await loadGradeStudents();
+  document.querySelector('.grade-hero')?.scrollIntoView({behavior:'smooth',block:'start'});
+});
+
+const QUALITY_VIEW_KEY='douAssessQualityViewMode';
+function qualityViewMode(){return localStorage.getItem(QUALITY_VIEW_KEY)||'standard';}
+function setQualityViewMode(mode='standard'){
+  const page=document.getElementById('page-quality360');if(!page)return;
+  const safe=mode==='expert'?'expert':'standard';
+  localStorage.setItem(QUALITY_VIEW_KEY,safe);
+  page.dataset.qualityMode=safe;
+  document.querySelectorAll('[data-quality-mode]').forEach(b=>b.classList.toggle('active',b.dataset.qualityMode===safe));
+  if(safe==='standard'){
+    const active=document.querySelector('[data-q360-workspace].active')?.dataset.q360Workspace;
+    const allowed=['overview','cycle','calendar','evidence'];
+    if(active&&!allowed.includes(active))setQ360Workspace('overview');
+  }
+}
+document.getElementById('qualityViewMode')?.addEventListener('click',e=>{const b=e.target.closest('[data-quality-mode]');if(b)setQualityViewMode(b.dataset.qualityMode);});
+
+
+/* =========================================================
+   6.70.6 MOBILE + ACCESSIBILITY + FIRST-USE CLOSURE
+========================================================= */
+function announceA11y(message=''){
+  const live=document.getElementById('a11yLive');if(!live)return;
+  live.textContent='';setTimeout(()=>{live.textContent=String(message||'');},10);
+}
+
+function renderMobileQuickNav(){
+  const root=document.getElementById('mobileQuickNav');if(!root)return;
+  const quality=isQualityOnly();
+  const items=quality?
+    [['dashboard','⌂','Ana'],['quality360','◆','Kalite'],['evidencehub','K','Kanıt'],['feedback','F','Geri Bildirim']]:
+    [['dashboard','⌂','Ana'],['mycourses','D','Ders'],['bank','?','Soru'],['exams','S','Sınav'],['grade','P','Puanla']];
+  root.innerHTML=items.map(([page,icon,label])=>`<button type="button" data-mobile-page="${page}" aria-label="${esc(label)}"><span aria-hidden="true">${esc(icon)}</span><b>${esc(label)}</b></button>`).join('');
+}
+document.getElementById('mobileQuickNav')?.addEventListener('click',e=>{const b=e.target.closest('[data-mobile-page]');if(!b)return;showPage(b.dataset.mobilePage);closeMobileNav();});
+
+function syncMobileQuickNavActive(){
+  const page=currentPageName();document.querySelectorAll('[data-mobile-page]').forEach(b=>b.classList.toggle('active',b.dataset.mobilePage===page));
+}
+const _showPage6706=showPage;
+showPage=function(name){_showPage6706(name);syncMobileQuickNavActive();};
+
+const dialogFocusState=new WeakMap();
+function focusableWithin(root){return [...root.querySelectorAll('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>!x.classList.contains('hidden')&&x.offsetParent!==null);}
+function activateDialogA11y(dialog){
+  if(!dialog||dialogFocusState.has(dialog))return;
+  const previous=document.activeElement;dialogFocusState.set(dialog,previous);
+  const items=focusableWithin(dialog);(items[0]||dialog).focus?.({preventScroll:true});
+}
+function deactivateDialogA11y(dialog){
+  const previous=dialogFocusState.get(dialog);dialogFocusState.delete(dialog);
+  if(previous&&document.contains(previous))previous.focus?.({preventScroll:true});
+}
+function dialogVisible(dialog){return !dialog.classList.contains('hidden')&&getComputedStyle(dialog).display!=='none';}
+const dialogObserver=new MutationObserver(entries=>entries.forEach(entry=>{const d=entry.target;if(dialogVisible(d))activateDialogA11y(d);else deactivateDialogA11y(d);}));
+document.querySelectorAll('[role="dialog"]').forEach(d=>{dialogObserver.observe(d,{attributes:true,attributeFilter:['class']});if(dialogVisible(d))activateDialogA11y(d);});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Tab')return;
+  const dialog=[...document.querySelectorAll('[role="dialog"]')].reverse().find(dialogVisible);if(!dialog)return;
+  const items=focusableWithin(dialog);if(!items.length){e.preventDefault();dialog.focus?.();return;}
+  const first=items[0],last=items[items.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+});
+
+document.querySelector('.skip-link')?.addEventListener('click',()=>setTimeout(()=>document.getElementById('mainContent')?.focus(),0));
+
+function markRequiredFields(){
+  document.querySelectorAll('input[required],select[required],textarea[required]').forEach(el=>{
+    el.setAttribute('aria-required','true');
+    const label=el.closest('label');if(label&&!label.querySelector('.required-mark'))label.insertAdjacentHTML('beforeend','<span class="required-mark" aria-hidden="true"> *</span>');
+  });
+}
+markRequiredFields();
+
+window.addEventListener('resize',()=>{if(window.innerWidth<=900)syncMobileQuickNavActive();});
+setTimeout(()=>{renderMobileQuickNav();syncMobileQuickNavActive();},0);

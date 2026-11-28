@@ -1098,11 +1098,11 @@ def run_pilot_uat(db: Session = Depends(get_db)):
     duration_ms = max(0, int((datetime.now(timezone.utc) - started).total_seconds() * 1000))
     row = m.PilotUATRun(
         status=result["status"], score=result["score"], checks=result["checks"],
-        summary={"readiness_score": result["readiness"]["score"], "version": APP_VERSION},
+        summary={"readiness_score": result["readiness"]["score"], "version": APP_VERSION, "journeys": result.get("journeys", [])},
         created_by=actor, duration_ms=duration_ms,
     )
     db.add(row); db.flush(); audit(db, "uat_run", "pilot_uat_run", row.id, {"status": row.status, "score": row.score}); _commit(db)
-    return {"id": row.id, "status": row.status, "score": row.score, "checks": row.checks, "summary": row.summary, "created_by": row.created_by, "duration_ms": row.duration_ms, "created_at": row.created_at.isoformat() if row.created_at else None}
+    return {"id": row.id, "status": row.status, "score": row.score, "checks": row.checks, "journeys": result.get("journeys", []), "summary": row.summary, "created_by": row.created_by, "duration_ms": row.duration_ms, "created_at": row.created_at.isoformat() if row.created_at else None}
 
 
 @app.get("/api/pilot/uat/runs")
