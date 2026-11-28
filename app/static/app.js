@@ -748,7 +748,7 @@ async function runAcademicWorkbook(validateOnly=false){
   const file=document.getElementById('academicWorkbookFile')?.files?.[0];const out=document.getElementById('academicWorkbookResult');
   if(!file){toast('Önce doldurulmuş Excel dosyasını seçin.','error');return;}
   const fd=new FormData();fd.append('file',file);if(out)out.textContent=validateOnly?'Excel doğrulanıyor…':'Excel içe aktarılıyor…';
-  try{const r=await api('POST',validateOnly?'/api/import/academic-workbook/validate':'/api/import/academic-workbook',fd);if(out)out.textContent=JSON.stringify(r,null,2);toast(validateOnly?'Excel doğrulaması başarılı.':'Akademik Excel içe aktarıldı.');if(!validateOnly)await loadData();}catch(e){if(out)out.textContent=e.message;toast(e.message,'error');}
+  try{const r=await api('POST',validateOnly?'/api/import/academic-workbook/validate':'/api/import/academic-workbook',fd);if(out)out.textContent=excelResultText(r);toast(validateOnly?'Excel doğrulaması başarılı.':'Akademik Excel içe aktarıldı.');if(!validateOnly)await loadData();}catch(e){if(out)out.textContent=e.message;toast(e.message,'error');}
 }
 document.getElementById('academicWorkbookValidate')?.addEventListener('click',()=>runAcademicWorkbook(true));
 document.getElementById('academicWorkbookImport')?.addEventListener('click',()=>runAcademicWorkbook(false));
@@ -876,7 +876,7 @@ async function uploadImport(validateOnly){
   const out=document.getElementById('importResult'); out.textContent='İşleniyor...';
   try{
     const path=validateOnly?'/api/integrations/obs/workbook/validate':'/api/integrations/obs/workbook/sync';
-    const r=await api('POST',path,fd); out.textContent=JSON.stringify(r,null,2);
+    const r=await api('POST',path,fd); out.textContent=excelResultText(r);
     toast(validateOnly?'Excel doğrulandı.':'Excel başarıyla PostgreSQL’e aktarıldı.');
     if(!validateOnly){await refreshCore();await loadDashboard();await preparePilotOps();}
   }catch(e){out.textContent=e.message;toast(e.message,'error');}
@@ -1396,7 +1396,7 @@ async function runQuestionBankWorkbook(validateOnly=false){
   const fd=new FormData();fd.append('file',file);if(out)out.textContent=validateOnly?'Soru havuzu Excel doğrulanıyor…':'Sorular havuza aktarılıyor…';
   try{
     const r=await api('POST',validateOnly?'/api/import/question-bank/validate':'/api/import/question-bank',fd);
-    if(out)out.textContent=JSON.stringify(r,null,2);
+    if(out)out.textContent=excelResultText(r);
     if(validateOnly)toast(`${r.ready??r.rows??0} soru içe aktarmaya hazır${r.duplicates?` · ${r.duplicates} tekrar`:''}.`);
     else{toast(`${r.summary?.created||0} soru havuza eklendi${r.summary?.skipped_duplicates?` · ${r.summary.skipped_duplicates} tekrar atlandı`:''}.`);await loadBank();}
   }catch(e){if(out)out.textContent=e.message;toast(e.message,'error');}
@@ -2867,7 +2867,9 @@ async function openExcelCenter(){
 }
 function closeExcelCenter(){document.getElementById('excelCenterModal')?.classList.add('hidden');excelSelected=null;}
 function selectExcelKind(kind){excelSelected=excelCatalog.find(x=>x.kind===kind);if(!excelSelected)return;document.querySelectorAll('[data-excel-kind]').forEach(x=>x.classList.toggle('active',x.dataset.excelKind===kind));document.getElementById('excelSelectedInfo').innerHTML=`<div class="excel-selected-title">${esc(excelSelected.title)}</div><div class="excel-selected-sub">${esc(excelSelected.description)}</div>`;document.getElementById('excelCenterWork')?.classList.remove('hidden');document.getElementById('excelCenterResult').textContent='';const f=document.getElementById('excelCenterFile');if(f)f.value='';document.getElementById('excelCenterFileName').textContent='Dosya seçilmedi';}
-async function excelSubmit(validateOnly){if(!excelSelected)return;const file=document.getElementById('excelCenterFile')?.files?.[0];if(!file)return toast('Önce Excel dosyasını seçin.','error');const fd=new FormData();fd.append('file',file);const out=document.getElementById('excelCenterResult');out.textContent='İşleniyor...';try{const r=await api('POST',validateOnly?excelSelected.validate_url:excelSelected.import_url,fd);out.textContent=JSON.stringify(r,null,2);toast(validateOnly?'Excel doğrulandı; içe aktarmaya hazır.':'Excel verileri içe aktarıldı.');if(!validateOnly)await refreshCore();}catch(e){out.textContent=e.message;toast(e.message,'error');}}
+const EXCEL_RESULT_TR={ok:'Durum',kind:'Tür',rows:'Satır sayısı',created:'Oluşturulan',updated:'Güncellenen',skipped:'Atlanan',duplicates:'Tekrar eden',message:'Mesaj',programs:'Programlar',courses:'Dersler',students:'Öğrenciler',enrollments:'Ders kayıtları',learning_outcomes:'Öğrenme çıktıları',program_outcomes:'Program çıktıları',mappings:'Eşleştirmeler',exams:'Sınavlar',questions:'Sorular',exam_students:'Sınav öğrencileri',bank_questions:'Havuz soruları',total:'Toplam',imported:'İçe aktarılan',warnings:'Uyarılar',details:'Ayrıntılar',summary:'Özet'};
+function excelResultText(r,ind){ind=ind||'';if(r===null||r===undefined)return '';if(typeof r==='boolean')return r?'Başarılı':'Başarısız';if(typeof r!=='object')return String(r);if(Array.isArray(r))return r.map(x=>ind+'• '+(typeof x==='object'?JSON.stringify(x):x)).join('\n');return Object.entries(r).filter(([k])=>k!=='batch_id').map(([k,v])=>{const label=EXCEL_RESULT_TR[k]||k;return (v&&typeof v==='object')?ind+label+':\n'+excelResultText(v,ind+'  '):ind+label+': '+excelResultText(v);}).join('\n');}
+async function excelSubmit(validateOnly){if(!excelSelected)return;const file=document.getElementById('excelCenterFile')?.files?.[0];if(!file)return toast('Önce Excel dosyasını seçin.','error');const fd=new FormData();fd.append('file',file);const out=document.getElementById('excelCenterResult');out.textContent='İşleniyor...';try{const r=await api('POST',validateOnly?excelSelected.validate_url:excelSelected.import_url,fd);out.textContent=excelResultText(r);toast(validateOnly?'Excel doğrulandı; içe aktarmaya hazır.':'Excel verileri içe aktarıldı.');if(!validateOnly)await refreshCore();}catch(e){out.textContent=e.message;toast(e.message,'error');}}
 document.getElementById('excelCenterBtn')?.addEventListener('click',openExcelCenter);document.getElementById('excelCenterClose')?.addEventListener('click',closeExcelCenter);document.getElementById('excelCenterModal')?.addEventListener('click',e=>{if(e.target.id==='excelCenterModal')closeExcelCenter();});document.getElementById('excelCenterKinds')?.addEventListener('click',e=>{const b=e.target.closest('[data-excel-kind]');if(b)selectExcelKind(b.dataset.excelKind);});document.getElementById('excelCenterFile')?.addEventListener('change',e=>{document.getElementById('excelCenterFileName').textContent=e.target.files?.[0]?.name||'Dosya seçilmedi';});document.getElementById('excelTemplateBtn')?.addEventListener('click',async()=>{if(!excelSelected)return;try{await downloadApi(excelSelected.template_url,`DOU-Assess-${excelSelected.kind}-Sablon.xlsx`);}catch(e){toast(e.message,'error');}});document.getElementById('excelValidateBtn')?.addEventListener('click',()=>excelSubmit(true));document.getElementById('excelImportBtn')?.addEventListener('click',()=>excelSubmit(false));
 
 

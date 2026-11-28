@@ -42,6 +42,8 @@ def obs_grades_xlsx(course_id: int, db: Session = Depends(get_db)):
                 ["Geçme notu (%)", gb["pass_threshold_percent"]], ["Üretim", datetime.now(timezone.utc).isoformat()],
                 ["Uyarı", "OBS toplu not şablonunun sütun düzeni kuruma göre değişir; bu dosyayı şablona kopyalayarak kullanın."]]:
         meta.append(row)
+    from .services.excel_tr import localize_workbook
+    localize_workbook(wb)
     buf = BytesIO(); wb.save(buf); buf.seek(0)
     db.add(m.AuditLog(actor_user_id=current_user().get("id"), actor_email=current_user().get("email") or "system", actor_roles=list(current_user().get("role_names") or []),
                       action="obs_grades_export", entity_type="course", entity_id=course_id, payload={"students": len(gb["students"]), "weights_valid": gb["weights_valid"]}))
