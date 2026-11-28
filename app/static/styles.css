@@ -2193,3 +2193,6 @@ body.login-active{overflow:hidden!important}
 #page-data .academic-form .required-mark{margin-left:1px}
 #page-data .academic-form-actions{margin-top:6px}
 .field-label-text .required-mark{color:#a6253e;font-weight:900}
+
+/* Admin side-drawer: no horizontal scrollbar (sticky head uses negative margins) */
+#academicCreatePanel{overflow-x:hidden!important}
