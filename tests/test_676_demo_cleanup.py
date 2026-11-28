@@ -30,3 +30,5 @@ def test_demo_cleanup_dry_run_then_apply(capsys):
     with SessionLocal() as db:
         assert not db.scalar(select(m.Program).where(m.Program.code == "DEMO-BP"))
         assert db.get(m.Program, program["id"]) is not None
+    # diğer testler demo senaryosunun varlığına güvenebilsin
+    assert client.post("/api/pilot/demo-scenario").status_code in (200, 201)

@@ -55,6 +55,7 @@ def main():
     for name, ids in sorted(found.items()):
         if ids:
             print(f"  {name}: {len(ids)} kayıt")
+    print("Demo kullanıcısı:", "demo-ogretim@local" if db.scalar(select(m.AppUser).where(m.AppUser.email == "demo-ogretim@local")) else "yok")
     print("Demo dönemleri:", [f"{p.academic_year} {p.term}" for p in periods] or "yok")
     if not a.apply:
         print("\nKuru çalıştırma — hiçbir şey silinmedi. Silmek için --apply ekleyin.")
@@ -73,6 +74,16 @@ def main():
             db.delete(p)
         else:
             print(f"Dönem {p.academic_year} başka kayıtlarca kullanıldığı için bırakıldı.")
+    db.flush()
+    demo_user = db.scalar(select(m.AppUser).where(m.AppUser.email == "demo-ogretim@local"))
+    if demo_user:
+        try:
+            with db.begin_nested():
+                db.execute(delete(m.UserRoleAssignment).where(m.UserRoleAssignment.user_id == demo_user.id))
+                db.delete(demo_user)
+                db.flush()
+        except Exception:
+            print("Demo kullanıcısı başka kayıtlarca kullanıldığı için bırakıldı.")
     db.commit()
     print("Demo verisi silindi.")
 
