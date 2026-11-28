@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .excel_tr import localize_workbook
 from io import BytesIO
 from typing import Iterable
 import re
@@ -221,6 +222,7 @@ def build_exam_results_xlsx(db: Session, exam_id: int) -> tuple[bytes, str]:
         sheet.sheet_view.showGridLines = False
 
     buf = BytesIO()
+    localize_workbook(wb)
     wb.save(buf)
     filename = f"DOU-Assess-Sinav-{exam.id}-Sonuclar.xlsx"
     return buf.getvalue(), filename
@@ -355,6 +357,7 @@ def build_accreditation_period_xlsx(db: Session, period_id: int) -> tuple[bytes,
         sheet.sheet_view.showGridLines = False
 
     buf = BytesIO()
+    localize_workbook(wb)
     wb.save(buf)
     return buf.getvalue(), f"DOU-Assess-Akreditasyon-Donem-{period['id']}.xlsx"
 
@@ -410,7 +413,7 @@ def build_quality_dashboard_xlsx(dashboard: dict) -> tuple[bytes, str]:
             cell = po_map.get(code)
             row.extend([cell["attainment_percent"], cell["target_percent"], cell["status"]] if cell else ["", "", "Ölçülmedi"])
         program_rows.append(row)
-    _tabular_sheet(wb, "Program_PC_Heatmap", headers, program_rows)
+    _tabular_sheet(wb, "Program_PC_Isi_Haritasi", headers, program_rows)
 
     _tabular_sheet(
         wb,
@@ -435,6 +438,7 @@ def build_quality_dashboard_xlsx(dashboard: dict) -> tuple[bytes, str]:
 
     for sheet in wb.worksheets:
         sheet.sheet_view.showGridLines = False
+    localize_workbook(wb)
     buf = BytesIO(); wb.save(buf)
     raw_name = f"{filters.get('academic_year','donem')}-{filters.get('term','')}"
     ascii_name = raw_name.translate(str.maketrans({"ü":"u","Ü":"U","ö":"o","Ö":"O","ç":"c","Ç":"C","ş":"s","Ş":"S","ğ":"g","Ğ":"G","ı":"i","İ":"I"}))
@@ -505,6 +509,7 @@ def build_course_gradebook_xlsx(db: Session, course_id: int, *, obs_mode: bool =
     for sheet in wb.worksheets:
         sheet.sheet_view.showGridLines = False
     buf = BytesIO()
+    localize_workbook(wb)
     wb.save(buf)
     suffix = "OBS-Aktarim" if obs_mode else "Ders-Not-Defteri"
     return buf.getvalue(), f"DOU-Assess-{course.code}-{suffix}.xlsx"

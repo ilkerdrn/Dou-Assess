@@ -8,6 +8,8 @@ from openpyxl import load_workbook
 
 from ..security import validate_xlsx_container
 
+from .excel_tr import canonical_header, canonical_value, header_tr, localize
+
 SHEET_NAME = "Soru_Havuzu"
 REQUIRED_COLUMNS = [
     "program_code", "course_code", "academic_year", "term",
@@ -86,17 +88,17 @@ def parse_question_bank_workbook(data: bytes) -> tuple[list[dict[str, Any]], lis
     values = list(ws.iter_rows(values_only=True))
     if not values:
         return [], [f"{SHEET_NAME} sayfası boş"]
-    headers = [_text(x) for x in values[0]]
+    headers = [canonical_header(x) for x in values[0]]  # Turkish or English column headers
     missing = [c for c in REQUIRED_COLUMNS if c not in headers]
     if missing:
-        return [], ["Eksik kolonlar: " + ", ".join(missing)]
+        return [], ["Eksik sütunlar: " + ", ".join(header_tr(c) for c in missing)]
 
     rows: list[dict[str, Any]] = []
     errors: list[str] = []
     for row_no, values_row in enumerate(values[1:], start=2):
         if all(_text(x) == "" for x in values_row):
             continue
-        row = {headers[i]: values_row[i] if i < len(values_row) else None for i in range(len(headers)) if headers[i]}
+        row = {headers[i]: canonical_value(headers[i], values_row[i] if i < len(values_row) else None) for i in range(len(headers)) if headers[i]}
         row["__row__"] = row_no
         for col in REQUIRED_COLUMNS:
             if not _text(row.get(col)):
@@ -166,4 +168,4 @@ def parse_question_bank_workbook(data: bytes) -> tuple[list[dict[str, Any]], lis
 
     if not rows and not errors:
         errors.append(f"{SHEET_NAME} sayfasında içe aktarılacak soru yok")
-    return rows, errors
+    return rows, [localize(e) for e in errors]

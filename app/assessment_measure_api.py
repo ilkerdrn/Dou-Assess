@@ -331,7 +331,7 @@ def measure_results_template(measure_id: int, db: Session = Depends(get_db)):
     require_course_access(db, obj.course_id, write=True)
     cols = _measure_columns(db, obj)
     wb = Workbook(); ws = wb.active; ws.title = "Puanlar"
-    ws.append(["ogrenci_no", "ad_soyad (bilgi)"] + [f"{k} (0-{mx:g})" for k, mx, _ in cols] + ["geri_bildirim"])
+    ws.append(["Öğrenci No", "Ad Soyad (bilgi)"] + [f"{'Puan' if k == 'puan' else k} (0-{mx:g})" for k, mx, _ in cols] + ["Geri Bildirim"])
     for st in db.scalars(select(m.Student).join(m.Enrollment, m.Enrollment.student_id == m.Student.id).where(m.Enrollment.course_id == obj.course_id).order_by(m.Student.student_no)).all():
         ws.append([st.student_no, st.full_name] + [None] * len(cols) + [""])
     info = wb.create_sheet("Yonerge")
@@ -358,11 +358,12 @@ async def import_measure_results(measure_id: int, validate_only: bool = False, f
     cols = _measure_columns(db, obj)
     idx = {}
     for key, mx, cid in cols:
-        pos = next((i for i, h in enumerate(header) if h.split(" ")[0].lower() == key.lower()), None)
+        pos = next((i for i, h in enumerate(header) if h.split(" ")[0].lower() in (key.lower(), "puan" if key == "puan" else key.lower())), None)
         if pos is None: raise HTTPException(422, f"Şablonda '{key}' sütunu yok")
         idx[key] = pos
-    no_pos = next((i for i, h in enumerate(header) if h.lower().startswith("ogrenci_no")), 0)
-    fb_pos = next((i for i, h in enumerate(header) if h.lower().startswith("geri_bildirim")), None)
+    fold = lambda t: "".join(ch for ch in t.lower().translate(str.maketrans("ığüşöç", "igusoc")) if ch.isalnum())
+    no_pos = next((i for i, h in enumerate(header) if fold(h).startswith("ogrencino")), 0)
+    fb_pos = next((i for i, h in enumerate(header) if fold(h).startswith("geribildirim")), None)
     enrolled = {st.student_no: st for st in db.scalars(select(m.Student).join(m.Enrollment, m.Enrollment.student_id == m.Student.id).where(m.Enrollment.course_id == obj.course_id)).all()}
     errors, ready = [], []
     for n, row in enumerate(rows[1:], start=2):

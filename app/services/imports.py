@@ -17,8 +17,11 @@ REQUIRED_SHEETS = {"Programlar", "Dersler", "Ogrenciler", "Ders_Kayitlari", "OC_
 OPTIONAL_SHEETS = {"Sinavlar", "Sorular"}
 
 
+from .excel_tr import canonical_header, canonical_value, localize
+
 class ImportValidationError(Exception):
     def __init__(self, errors: list[str]):
+        errors = [localize(e) for e in errors]  # Turkish column names in every message
         super().__init__("; ".join(errors))
         self.errors = errors
 
@@ -27,12 +30,12 @@ def _rows(ws) -> list[dict[str, Any]]:
     values = list(ws.iter_rows(values_only=True))
     if not values:
         return []
-    headers = [str(x).strip() if x is not None else "" for x in values[0]]
+    headers = [canonical_header(x) for x in values[0]]  # Turkish or English column headers
     result = []
     for idx, row in enumerate(values[1:], start=2):
         if all(v is None or str(v).strip() == "" for v in row):
             continue
-        item = {headers[i]: row[i] if i < len(row) else None for i in range(len(headers))}
+        item = {headers[i]: canonical_value(headers[i], row[i] if i < len(row) else None) for i in range(len(headers))}
         item["__row__"] = idx
         result.append(item)
     return result
@@ -236,7 +239,7 @@ def validate_workbook(data: bytes) -> tuple[dict[str, list[dict]], list[str]]:
             if code not in known:
                 errors.append(f"Sorular satır {r['__row__']}: '{code}' ÖÇ kodu OC_PC sayfasında bu ders için tanımlı değil")
 
-    return parsed, errors
+    return parsed, [localize(e) for e in errors]
 
 
 def _ensure_exam_snapshot(db: Session, exam: m.Exam, course: m.Course) -> None:

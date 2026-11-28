@@ -442,7 +442,7 @@ def test_obs_grade_export_po_formula_and_measure_excel_import():
     mid = meas["id"]
     tpl = client.get(f"/api/assessment-measures/{mid}/results-template.xlsx"); assert tpl.status_code == 200
     wb = load_workbook(BytesIO(tpl.content)); sheet = wb["Puanlar"]
-    rows = list(sheet.iter_rows(values_only=True)); assert rows[0][0] == "ogrenci_no" and len(rows) == 3
+    rows = list(sheet.iter_rows(values_only=True)); assert rows[0][0] in ("ogrenci_no", "Öğrenci No") and len(rows) == 3
     sheet.cell(row=2, column=3, value=80); sheet.cell(row=3, column=3, value=150)  # second is out of range
     buf = BytesIO(); wb.save(buf)
     bad = client.post(f"/api/assessment-measures/{mid}/results-import", files={"file": ("p.xlsx", buf.getvalue(), "application/octet-stream")})
