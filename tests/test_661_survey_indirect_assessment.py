@@ -74,7 +74,7 @@ def test_661_nonanonymous_duplicate_guard_and_ui_contract():
     css=(root/'app/static/styles.css').read_text(encoding='utf-8')
     assert 'data-page="surveys"' in html
     assert 'id="page-surveys"' in html
-    assert 'INDIRECT ASSESSMENT ENGINE' in html
+    assert 'DOLAYLI ÖLÇME MOTORU' in html
     assert 'prepareSurveys' in js
     assert 'outcome-evidence-mix' in js
     assert '.survey-layout' in css
