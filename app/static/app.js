@@ -3377,7 +3377,12 @@ document.querySelector('.skip-link')?.addEventListener('click',()=>setTimeout(()
 function markRequiredFields(){
   document.querySelectorAll('input[required],select[required],textarea[required]').forEach(el=>{
     el.setAttribute('aria-required','true');
-    const label=el.closest('label');if(label&&!label.querySelector('.required-mark'))label.insertAdjacentHTML('beforeend','<span class="required-mark" aria-hidden="true"> *</span>');
+    const label=el.closest('label');if(!label||label.querySelector('.required-mark'))return;
+    // Put the star right after the label text. Form labels are stacked (flex column), so appending it to the
+    // end of the label dropped it onto its own line below the field.
+    const textNode=[...label.childNodes].find(n=>n.nodeType===3&&n.textContent.trim());
+    if(textNode){const wrap=document.createElement('span');wrap.className='field-label-text';wrap.append(textNode.textContent.trim()+' ');const star=document.createElement('span');star.className='required-mark';star.setAttribute('aria-hidden','true');star.textContent='*';wrap.append(star);label.replaceChild(wrap,textNode);}
+    else label.insertAdjacentHTML('beforeend','<span class="required-mark" aria-hidden="true"> *</span>');
   });
 }
 markRequiredFields();
