@@ -2182,3 +2182,14 @@ body.login-active{overflow:hidden!important}
   .login-card{width:100%!important;max-width:520px!important;padding-top:max(18px,env(safe-area-inset-top))!important;padding-bottom:max(18px,env(safe-area-inset-bottom))!important}
   .login-footer-note{text-align:center!important;margin-top:16px!important}
 }
+
+/* Admin side-drawer forms: readable labels, inline required star, wrapping field rows */
+#page-data .academic-form{display:grid;gap:14px;padding-top:4px}
+#page-data .academic-form label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#34404a}
+#page-data .academic-form .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+#page-data .academic-form input,#page-data .academic-form select{min-height:42px;font-weight:600}
+#page-data .academic-form input::placeholder{color:#a3abb3;font-weight:500}
+#page-data .academic-form .field-label-text{display:block}
+#page-data .academic-form .required-mark{margin-left:1px}
+#page-data .academic-form-actions{margin-top:6px}
+.field-label-text .required-mark{color:#a6253e;font-weight:900}
