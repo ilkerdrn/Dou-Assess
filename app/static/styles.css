@@ -2199,3 +2199,6 @@ body.login-active{overflow:hidden!important}
 .matrix-bulk label{display:flex!important;flex-direction:row!important;gap:8px;align-items:center;font-size:12px;font-weight:700;margin:0}
 .matrix-bulk select{min-height:34px!important;width:auto!important}
 .outcome-matrix input.mx-row,.outcome-matrix input.mx-col{width:16px!important;height:16px!important;min-height:0!important;padding:0!important;margin:0 8px 0 0!important;border:0!important;background:none!important;box-shadow:none!important;accent-color:#a10d27;cursor:pointer;display:inline-block;vertical-align:middle}
+
+/* Admin side-drawer: no horizontal scrollbar (sticky head uses negative margins) */
+#academicCreatePanel{overflow-x:hidden!important}
