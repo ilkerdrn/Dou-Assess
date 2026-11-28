@@ -442,7 +442,7 @@ def test_obs_grade_export_po_formula_and_measure_excel_import():
     mid = meas["id"]
     tpl = client.get(f"/api/assessment-measures/{mid}/results-template.xlsx"); assert tpl.status_code == 200
     wb = load_workbook(BytesIO(tpl.content)); sheet = wb["Puanlar"]
-    rows = list(sheet.iter_rows(values_only=True)); assert rows[0][0] == "ogrenci_no" and len(rows) == 3
+    rows = list(sheet.iter_rows(values_only=True)); assert rows[0][0] in ("ogrenci_no", "Öğrenci No") and len(rows) == 3
     sheet.cell(row=2, column=3, value=80); sheet.cell(row=3, column=3, value=150)  # second is out of range
     buf = BytesIO(); wb.save(buf)
     bad = client.post(f"/api/assessment-measures/{mid}/results-import", files={"file": ("p.xlsx", buf.getvalue(), "application/octet-stream")})
@@ -648,3 +648,19 @@ def test_production_obs_mode_bootstrap_admin_and_deploy_files(monkeypatch):
     comp = (root / "docker-compose.production.yml").read_text(encoding="utf-8")
     assert "ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}" in comp and "OBS_JWT_SECRET:" in comp and "BOOTSTRAP_ADMIN_EMAILS:" in comp
     assert "STUDENT_LINK_SECRET:" in comp
+
+
+def test_pilot_compose_passes_new_settings_and_link_secret_not_guessable_when_login_required(monkeypatch):
+    import dataclasses
+    from pathlib import Path
+    import app.student_portal_api as sp
+    comp = (Path(__file__).resolve().parents[1] / "docker-compose.yml").read_text(encoding="utf-8")
+    for key in ("OBS_PROLIZ_ENABLED", "OBS_PROLIZ_USERNAME", "OBS_PROLIZ_PASSWORD", "OBS_JWT_SECRET", "BOOTSTRAP_ADMIN_EMAILS", "STUDENT_LINK_SECRET", "SCAN_RETENTION_DAYS", "AI_SCORING_ENABLED"):
+        assert f"      {key}:" in comp, f"pilot compose does not pass {key} to the api container"
+    monkeypatch.setattr(sp, "settings", dataclasses.replace(sp.settings, student_link_secret="", app_env="pilot", auth_required=True))
+    import pytest as _pt
+    with _pt.raises(Exception) as exc:
+        sp.make_token(1, 1)
+    assert getattr(exc.value, "status_code", None) == 503  # no well-known fallback key once real login is on
+    monkeypatch.setattr(sp, "settings", dataclasses.replace(sp.settings, student_link_secret="x" * 40, auth_required=True))
+    assert len(sp.make_token(1, 1)) == 40

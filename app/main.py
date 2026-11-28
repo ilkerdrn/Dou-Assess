@@ -40,6 +40,7 @@ from .schemas import (
 )
 from .services.analytics import course_gradebook, exam_analytics, student_exam_analytics
 from .services.exports import build_course_gradebook_xlsx, build_exam_results_xlsx, build_accreditation_period_xlsx, build_quality_dashboard_xlsx
+from .services.excel_tr import localize as excel_localize
 from .services.imports import ImportValidationError, import_workbook, validate_workbook
 from .services.question_bank_import import parse_question_bank_workbook
 from .services.excel_center import TEMPLATES as EXCEL_CENTER_TEMPLATES, template_bytes as excel_center_template_bytes, parse_workbook as parse_excel_center_workbook, yes_no as excel_yes_no, rubric_scores as parse_excel_rubric_scores
@@ -4420,7 +4421,7 @@ def _excel_center_authorize(kind: str) -> None:
 def excel_center_template(kind: str):
     _excel_center_authorize(kind)
     payload = excel_center_template_bytes(kind)
-    return StreamingResponse(BytesIO(payload), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition":f'attachment; filename="DOU-Assess-{kind}.xlsx"'})
+    return StreamingResponse(BytesIO(payload), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition":f'attachment; filename="DOU-Assess-{EXCEL_CENTER_TEMPLATES[kind].get("file", kind)}.xlsx"'})
 
 
 def _excel_center_validate_rows(kind: str, rows: list[dict], db: Session) -> list[str]:
@@ -4475,7 +4476,7 @@ def _excel_center_validate_rows(kind: str, rows: list[dict], db: Session) -> lis
 async def excel_center_validate(kind: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     _excel_center_authorize(kind); data=await read_upload_limited(file); rows, errors=parse_excel_center_workbook(kind,data)
     if not errors: errors.extend(_excel_center_validate_rows(kind,rows,db))
-    if errors: return JSONResponse(status_code=422,content={"ok":False,"error":{"code":"EXCEL_CENTER_VALIDATION","message":"Excel doğrulaması başarısız","details":errors}})
+    if errors: return JSONResponse(status_code=422,content={"ok":False,"error":{"code":"EXCEL_CENTER_VALIDATION","message":"Excel doğrulaması başarısız","details":[excel_localize(x) for x in errors]}})
     return {"ok":True,"kind":kind,"rows":len(rows),"message":"Dosya içe aktarmaya hazır"}
 
 
@@ -4483,7 +4484,7 @@ async def excel_center_validate(kind: str, file: UploadFile = File(...), db: Ses
 async def excel_center_import(kind: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     _excel_center_authorize(kind); data=await read_upload_limited(file); rows, errors=parse_excel_center_workbook(kind,data)
     if not errors: errors.extend(_excel_center_validate_rows(kind,rows,db))
-    if errors: return JSONResponse(status_code=422,content={"ok":False,"error":{"code":"EXCEL_CENTER_VALIDATION","message":"Excel doğrulaması başarısız","details":errors}})
+    if errors: return JSONResponse(status_code=422,content={"ok":False,"error":{"code":"EXCEL_CENTER_VALIDATION","message":"Excel doğrulaması başarısız","details":[excel_localize(x) for x in errors]}})
     if kind in QUALITY_EXCEL_KINDS:
         created, updated = import_quality_excel_rows(kind, rows, db)
         audit(db,"excel_center_import",kind,payload={"rows":len(rows),"created":created,"updated":updated}); _commit(db)

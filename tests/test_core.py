@@ -1038,7 +1038,7 @@ def test_613_management_quality_heatmap_course_lo_question_drilldown_and_export(
     xlsx = client.get('/api/quality/dashboard.xlsx', params={'academic_year':'2026-2027','term':'Güz','program_id':program['id']})
     assert xlsx.status_code == 200, xlsx.text
     wb = load_workbook(BytesIO(xlsx.content), data_only=True)
-    assert {'Yonetici_Ozeti','Program_PC_Heatmap','Riskli_Dersler','Donem_Trendi'} <= set(wb.sheetnames)
+    assert {'Yonetici_Ozeti','Program_PC_Isi_Haritasi','Riskli_Dersler','Donem_Trendi'} <= set(wb.sheetnames)
 
     # Management dashboard must obey the same academic scope rules as the rest of the system.
     head = post('/api/users', {'email':'quality-head-613@local','display_name':'6.13 Program Başkanı','auth_source':'pilot','is_active':True})
