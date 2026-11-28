@@ -424,6 +424,15 @@ async function renderActionCenter(d){
     if(Number(d.open_improvements||0)>0)rows.unshift({priority:'critical',title:`${d.open_improvements} açık iyileştirme aksiyonu`,text:'Termin, sorumlu ve etkililik kontrolü bekleyen PUKÖ/iyileştirme kayıtları var.',page:'accreditation'});
     if(!rows.length)rows.push({priority:'info',title:'Kalite iş kuyruğu temiz',text:'Mevcut görünümde kritik kalite açığı veya açık iyileştirme görünmüyor.',page:'quality360'});
   }
+  if(isAdmin()){
+    try{
+      const periods=await api('GET','/api/academic-periods');
+      const setup=[];
+      if(!(periods||[]).some(x=>x.status==='active'))setup.push({priority:'critical',title:'Aktif akademik dönemi tanımlayın',text:'Yönetim Araçları → Akademik Dönemler bölümünden gerçek dönemi aktif yapın.',page:'data'});
+      if(!(state.courses||[]).length)setup.push({priority:'critical',title:'İlk dersleri ve öğrencileri yükleyin',text:'Excel Veri Merkezi ile programları, dersleri, öğrencileri ve ders kayıtlarını tek dosyayla yükleyin.',page:'import'});
+      rows.unshift(...setup);
+    }catch(_e){}
+  }
   const order={critical:0,high:1,medium:2,info:3};rows.sort((a,b)=>(order[a.priority]??9)-(order[b.priority]??9));
   renderDashboardNextAction(rows);
   const list=document.getElementById('dashboardActionCenter');const badge=document.getElementById('actionCenterCount');
@@ -1688,7 +1697,7 @@ document.getElementById('gradePrev').addEventListener('click',()=>moveGradeStude
 document.getElementById('gradeNext').addEventListener('click',()=>moveGradeStudent(1,true));
 document.addEventListener('keydown',ev=>{const page=document.getElementById('page-grade');if(!page?.classList.contains('active')||document.getElementById('gradeForm').classList.contains('hidden'))return;if((ev.ctrlKey||ev.metaKey)&&ev.key==='Enter'){ev.preventDefault();saveCurrentGrade(true);return;}if(ev.altKey&&ev.key==='ArrowRight'){ev.preventDefault();moveGradeStudent(1,true);return;}if(ev.altKey&&ev.key==='ArrowLeft'){ev.preventDefault();moveGradeStudent(-1,true);return;}if(!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&['1','2','3','4','5'].includes(ev.key)&&!['TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){const row=activeRubricRow();const btn=row?.querySelector(`[data-key="${ev.key}"]`);if(btn){ev.preventDefault();applyRubricQuick(btn);}}});
 
-async function prepareAnalytics(){try{await refreshCore();}catch(e){toast(e.message,'error');}}
+async function prepareAnalytics(){try{await refreshCore();const sel=document.getElementById('analyticsExam');if(sel&&sel.options.length&&!state.analyticsAutoLoaded){state.analyticsAutoLoaded=true;if(!sel.value)sel.value=sel.options[sel.options.length-1].value;document.getElementById('loadAnalytics')?.click();}}catch(e){toast(e.message,'error');}}
 function analyticsStatusLabel(status){return status==='achieved'?'Başarılı':'İyileştirme gerekli';}
 function analyticsPctBar(value,target=0,label=''){
   const v=Math.max(0,Math.min(100,Number(value)||0));const t=Math.max(0,Math.min(100,Number(target)||0));
@@ -3339,8 +3348,8 @@ function renderMobileQuickNav(){
   const root=document.getElementById('mobileQuickNav');if(!root)return;
   const quality=isQualityOnly();
   const items=quality?
-    [['dashboard','⌂','Ana'],['quality360','◆','Kalite'],['evidencehub','K','Kanıt'],['feedback','F','Geri Bildirim']]:
-    [['dashboard','⌂','Ana'],['mycourses','D','Ders'],['bank','?','Soru'],['exams','S','Sınav'],['grade','P','Puanla']];
+    [['dashboard','⌂','Ana'],['quality360','◆','Kalite'],['evidencehub','🗂','Kanıt'],['feedback','💬','Geri bildirim']]:
+    [['dashboard','⌂','Ana'],['mycourses','📚','Ders'],['bank','❓','Soru'],['exams','📝','Sınav'],['grade','✔','Puanla']];
   root.innerHTML=items.map(([page,icon,label])=>`<button type="button" data-mobile-page="${page}" aria-label="${esc(label)}"><span aria-hidden="true">${esc(icon)}</span><b>${esc(label)}</b></button>`).join('');
 }
 document.getElementById('mobileQuickNav')?.addEventListener('click',e=>{const b=e.target.closest('[data-mobile-page]');if(!b)return;showPage(b.dataset.mobilePage);closeMobileNav();});
