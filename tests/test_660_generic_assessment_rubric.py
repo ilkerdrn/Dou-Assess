@@ -84,7 +84,7 @@ def test_660_server_rejects_invalid_rubric_score_and_ui_contract():
     css = (root/'app/static/styles.css').read_text(encoding='utf-8')
     assert 'data-page="assessmentmeasures"' in html
     assert 'id="page-assessmentmeasures"' in html
-    assert 'GENERIC ASSESSMENT ENGINE' in html
+    assert 'GENEL ÖLÇME MOTORU' in html
     assert 'prepareAssessmentMeasures' in js
     assert '/assessment-measures' in js
     assert '.assessment-measure-layout' in css
