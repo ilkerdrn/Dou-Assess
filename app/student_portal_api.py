@@ -31,9 +31,10 @@ PUB = "/api/public/student-exam/{exam_id}/{student_id}"
 def _secret() -> str:
     if settings.student_link_secret:
         return settings.student_link_secret
-    if settings.app_env == "production":
+    if settings.app_env == "production" or settings.auth_required:
+        # Real logins are on: a well-known fallback key would let anyone forge student links.
         raise HTTPException(503, "Öğrenci bağlantıları için STUDENT_LINK_SECRET tanımlı değil")
-    return "dev-only-student-link-secret"
+    return "dev-only-student-link-secret"  # open demo/test setups only (no login required)
 
 
 def make_token(exam_id: int, student_id: int) -> str:
