@@ -12,7 +12,7 @@ client=TestClient(app)
 
 def test_642_version_and_no_schema_bump():
     assert 'APP_VERSION = "6.70-production-hardening"' in MAIN
-    assert 'EXPECTED_SCHEMA_REVISION = "0047_institution_settings_outcome_approval"' in MAIN
+    assert 'EXPECTED_SCHEMA_REVISION = "0048_question_bank_versions"' in MAIN
 
 def test_642_action_center_and_student_workspace_contract():
     # Dashboard was redesigned task-first in 6.70.4+ (no 'YAPILACAKLAR' banner); the action center itself stays.

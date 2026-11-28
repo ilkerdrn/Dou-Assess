@@ -672,6 +672,19 @@ class QuestionBank(Base):
     learning_outcomes: Mapped[list[LearningOutcome]] = relationship(secondary="question_bank_outcomes", viewonly=True)
 
 
+class QuestionBankVersion(Base):
+    """Soru havuzu kaydının önceki içerik sürümü (her düzenlemeden hemen önce alınan değişmez kopya)."""
+    __tablename__ = "question_bank_versions"
+    __table_args__ = (UniqueConstraint("question_bank_id", "version_no", name="uq_question_bank_version"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    question_bank_id: Mapped[int] = mapped_column(ForeignKey("question_bank.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    changed_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    source: Mapped[str] = mapped_column(String(32), default="edit", nullable=False)
+
+
 class AssessmentBlueprint(Base):
     __tablename__ = "assessment_blueprints"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

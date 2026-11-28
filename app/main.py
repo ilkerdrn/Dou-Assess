@@ -25,7 +25,7 @@ from .config import settings
 from .release import APP_VERSION, EXPECTED_SCHEMA_REVISION, build_metadata
 # Historical release-contract tests search source text; runtime truth remains RELEASE.env.
 # APP_VERSION = "6.70-production-hardening"
-# EXPECTED_SCHEMA_REVISION = "0047_institution_settings_outcome_approval"
+# EXPECTED_SCHEMA_REVISION = "0048_question_bank_versions"
 # EXPECTED_SCHEMA_REVISION = "0042_performance_production_hardening"
 # EXPECTED_SCHEMA_REVISION = "0039_evidence_integrity_security"
 from .db import engine, get_db, SessionLocal
@@ -2865,6 +2865,76 @@ def create_bank_question(data: QuestionBankCreate, db: Session = Depends(get_db)
     return _bank_out(saved)
 
 
+BANK_VERSION_FIELDS = ("question_type", "text", "default_points", "correct_answer", "choices", "learning_outcome_code", "tags", "topic", "unit",
+                       "difficulty", "bloom_level", "image_data", "rubric", "expected_answer", "answer_lines")
+
+
+def _bank_content(obj: "m.QuestionBank") -> dict:
+    data = {f: getattr(obj, f) for f in BANK_VERSION_FIELDS}
+    data["learning_outcome_codes"] = sorted(lo.code for lo in (obj.learning_outcomes or []))
+    return json.loads(json.dumps(data, default=str))
+
+
+def _snapshot_bank_version(db: Session, obj: "m.QuestionBank", source: str = "edit") -> None:
+    """Düzenlemeden ÖNCE mevcut içeriği version_no ile saklar (aynı numara ikinci kez yazılmaz)."""
+    exists_ = db.scalar(select(m.QuestionBankVersion.id).where(m.QuestionBankVersion.question_bank_id == obj.id, m.QuestionBankVersion.version_no == int(obj.version_no or 1)))
+    if exists_:
+        return
+    db.add(m.QuestionBankVersion(question_bank_id=obj.id, version_no=int(obj.version_no or 1), snapshot=_bank_content(obj),
+                                 changed_by=current_user().get("email") or "system", source=source))
+
+
+@app.get("/api/question-bank/{question_id}/versions")
+def bank_question_versions(question_id: int, db: Session = Depends(get_db)):
+    obj = db.scalar(select(m.QuestionBank).options(selectinload(m.QuestionBank.learning_outcomes)).where(m.QuestionBank.id == question_id))
+    if not obj: raise HTTPException(404, "Soru havuzu kaydı bulunamadı")
+    require_course_access(db, obj.course_id, write=False)
+    rows = db.scalars(select(m.QuestionBankVersion).where(m.QuestionBankVersion.question_bank_id == question_id).order_by(m.QuestionBankVersion.version_no)).all()
+    snaps = [(r.version_no, r.snapshot, r) for r in rows] + [(int(obj.version_no or 1), _bank_content(obj), None)]
+    out = []
+    for i, (no, snap, r) in enumerate(snaps):
+        prev = snaps[i - 1][1] if i else None
+        changed = [k for k in snap if prev is not None and snap.get(k) != prev.get(k)]
+        out.append({"version_no": no, "current": r is None, "changed_fields": changed,
+                    "saved_by": r.changed_by if r else None, "saved_at": r.changed_at.isoformat() if r and r.changed_at else None, "source": r.source if r else "current"})
+    return {"question_id": question_id, "current_version": int(obj.version_no or 1), "versions": out[::-1]}
+
+
+@app.get("/api/question-bank/{question_id}/versions/{version_no}")
+def bank_question_version(question_id: int, version_no: int, db: Session = Depends(get_db)):
+    obj = db.scalar(select(m.QuestionBank).options(selectinload(m.QuestionBank.learning_outcomes)).where(m.QuestionBank.id == question_id))
+    if not obj: raise HTTPException(404, "Soru havuzu kaydı bulunamadı")
+    require_course_access(db, obj.course_id, write=False)
+    if version_no == int(obj.version_no or 1):
+        return {"version_no": version_no, "current": True, "content": _bank_content(obj)}
+    row = db.scalar(select(m.QuestionBankVersion).where(m.QuestionBankVersion.question_bank_id == question_id, m.QuestionBankVersion.version_no == version_no))
+    if not row: raise HTTPException(404, "Sürüm bulunamadı")
+    return {"version_no": version_no, "current": False, "content": row.snapshot, "saved_by": row.changed_by, "saved_at": row.changed_at.isoformat() if row.changed_at else None}
+
+
+@app.post("/api/question-bank/{question_id}/versions/{version_no}/restore")
+def restore_bank_question_version(question_id: int, version_no: int, db: Session = Depends(get_db)):
+    """Eski sürümün içeriğini YENİ bir sürüm olarak geri yükler (geçmiş silinmez)."""
+    obj = db.scalar(select(m.QuestionBank).options(selectinload(m.QuestionBank.learning_outcomes)).where(m.QuestionBank.id == question_id))
+    if not obj: raise HTTPException(404, "Soru havuzu kaydı bulunamadı")
+    require_course_access(db, obj.course_id, write=True)
+    if version_no == int(obj.version_no or 1): raise HTTPException(409, "Bu zaten güncel sürüm")
+    row = db.scalar(select(m.QuestionBankVersion).where(m.QuestionBankVersion.question_bank_id == question_id, m.QuestionBankVersion.version_no == version_no))
+    if not row: raise HTTPException(404, "Sürüm bulunamadı")
+    _snapshot_bank_version(db, obj, "restore")
+    snap = row.snapshot
+    obj.version_no = int(obj.version_no or 1) + 1
+    for f in BANK_VERSION_FIELDS:
+        if f in snap: setattr(obj, f, snap[f])
+    codes = list(snap.get("learning_outcome_codes") or [])
+    db.flush()
+    _set_bank_outcomes(db, obj, _resolve_course_outcomes(db, obj.course_id, codes) if codes else [])
+    audit(db, "restore_version", "question_bank", obj.id, {"from_version": version_no, "new_version": obj.version_no})
+    _commit(db)
+    saved = db.scalar(select(m.QuestionBank).options(selectinload(m.QuestionBank.learning_outcomes)).where(m.QuestionBank.id == obj.id))
+    return _bank_out(saved)
+
+
 @app.patch("/api/question-bank/{question_id}")
 def update_bank_question(question_id: int, data: QuestionBankUpdate, db: Session = Depends(get_db)):
     obj = db.get(m.QuestionBank, question_id)
@@ -2879,6 +2949,7 @@ def update_bank_question(question_id: int, data: QuestionBankUpdate, db: Session
         payload["image_data"] = _normalize_image_data(payload.get("image_data"))
     if "rubric" in payload or "question_type" in payload or "default_points" in payload:
         payload["rubric"] = _normalize_rubric(next_type, payload.get("rubric", obj.rubric), next_points)
+    _snapshot_bank_version(db, obj)
     obj.version_no = int(obj.version_no or 1) + 1
     for key, value in payload.items():
         setattr(obj, key, value)
