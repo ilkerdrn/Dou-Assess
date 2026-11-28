@@ -139,7 +139,7 @@ def build_uat_checks(db: Session, settings, version: str) -> dict:
         journey("program_head", "program_head", "Program Başkanı Yolculuğu", 8, [
             _check("role", "Program yönetim rolü", "pass" if program_leads else "fail", f"{program_leads} program/bölüm/fakülte yöneticisi tanımlı.", "Kullanıcı & Yetki"),
             _check("mapping", "Çıktı haritası", "pass" if outcome_maps else "warn", f"{outcome_maps} ÖÇ↔PÇ eşleşmesi var.", "ÖÇ ↔ PÇ Haritası", False),
-            _check("review", "Program Review", "pass" if program_reviews else "warn", f"{program_reviews} Program Review kaydı var.", "Program Review", False),
+            _check("review", "Program Değerlendirmesi", "pass" if program_reviews else "warn", f"{program_reviews} Program Değerlendirmesi kaydı var.", "Program Değerlendirmesi", False),
             _check("evidence", "Kanıt görünürlüğü", "pass" if evidence_count or quality_evidence_count else "warn", f"{evidence_count + quality_evidence_count} erişilebilir kanıt kaydı var.", "Kanıt Yönetimi", False),
         ]),
         journey("quality", "quality", "Kalite Kullanıcısı Yolculuğu", 8, [

@@ -37,7 +37,7 @@ def test_structured_quality_workflows_replace_prompt_chains():
         "title:'Sınavı onaya gönder'",
         "title:'Revizyon iste'",
         "title:'Ölçme güvence planını dondur'",
-        "title:'Kanıtı Program Review bölümüne bağla'",
+        "title:'Kanıtı Program Değerlendirmesi bölümüne bağla'",
     ]:
         assert token in JS
 

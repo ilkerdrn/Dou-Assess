@@ -205,13 +205,13 @@ def update_section(section_id: int, data: SectionUpdate, db: Session = Depends(g
     changes=data.model_dump(exclude_unset=True)
     governed={"contributor_email","reviewer_email","due_date"}
     if governed.intersection(changes) and not review_manager():
-        raise HTTPException(403,"Katkı veren, reviewer ve termin atamalarını yalnız program/kalite yöneticisi değiştirebilir")
+        raise HTTPException(403,"Katkı veren, inceleyen ve termin atamalarını yalnız program/kalite yöneticisi değiştirebilir")
     normalized=dict(changes)
     for key,value in normalized.items():
         if key in {"contributor_email","reviewer_email"} and value is not None: value=value.strip().lower()
         setattr(section,key,value)
     if section.contributor_email and section.reviewer_email and section.contributor_email.casefold()==section.reviewer_email.casefold():
-        raise HTTPException(409,"Katkı veren ile reviewer aynı kişi olamaz")
+        raise HTTPException(409,"Katkı veren ile inceleyen aynı kişi olamaz")
     if "narrative" in changes and section.status in {"not_started","changes_requested"}: section.status="in_progress"
     section.updated_at=now();review.status="in_progress" if review.status=="draft" else review.status;review.updated_at=now()
     audit(db,"update","program_review_section",section.id,{"fields":sorted(changes)});commit(db);db.refresh(section);return section_out(section,section_evidence(db,section.id))
@@ -224,7 +224,7 @@ def submit_section(section_id: int, db: Session = Depends(get_db)):
     if not can_edit_section(section,review): raise HTTPException(403,"Bu bölümü gönderme yetkiniz yok")
     if not section.narrative.strip(): raise HTTPException(409,"Bölüm anlatımı boşken incelemeye gönderilemez")
     if not section.reviewer_email.strip(): raise HTTPException(409,"Bölüm reviewer atanmadan incelemeye gönderilemez")
-    if section.contributor_email and section.contributor_email.casefold()==section.reviewer_email.casefold(): raise HTTPException(409,"Katkı veren ile reviewer aynı kişi olamaz")
+    if section.contributor_email and section.contributor_email.casefold()==section.reviewer_email.casefold(): raise HTTPException(409,"Katkı veren ile inceleyen aynı kişi olamaz")
     section.status="submitted";section.submitted_at=now();section.updated_at=now();review.status="review";review.updated_at=now();audit(db,"submit","program_review_section",section.id,{});commit(db);return section_out(section,section_evidence(db,section.id))
 
 
@@ -297,7 +297,7 @@ def finalize_review(review_id: int, db: Session = Depends(get_db)):
     require_roles("admin","quality","program_head")
     if obj.status in {"final","archived"}: raise HTTPException(409,"Program review zaten final/arsivlenmiş")
     sections=list(db.scalars(select(m.ProgramReviewSection).where(m.ProgramReviewSection.review_id==obj.id).order_by(m.ProgramReviewSection.order_no,m.ProgramReviewSection.id)).all())
-    if not sections or any(s.status!="approved" for s in sections): raise HTTPException(409,"Final için tüm bölümler reviewer tarafından onaylanmış olmalı")
+    if not sections or any(s.status!="approved" for s in sections): raise HTTPException(409,"Final için tüm bölümler inceleyen tarafından onaylanmış olmalı")
     frozen_sections=[]
     for section in sections:
         evidence=[]

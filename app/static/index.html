@@ -78,7 +78,7 @@
         <div class="nav-submenu">
           <button data-page="analytics"><span class="nav-icon">7</span><span><b>Sınav Sonuçları</b><small>Soru ve öğrenci başarısı</small></span></button>
           <button id="courseAnalyticsNav" data-page="courseanalytics"><span class="nav-icon">8</span><span><b>Ders Sonuçları</b><small>Dönem ve çıktı gelişimi</small></span></button>
-          <button id="programAnalyticsNav" data-page="programanalytics"><span class="nav-icon">9</span><span><b>Program Workspace</b><small>Çıktı · ders · review · kanıt</small></span></button>
+          <button id="programAnalyticsNav" data-page="programanalytics"><span class="nav-icon">9</span><span><b>Program Workspace</b><small>Çıktı · ders · değerlendirme · kanıt</small></span></button>
           <button id="studentCardsNav" data-page="studentcards"><span class="nav-icon">10</span><span><b>Öğrenci Karneleri</b><small>ÖÇ · PÇ · gelişim · PDF</small></span></button>
         </div>
       </div>
@@ -89,7 +89,7 @@
           <button id="institutionalReadinessNav" data-page="institutionalreadiness"><span class="nav-icon nav-icon-quality">R</span><span><b>Kurumsal Hazırlık</b><small>Program × framework · gap · kanıt</small></span></button>
           <button id="quality360Nav" data-page="quality360"><span class="nav-icon nav-icon-quality">◆</span><span><b>Kalite & Akreditasyon</b><small>PUKÖ · Kanıt · ÖDR · KİDR</small></span></button>
           <button id="assessmentAssuranceNav" data-page="assessmentassurance"><span class="nav-icon">G</span><span><b>Ölçme Güvence Planı</b><small>PÇ · direct/indirect · yıllık review</small></span></button>
-          <button id="programReviewNav" data-page="programreview"><span class="nav-icon nav-icon-quality">P</span><span><b>Program Review</b><small>Periyodik değerlendirme · reviewer · final</small></span></button>
+          <button id="programReviewNav" data-page="programreview"><span class="nav-icon nav-icon-quality">P</span><span><b>Program Değerlendirmesi</b><small>Periyodik değerlendirme · inceleyen · final</small></span></button>
           <button id="evidenceHubNav" data-page="evidencehub"><span class="nav-icon nav-icon-quality">K</span><span><b>Kanıt Merkezi</b><small>Arama · etiket · kullanım · duplicate</small></span></button>
         </div>
       </div>
@@ -164,19 +164,19 @@
 
     <section id="page-programanalytics" class="page program-workspace-page">
       <div class="program-workspace-hero card">
-        <div><span class="eyebrow">PROGRAM BAŞKANI ÇALIŞMA ALANI</span><h2>Programı tek ekrandan yönetin</h2><p class="muted">Program çıktıları, ders performansı, Program Review, kanıt, PUKÖ ve akreditasyon durumunu ayrı menülerde aramadan izleyin.</p></div>
+        <div><span class="eyebrow">PROGRAM BAŞKANI ÇALIŞMA ALANI</span><h2>Programı tek ekrandan yönetin</h2><p class="muted">Program çıktıları, ders performansı, Program Değerlendirmesi, kanıt, PUKÖ ve akreditasyon durumunu ayrı menülerde aramadan izleyin.</p></div>
         <div class="program-workspace-selector"><label>Program<select id="programAnalyticsProgram"></select></label><button id="loadProgramAnalytics" class="primary" type="button">Çalışma alanını aç</button></div>
       </div>
       <div id="programWorkspaceDecision" class="program-workspace-decision card" aria-live="polite"><div><span class="eyebrow">ŞİMDİ NE YAPMALIYIM?</span><h3>Bir program seçin</h3><p class="muted">Programın öncelikli işini burada göstereceğiz.</p></div></div>
       <div id="programWorkspaceActions" class="program-workspace-actions">
         <button type="button" data-program-workspace-go="outcomes"><span>1</span><div><b>Çıktılar</b><small>Öğrenim ve Program Çıktıları katkı matrisini yönetin</small></div><i>→</i></button>
         <button type="button" data-program-workspace-go="courses"><span>2</span><div><b>Ders performansı</b><small>Riskli ve ölçülmeyen derslere gidin</small></div><i>→</i></button>
-        <button type="button" data-program-workspace-go="programreview"><span>3</span><div><b>Program Review</b><small>Periyodik değerlendirmeyi tamamlayın</small></div><i>→</i></button>
+        <button type="button" data-program-workspace-go="programreview"><span>3</span><div><b>Program Değerlendirmesi</b><small>Periyodik değerlendirmeyi tamamlayın</small></div><i>→</i></button>
         <button type="button" data-program-workspace-go="evidencehub"><span>4</span><div><b>Kanıtlar</b><small>Program kanıtlarını bulun ve bağlayın</small></div><i>→</i></button>
         <button type="button" data-program-workspace-go="quality"><span>5</span><div><b>PUKÖ & Kalite</b><small>Açık iyileştirme işlerini kapatın</small></div><i>→</i></button>
         <button type="button" data-program-workspace-go="accreditation"><span>6</span><div><b>Akreditasyon</b><small>Ölçüt, açık ve başvuru hazırlığını izleyin</small></div><i>→</i></button>
       </div>
-      <div id="programWorkspaceReview" class="program-workspace-review card"><div class="empty-state"><span>Program Review durumu program seçildiğinde burada görünür.</span></div></div>
+      <div id="programWorkspaceReview" class="program-workspace-review card"><div class="empty-state"><span>Program Değerlendirmesi durumu program seçildiğinde burada görünür.</span></div></div>
       <details class="program-workspace-analysis card" open><summary><div><span class="eyebrow">PROGRAM KARAR ÖZETİ</span><b>Performans ve risk görünümü</b></div><span>Detay</span></summary><div id="programAnalyticsResult"></div></details>
       <span class="sr-only">Program Analizi · Program Çıktıları ve riskler</span>
     </section>
@@ -991,12 +991,12 @@ Kod doğruluğu | 4
     </section>
 
     <section id="page-programreview" class="page program-review-page reference-workspace-page modern-admin-page">
-      <div class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM REVIEW</span><h2>Periyodik Program Değerlendirmesi</h2><p class="muted">Akreditasyon başvurusundan bağımsız olarak programın profil, müfredat, öğrenme sonuçları, kadro, kaynak, paydaş ve eylem planını reviewer kontrollü bir çalışma alanında yönetin.</p></div><span id="programReviewStatusBadge" class="badge">Hazırlık</span></div>
+      <div class="card"><div class="section-head"><div><span class="eyebrow">PROGRAM DEĞERLENDİRMESİ</span><h2>Periyodik Program Değerlendirmesi</h2><p class="muted">Akreditasyon başvurusundan bağımsız olarak programın profil, müfredat, öğrenme sonuçları, kadro, kaynak, paydaş ve eylem planını inceleyen kontrollü bir çalışma alanında yönetin.</p></div><span id="programReviewStatusBadge" class="badge">Hazırlık</span></div>
         <div class="row program-review-toolbar"><label>Program<select id="programReviewProgram"></select></label><label>Akademik yıl<input id="programReviewYear" value="2026-2027"></label><label>Şablon<select id="programReviewTemplate"></select></label></div>
-        <div class="actions"><button id="programReviewReload" class="ghost" type="button">Yenile</button><button id="programReviewCreateDefaultTemplate" class="ghost" type="button">Standart şablon oluştur</button><button id="programReviewCreate" class="primary" type="button">Yeni Program Review</button></div>
+        <div class="actions"><button id="programReviewReload" class="ghost" type="button">Yenile</button><button id="programReviewCreateDefaultTemplate" class="ghost" type="button">Standart şablon oluştur</button><button id="programReviewCreate" class="primary" type="button">Yeni Program Değerlendirmesi</button></div>
       </div>
-      <div class="grid2 program-review-grid"><div class="card"><div class="section-head"><div><h3>Review dönemleri</h3><p class="muted">Program ve akademik yıla göre sürümlü değerlendirme kayıtları.</p></div></div><div id="programReviewList" class="compact-record-list"></div></div><div class="card"><div class="section-head"><div><h3>İlerleme</h3><p class="muted">Onaylanan bölüm oranı ve final hazırlığı.</p></div></div><div id="programReviewProgress" class="muted">Bir review seçin.</div></div></div>
-      <div id="programReviewWorkspace" class="card hidden"><div class="section-head"><div><span class="eyebrow">REVIEW WORKSPACE</span><h3 id="programReviewWorkspaceTitle">Program Review</h3><p id="programReviewWorkspaceMeta" class="muted"></p></div><button id="programReviewFinalize" class="primary small" type="button">Final snapshot oluştur</button></div><div id="programReviewSections" class="program-review-sections"></div></div>
+      <div class="grid2 program-review-grid"><div class="card"><div class="section-head"><div><h3>Değerlendirme dönemleri</h3><p class="muted">Program ve akademik yıla göre sürümlü değerlendirme kayıtları.</p></div></div><div id="programReviewList" class="compact-record-list"></div></div><div class="card"><div class="section-head"><div><h3>İlerleme</h3><p class="muted">Onaylanan bölüm oranı ve final hazırlığı.</p></div></div><div id="programReviewProgress" class="muted">Bir değerlendirme seçin.</div></div></div>
+      <div id="programReviewWorkspace" class="card hidden"><div class="section-head"><div><span class="eyebrow">REVIEW WORKSPACE</span><h3 id="programReviewWorkspaceTitle">Program Değerlendirmesi</h3><p id="programReviewWorkspaceMeta" class="muted"></p></div><button id="programReviewFinalize" class="primary small" type="button">Final snapshot oluştur</button></div><div id="programReviewSections" class="program-review-sections"></div></div>
     </section>
 
     <section id="page-evidencehub" class="page evidence-hub-page reference-workspace-page modern-admin-page">
@@ -1006,7 +1006,7 @@ Kod doğruluğu | 4
       </div>
       <div id="evidenceHubDecision" class="evidence-decision-brief card" aria-live="polite"></div>
       <div id="evidenceHubKpis" class="evidence-health-kpis"></div>
-      <div class="grid2 evidence-hub-layout"><div class="card"><div class="section-head"><div><h3>Kanıt kayıtları</h3><p id="evidenceHubCount" class="muted">Arama bekleniyor.</p></div></div><div id="evidenceHubList" class="evidence-hub-list"></div><div class="actions evidence-hub-pager"><button id="evidenceHubPrev" class="ghost small" type="button">← Önceki</button><span id="evidenceHubPageInfo" class="muted">1</span><button id="evidenceHubNext" class="ghost small" type="button">Sonraki →</button></div></div><div class="card"><div class="section-head"><div><h3>Kanıt detayı</h3><p class="muted">Etiketleri ve Program Review kullanım zincirini görün.</p></div></div><div id="evidenceHubDetail" class="muted">Bir kanıt seçin.</div></div></div>
+      <div class="grid2 evidence-hub-layout"><div class="card"><div class="section-head"><div><h3>Kanıt kayıtları</h3><p id="evidenceHubCount" class="muted">Arama bekleniyor.</p></div></div><div id="evidenceHubList" class="evidence-hub-list"></div><div class="actions evidence-hub-pager"><button id="evidenceHubPrev" class="ghost small" type="button">← Önceki</button><span id="evidenceHubPageInfo" class="muted">1</span><button id="evidenceHubNext" class="ghost small" type="button">Sonraki →</button></div></div><div class="card"><div class="section-head"><div><h3>Kanıt detayı</h3><p class="muted">Etiketleri ve Program Değerlendirmesi kullanım zincirini görün.</p></div></div><div id="evidenceHubDetail" class="muted">Bir kanıt seçin.</div></div></div>
     </section>
 
     <section id="page-evidence" class="page reference-workspace-page modern-admin-page evidence-reference-page">
