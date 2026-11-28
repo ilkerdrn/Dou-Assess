@@ -424,6 +424,15 @@ async function renderActionCenter(d){
     if(Number(d.open_improvements||0)>0)rows.unshift({priority:'critical',title:`${d.open_improvements} açık iyileştirme aksiyonu`,text:'Termin, sorumlu ve etkililik kontrolü bekleyen PUKÖ/iyileştirme kayıtları var.',page:'accreditation'});
     if(!rows.length)rows.push({priority:'info',title:'Kalite iş kuyruğu temiz',text:'Mevcut görünümde kritik kalite açığı veya açık iyileştirme görünmüyor.',page:'quality360'});
   }
+  if(isAdmin()){
+    try{
+      const periods=await api('GET','/api/academic-periods');
+      const setup=[];
+      if(!(periods||[]).some(x=>x.status==='active'))setup.push({priority:'critical',title:'Aktif akademik dönemi tanımlayın',text:'Yönetim Araçları → Akademik Dönemler bölümünden gerçek dönemi aktif yapın.',page:'data'});
+      if(!(state.courses||[]).length)setup.push({priority:'critical',title:'İlk dersleri ve öğrencileri yükleyin',text:'Excel Veri Merkezi ile programları, dersleri, öğrencileri ve ders kayıtlarını tek dosyayla yükleyin.',page:'import'});
+      rows.unshift(...setup);
+    }catch(_e){}
+  }
   const order={critical:0,high:1,medium:2,info:3};rows.sort((a,b)=>(order[a.priority]??9)-(order[b.priority]??9));
   renderDashboardNextAction(rows);
   const list=document.getElementById('dashboardActionCenter');const badge=document.getElementById('actionCenterCount');
@@ -860,11 +869,33 @@ window.saveProgramOutcomeEdit=async id=>{try{await api('PATCH',`/api/program-out
 window.deleteProgramOutcome=async id=>{if(!confirm('Bu Program Çıktısı silinsin mi? Eşleşme veya sınav kaydı varsa sistem işlemi engeller.'))return;try{await api('DELETE',`/api/program-outcomes/${id}`);toast('Program Çıktısı silindi.');await loadOutcomeMap();}catch(e){toast(e.message,'error');}};
 function renderOutcomeMatrix(data){
   const box=document.getElementById('outcomeMatrix');if(!data.learning_outcomes.length||!data.program_outcomes.length){box.innerHTML='<div class="empty-state"><b>Matris için Öğrenim Çıktısı ve Program Çıktısı gerekli.</b><span>Yukarıdaki formlarla eksik kazanımları ekleyin.</span></div>';return;}
-  const head=data.program_outcomes.map(po=>`<th><span class="matrix-code">${esc(po.code)}</span><span title="${esc(po.description)}">${esc(po.description)}</span></th>`).join('');
-  const rows=data.learning_outcomes.map(lo=>`<tr><th class="lo-head"><span class="matrix-code">${esc(lo.code)}</span><b>${esc(lo.description)}</b><small>Hedef %${lo.target_percent}</small></th>${data.program_outcomes.map(po=>{const mp=mappingFor(data,lo.id,po.id);const v=mp?.contribution??null;return `<td><select class="matrix-select ${v?`level-${v}`:'level-unmapped'}" data-lo="${lo.id}" data-po="${po.id}" title="${contributionLabel(v)}" ${canAcademicMaster()?'':'disabled'}><option value="" ${v==null?'selected':''} disabled>—</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${n===v?'selected':''}>${n}</option>`).join('')}</select></td>`}).join('')}</tr>`).join('');
-  box.innerHTML=`<table class="outcome-matrix"><thead><tr><th>Öğrenim ve Program Çıktıları</th>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+  const head=data.program_outcomes.map(po=>`<th>${canAcademicMaster()?`<input type="checkbox" class="mx-col" data-po="${po.id}" aria-label="${esc(po.code)} sütununu seç">`:''}<span class="matrix-code">${esc(po.code)}</span><span title="${esc(po.description)}">${esc(po.description)}</span></th>`).join('');
+  const rows=data.learning_outcomes.map(lo=>`<tr><th class="lo-head">${canAcademicMaster()?`<input type="checkbox" class="mx-row" data-lo="${lo.id}" aria-label="${esc(lo.code)} satırını seç">`:''}<span class="matrix-code">${esc(lo.code)}</span><b>${esc(lo.description)}</b><small>Hedef %${lo.target_percent}</small></th>${data.program_outcomes.map(po=>{const mp=mappingFor(data,lo.id,po.id);const v=mp?.contribution??null;return `<td><select class="matrix-select ${v?`level-${v}`:'level-unmapped'}" data-lo="${lo.id}" data-po="${po.id}" title="${contributionLabel(v)}" ${canAcademicMaster()?'':'disabled'}><option value="" ${v==null?'selected':''} disabled>—</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${n===v?'selected':''}>${n}</option>`).join('')}</select></td>`}).join('')}</tr>`).join('');
+  const bulkBar=canAcademicMaster()?`<div class="matrix-bulk"><span class="muted">Satır ve sütun kutularını işaretleyin; kesişen hücrelere toplu uygulayın.</span><label>Katkı<select id="mxBulkLevel"><option value="1">1 · çok düşük</option><option value="2">2 · düşük</option><option value="3" selected>3 · orta</option><option value="4">4 · yüksek</option><option value="5">5 · çok yüksek</option></select></label><button type="button" class="ghost small" id="mxBulkApply">Seçililere uygula</button><button type="button" class="ghost small" id="mxBulkClear">Seçili eşleşmeleri kaldır</button><button type="button" class="ghost small" id="mxBulkAll">Tümünü seç / bırak</button></div>`:'';
+  box.innerHTML=bulkBar+`<table class="outcome-matrix"><thead><tr><th>Öğrenim ve Program Çıktıları</th>${head}</tr></thead><tbody>${rows}</tbody></table>`;
   box.querySelectorAll('.matrix-select').forEach(sel=>sel.addEventListener('change',async ev=>{const el=ev.currentTarget;const contribution=Number(el.value);if(!Number.isInteger(contribution)||contribution<1||contribution>5){toast('Katkı düzeyi 1–5 arasında olmalıdır.','error');await loadOutcomeMap();return;}const oldClass=[...el.classList].find(x=>x.startsWith('level-'));if(oldClass)el.classList.remove(oldClass);el.classList.add(`level-${contribution}`);document.getElementById('outcomeSaveState').textContent='Kaydediliyor…';try{await api('PUT','/api/outcome-mappings',{learning_outcome_id:Number(el.dataset.lo),program_outcome_id:Number(el.dataset.po),contribution});document.getElementById('outcomeSaveState').textContent='Kaydedildi ✓';await loadOutcomeMap();setTimeout(()=>{const x=document.getElementById('outcomeSaveState');if(x)x.textContent='Hazır';},1300);}catch(e){toast(e.message,'error');document.getElementById('outcomeSaveState').textContent='Hata';await loadOutcomeMap();}}));
 }
+function matrixBulkCells(box){
+  const rows=[...box.querySelectorAll('.mx-row:checked')].map(x=>Number(x.dataset.lo));
+  const cols=[...box.querySelectorAll('.mx-col:checked')].map(x=>Number(x.dataset.po));
+  const allLo=[...box.querySelectorAll('.mx-row')].map(x=>Number(x.dataset.lo));
+  const allPo=[...box.querySelectorAll('.mx-col')].map(x=>Number(x.dataset.po));
+  const useLo=rows.length?rows:(cols.length?allLo:[]);const usePo=cols.length?cols:(rows.length?allPo:[]);
+  const cells=[];useLo.forEach(lo=>usePo.forEach(po=>cells.push({learning_outcome_id:lo,program_outcome_id:po})));return cells;
+}
+async function matrixBulkApply(remove){
+  const box=document.getElementById('outcomeMatrix');const cells=matrixBulkCells(box);
+  if(!cells.length)return toast('Önce en az bir satır veya sütun işaretleyin.','error');
+  const level=Number(document.querySelector('#mxBulkLevel').value);
+  if(remove&&!confirm(`${cells.length} hücredeki eşleşme kaldırılsın mı?`))return;
+  const st=document.getElementById('outcomeSaveState');if(st)st.textContent='Kaydediliyor…';
+  try{const r=await api('PUT','/api/outcome-mappings/bulk',{items:cells.map(c=>({...c,contribution:remove?null:level}))});toast(`Toplu güncelleme: ${r.created} yeni, ${r.updated} güncellendi, ${r.removed} kaldırıldı.`);await loadOutcomeMap();}catch(e){toast(e.message,'error');if(st)st.textContent='Hata';}
+}
+document.getElementById('outcomeMatrix')?.addEventListener('click',e=>{
+  if(e.target.id==='mxBulkApply')matrixBulkApply(false);
+  else if(e.target.id==='mxBulkClear')matrixBulkApply(true);
+  else if(e.target.id==='mxBulkAll'){const boxes=[...document.querySelectorAll('#outcomeMatrix .mx-row,#outcomeMatrix .mx-col')];const on=boxes.some(b=>!b.checked);boxes.forEach(b=>b.checked=on);}
+});
 document.getElementById('outcomeCourse').addEventListener('change',loadOutcomeMap);
 document.getElementById('loQuickForm').addEventListener('submit',async ev=>{ev.preventDefault();const courseId=Number(document.getElementById('outcomeCourse').value);if(!courseId)return;try{window.lastLoCreate=null;var lastLoCreate=await api('POST',`/api/courses/${courseId}/learning-outcomes`,{code:document.getElementById('loCode').value.trim(),description:document.getElementById('loDescription').value.trim(),target_percent:Number(document.getElementById('loTarget').value)});ev.currentTarget.reset();document.getElementById('loTarget').value=60;toast(lastLoCreate?.pending_approval?lastLoCreate.message:'Öğrenim Çıktısı eklendi.');await loadOutcomeMap();}catch(e){toast(e.message,'error');}});
 document.getElementById('poQuickForm').addEventListener('submit',async ev=>{ev.preventDefault();const courseId=Number(document.getElementById('outcomeCourse').value);const course=state.courses.find(x=>x.id===courseId);if(!course)return;try{await api('POST',`/api/programs/${course.program_id}/program-outcomes`,{academic_year:course.academic_year,code:document.getElementById('poCode').value.trim(),description:document.getElementById('poDescription').value.trim()});document.getElementById('poCode').value='';document.getElementById('poDescription').value='';toast('Program Çıktısı eklendi.');await loadOutcomeMap();}catch(e){toast(e.message,'error');}});
@@ -1611,6 +1642,28 @@ async function loadGradeCompleteness(){
 }
 document.getElementById('gradeStudent')?.addEventListener('change',loadGradeCompleteness);
 
+
+function fillAnswerGroupQuestions(){const sel=document.getElementById('answerGroupQuestion');if(!sel)return;const prev=sel.value;sel.innerHTML=gradeClassicQuestions().map(q=>`<option value="${q.id}">Soru ${q.order_no} (${q.points} puan)</option>`).join('');if(prev)sel.value=prev;}
+document.getElementById('answerGroupCard')?.addEventListener('toggle',e=>{if(e.target.open)fillAnswerGroupQuestions()});
+async function loadAnswerGroups(){
+  const id=Number(document.getElementById('gradeExam').value),qid=Number(document.getElementById('answerGroupQuestion').value),box=document.getElementById('answerGroupBox');
+  if(!id||!qid){box.innerHTML='<p class="muted">Önce sınav ve klasik soru seçin.</p>';return}
+  try{
+    const g=await api('GET',`/api/exams/${id}/questions/${qid}/answer-groups?threshold=${document.getElementById('answerGroupThreshold').value}`);
+    state.answerGroups=g;
+    if(!g.total){box.innerHTML='<p class="muted">Bu soru için metin cevap yok.</p>';return}
+    box.innerHTML=`<p class="muted">${g.total} cevap · ${g.group_count} grup</p>`+g.groups.map(gr=>`<article class="record answer-group" data-group="${gr.group_no}"><div class="section-head"><div><b>Grup ${gr.group_no} · ${gr.size} cevap</b><small>${gr.ungraded} puanlanmamış</small></div></div><p class="note">${esc(gr.sample)}</p><small class="muted">Öğrenciler: ${gr.members.map(x=>esc(x.student_no)).join(', ')}</small>${gr.blank?'':`<div class="row answer-group-scores">${g.criteria.map(c=>`<label>${esc(c.label)} (0–${c.max_points})<input type="number" min="0" max="${c.max_points}" step="0.5" data-crit="${esc(c.id)}"></label>`).join('')}<button type="button" class="primary small" data-apply-group="${gr.group_no}">Gruba uygula</button></div>`}</article>`).join('');
+  }catch(e){box.innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
+}
+document.getElementById('answerGroupLoad')?.addEventListener('click',loadAnswerGroups);
+document.getElementById('answerGroupBox')?.addEventListener('click',async ev=>{
+  const b=ev.target.closest('[data-apply-group]');if(!b)return;
+  const art=b.closest('.answer-group'),g=state.answerGroups,gr=g.groups.find(x=>String(x.group_no)===b.dataset.applyGroup),id=Number(document.getElementById('gradeExam').value);
+  const scores={};let missing=false;art.querySelectorAll('[data-crit]').forEach(i=>{if(i.value===''){missing=true}else scores[i.dataset.crit]=Number(i.value)});
+  if(missing)return toast('Tüm rubrik kriterleri için puan girin.','error');
+  if(!confirm(`${gr.size} cevaba aynı puan uygulansın mı?`))return;
+  try{const r=await api('POST',`/api/exams/${id}/questions/${g.question_id}/answer-groups/apply`,{response_ids:gr.members.map(x=>x.response_id),rubric_scores:scores});toast(`${r.applied} cevaba ${r.awarded_points} puan uygulandı.`);await loadAnswerGroups();}catch(e){toast(e.message,'error');}
+});
 function fillGradeGridQuestions(){const sel=document.getElementById('gradeGridQuestion');if(!sel)return;const prev=sel.value;sel.innerHTML=gradeClassicQuestions().map(q=>`<option value="${q.id}">Soru ${q.order_no} (${q.points} puan)</option>`).join('');if(prev)sel.value=prev;}
 document.getElementById('gradeGridCard')?.addEventListener('toggle',e=>{if(e.target.open)fillGradeGridQuestions()});
 document.getElementById('gradeGridLoad')?.addEventListener('click',async()=>{
@@ -1688,7 +1741,7 @@ document.getElementById('gradePrev').addEventListener('click',()=>moveGradeStude
 document.getElementById('gradeNext').addEventListener('click',()=>moveGradeStudent(1,true));
 document.addEventListener('keydown',ev=>{const page=document.getElementById('page-grade');if(!page?.classList.contains('active')||document.getElementById('gradeForm').classList.contains('hidden'))return;if((ev.ctrlKey||ev.metaKey)&&ev.key==='Enter'){ev.preventDefault();saveCurrentGrade(true);return;}if(ev.altKey&&ev.key==='ArrowRight'){ev.preventDefault();moveGradeStudent(1,true);return;}if(ev.altKey&&ev.key==='ArrowLeft'){ev.preventDefault();moveGradeStudent(-1,true);return;}if(!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&['1','2','3','4','5'].includes(ev.key)&&!['TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){const row=activeRubricRow();const btn=row?.querySelector(`[data-key="${ev.key}"]`);if(btn){ev.preventDefault();applyRubricQuick(btn);}}});
 
-async function prepareAnalytics(){try{await refreshCore();}catch(e){toast(e.message,'error');}}
+async function prepareAnalytics(){try{await refreshCore();const sel=document.getElementById('analyticsExam');if(sel&&sel.options.length&&!state.analyticsAutoLoaded){state.analyticsAutoLoaded=true;if(!sel.value)sel.value=sel.options[sel.options.length-1].value;document.getElementById('loadAnalytics')?.click();}}catch(e){toast(e.message,'error');}}
 function analyticsStatusLabel(status){return status==='achieved'?'Başarılı':'İyileştirme gerekli';}
 function analyticsPctBar(value,target=0,label=''){
   const v=Math.max(0,Math.min(100,Number(value)||0));const t=Math.max(0,Math.min(100,Number(target)||0));
@@ -3339,8 +3392,8 @@ function renderMobileQuickNav(){
   const root=document.getElementById('mobileQuickNav');if(!root)return;
   const quality=isQualityOnly();
   const items=quality?
-    [['dashboard','⌂','Ana'],['quality360','◆','Kalite'],['evidencehub','K','Kanıt'],['feedback','F','Geri Bildirim']]:
-    [['dashboard','⌂','Ana'],['mycourses','D','Ders'],['bank','?','Soru'],['exams','S','Sınav'],['grade','P','Puanla']];
+    [['dashboard','⌂','Ana'],['quality360','◆','Kalite'],['evidencehub','🗂','Kanıt'],['feedback','💬','Geri bildirim']]:
+    [['dashboard','⌂','Ana'],['mycourses','📚','Ders'],['bank','❓','Soru'],['exams','📝','Sınav'],['grade','✔','Puanla']];
   root.innerHTML=items.map(([page,icon,label])=>`<button type="button" data-mobile-page="${page}" aria-label="${esc(label)}"><span aria-hidden="true">${esc(icon)}</span><b>${esc(label)}</b></button>`).join('');
 }
 document.getElementById('mobileQuickNav')?.addEventListener('click',e=>{const b=e.target.closest('[data-mobile-page]');if(!b)return;showPage(b.dataset.mobilePage);closeMobileNav();});

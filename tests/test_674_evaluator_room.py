@@ -187,6 +187,8 @@ def test_student_portal_links_release_and_appeal():
     assert client.get(pub, headers=h2).status_code == 401  # another student's token
     v = client.get(pub, headers=h1); assert v.status_code == 200, v.text
     assert len(v.json()["questions"]) == 1 and v.json()["appeal_open"] is True
+    oc = v.json()["outcomes"]
+    assert len(oc) == 1 and oc[0]["code"] == "Ö1" and oc[0]["attainment_percent"] == 0.0 and oc[0]["status"] == "needs_improvement"
     assert client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "kısa"}).status_code == 422
     r = client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "Cevabım doğru olmalı, kontrol edilsin."}); assert r.status_code == 201, r.text
     assert client.post(pub + "/appeals", headers=h1, json={"question_id": q["id"], "reason": "Tekrar itiraz gerekçesi uzun."}).status_code == 409

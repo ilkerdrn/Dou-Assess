@@ -16,7 +16,7 @@ def test_mobile_quick_navigation_contract():
     assert 'id="mobileQuickNav"' in HTML
     assert 'function renderMobileQuickNav()' in JS
     assert "['dashboard','⌂','Ana']" in JS
-    assert "['mycourses','D','Ders']" in JS
+    assert "['mycourses','📚','Ders']" in JS
     assert "['quality360','◆','Kalite']" in JS
     assert '.mobile-quick-nav' in CSS
 

@@ -89,6 +89,17 @@ def student_links(exam_id: int, db: Session = Depends(get_db)):
     return {"exam_id": exam_id, "appeal_days": settings.student_appeal_days, "links": sorted(out, key=lambda x: x["student_no"])}
 
 
+def _own_outcomes(db: Session, exam_id: int, exam_student_id: int) -> list[dict]:
+    """Öğrencinin yalnız kendi Öğrenim Çıktısı gerçekleşmesi (başkasının verisi dönmez)."""
+    from .services.analytics import student_exam_analytics
+    try:
+        data = student_exam_analytics(db, exam_id, exam_student_id)
+    except ValueError:
+        return []
+    return [{"code": x["code"], "description": x["description"], "attainment_percent": x["attainment_percent"],
+             "target_percent": x["target_percent"], "status": x["status"]} for x in data.get("learning_outcomes", [])]
+
+
 @router.get(PUB)
 def student_view(ctx: Ctx = Depends(student_ctx), db: Session = Depends(get_db)):
     exam, es = ctx.exam, ctx.es
@@ -114,6 +125,7 @@ def student_view(ctx: Ctx = Depends(student_ctx), db: Session = Depends(get_db))
         "appeals": [{"id": a.id, "question_id": a.question_id, "reason": a.reason, "status": a.status,
                      "decision_note": a.decision_note if a.status != "open" else "", "created_at": a.created_at.isoformat()} for a in appeals],
         "scan_pages": [{"id": s.id, "page_no": s.page_no} for s in scans if s.preview_name],
+        "outcomes": _own_outcomes(db, exam.id, es.id),
     }
 
 

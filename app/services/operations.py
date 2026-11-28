@@ -351,6 +351,42 @@ def _emit_due_notification(
     return True
 
 
+def _emit_below_target_alerts(db: Session) -> int:
+    """Onaylı sınavlarda hedef altı kalan Öğrenim Çıktıları için dersin hocasına uygulama içi uyarı üretir (tekrarsız)."""
+    from .analytics import exam_analytics
+    created = 0
+    exams = db.scalars(select(m.Exam).where(m.Exam.status == "approved").order_by(m.Exam.id.desc()).limit(200)).all()
+    for exam in exams:
+        course = db.get(m.Course, exam.course_id)
+        if not course:
+            continue
+        try:
+            an = exam_analytics(db, exam.id)
+        except Exception:
+            continue
+        for lo in an.get("learning_outcomes", []):
+            if lo.get("status") != "needs_improvement":
+                continue
+            key = f"below_target:{exam.id}:{lo['id']}"
+            if _notification_exists(db, key):
+                continue
+            email, role = _target(course.instructor_email, "program_head")
+            db.add(m.OperationalNotification(
+                user_email=email, role_scope=role, program_id=course.program_id, notification_type="below_target",
+                severity="high", title=f"Hedef altı çıktı: {course.code} · {lo['code']}"[:255],
+                body=f"{exam.title}: gerçekleşme %{lo['attainment_percent']} (hedef %{lo['target_percent']}). İyileştirme aksiyonu planlayın.",
+                action_url="/#courseanalytics", dedupe_key=key, source_entity_type="exam", source_entity_id=exam.id,
+                status="unread", expires_at=utcnow() + timedelta(days=120),
+            ))
+            created += 1
+            if email:
+                from .mailer import send_mail
+                send_mail(email, f"DOU Assess · Hedef altı çıktı: {course.code} · {lo['code']}",
+                          f"{course.code} {course.name}\n{exam.title}: gerçekleşme %{lo['attainment_percent']} (hedef %{lo['target_percent']}).\n"
+                          "İyileştirme aksiyonunu DOU Assess'te planlayabilirsiniz.")
+    return created
+
+
 def generate_due_notifications(db: Session) -> dict:
     lookahead = max(1, settings.notification_lookahead_days)
     max_due = date.today() + timedelta(days=lookahead)
@@ -398,6 +434,8 @@ def generate_due_notifications(db: Session) -> dict:
         plan = db.get(m.AssessmentPlan, x.assessment_plan_id)
         created += int(_emit_due_notification(db, entity_type="assessment_plan_item", entity_id=x.id, program_id=plan.program_id if plan else None,
             title=f"Ölçme Güvence Planı: {x.method_label}", due=x.due_date, owner=x.owner or (plan.owner if plan else ""), action_url="/#assessmentassurance", default_role="program_head"))
+
+    created += _emit_below_target_alerts(db)
 
     _audit(db, "notification_sweep", "operational_notification", None, {"created": created, "lookahead_days": lookahead})
     return {"created": created, "lookahead_days": lookahead}
