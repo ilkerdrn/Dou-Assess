@@ -6,7 +6,7 @@ CSS=(ROOT/'app/static/styles.css').read_text(encoding='utf-8')
 
 def test_6710_asset_key_and_nav_label():
     assert '6710-program-workspace' in HTML
-    assert '<b>Program Workspace</b>' in HTML
+    assert '<b>Program Çalışma Alanı</b>' in HTML
 
 def test_program_workspace_has_decision_and_quick_actions():
     assert 'id="programWorkspaceDecision"' in HTML
