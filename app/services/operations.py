@@ -379,6 +379,11 @@ def _emit_below_target_alerts(db: Session) -> int:
                 status="unread", expires_at=utcnow() + timedelta(days=120),
             ))
             created += 1
+            if email:
+                from .mailer import send_mail
+                send_mail(email, f"DOU Assess · Hedef altı çıktı: {course.code} · {lo['code']}",
+                          f"{course.code} {course.name}\n{exam.title}: gerçekleşme %{lo['attainment_percent']} (hedef %{lo['target_percent']}).\n"
+                          "İyileştirme aksiyonunu DOU Assess'te planlayabilirsiniz.")
     return created
 
 

@@ -886,7 +886,7 @@ function matrixBulkCells(box){
 async function matrixBulkApply(remove){
   const box=document.getElementById('outcomeMatrix');const cells=matrixBulkCells(box);
   if(!cells.length)return toast('Önce en az bir satır veya sütun işaretleyin.','error');
-  const level=Number(document.getElementById('mxBulkLevel').value);
+  const level=Number(document.querySelector('#mxBulkLevel').value);
   if(remove&&!confirm(`${cells.length} hücredeki eşleşme kaldırılsın mı?`))return;
   const st=document.getElementById('outcomeSaveState');if(st)st.textContent='Kaydediliyor…';
   try{const r=await api('PUT','/api/outcome-mappings/bulk',{items:cells.map(c=>({...c,contribution:remove?null:level}))});toast(`Toplu güncelleme: ${r.created} yeni, ${r.updated} güncellendi, ${r.removed} kaldırıldı.`);await loadOutcomeMap();}catch(e){toast(e.message,'error');if(st)st.textContent='Hata';}
@@ -1642,6 +1642,28 @@ async function loadGradeCompleteness(){
 }
 document.getElementById('gradeStudent')?.addEventListener('change',loadGradeCompleteness);
 
+
+function fillAnswerGroupQuestions(){const sel=document.getElementById('answerGroupQuestion');if(!sel)return;const prev=sel.value;sel.innerHTML=gradeClassicQuestions().map(q=>`<option value="${q.id}">Soru ${q.order_no} (${q.points} puan)</option>`).join('');if(prev)sel.value=prev;}
+document.getElementById('answerGroupCard')?.addEventListener('toggle',e=>{if(e.target.open)fillAnswerGroupQuestions()});
+async function loadAnswerGroups(){
+  const id=Number(document.getElementById('gradeExam').value),qid=Number(document.getElementById('answerGroupQuestion').value),box=document.getElementById('answerGroupBox');
+  if(!id||!qid){box.innerHTML='<p class="muted">Önce sınav ve klasik soru seçin.</p>';return}
+  try{
+    const g=await api('GET',`/api/exams/${id}/questions/${qid}/answer-groups?threshold=${document.getElementById('answerGroupThreshold').value}`);
+    state.answerGroups=g;
+    if(!g.total){box.innerHTML='<p class="muted">Bu soru için metin cevap yok.</p>';return}
+    box.innerHTML=`<p class="muted">${g.total} cevap · ${g.group_count} grup</p>`+g.groups.map(gr=>`<article class="record answer-group" data-group="${gr.group_no}"><div class="section-head"><div><b>Grup ${gr.group_no} · ${gr.size} cevap</b><small>${gr.ungraded} puanlanmamış</small></div></div><p class="note">${esc(gr.sample)}</p><small class="muted">Öğrenciler: ${gr.members.map(x=>esc(x.student_no)).join(', ')}</small>${gr.blank?'':`<div class="row answer-group-scores">${g.criteria.map(c=>`<label>${esc(c.label)} (0–${c.max_points})<input type="number" min="0" max="${c.max_points}" step="0.5" data-crit="${esc(c.id)}"></label>`).join('')}<button type="button" class="primary small" data-apply-group="${gr.group_no}">Gruba uygula</button></div>`}</article>`).join('');
+  }catch(e){box.innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
+}
+document.getElementById('answerGroupLoad')?.addEventListener('click',loadAnswerGroups);
+document.getElementById('answerGroupBox')?.addEventListener('click',async ev=>{
+  const b=ev.target.closest('[data-apply-group]');if(!b)return;
+  const art=b.closest('.answer-group'),g=state.answerGroups,gr=g.groups.find(x=>String(x.group_no)===b.dataset.applyGroup),id=Number(document.getElementById('gradeExam').value);
+  const scores={};let missing=false;art.querySelectorAll('[data-crit]').forEach(i=>{if(i.value===''){missing=true}else scores[i.dataset.crit]=Number(i.value)});
+  if(missing)return toast('Tüm rubrik kriterleri için puan girin.','error');
+  if(!confirm(`${gr.size} cevaba aynı puan uygulansın mı?`))return;
+  try{const r=await api('POST',`/api/exams/${id}/questions/${g.question_id}/answer-groups/apply`,{response_ids:gr.members.map(x=>x.response_id),rubric_scores:scores});toast(`${r.applied} cevaba ${r.awarded_points} puan uygulandı.`);await loadAnswerGroups();}catch(e){toast(e.message,'error');}
+});
 function fillGradeGridQuestions(){const sel=document.getElementById('gradeGridQuestion');if(!sel)return;const prev=sel.value;sel.innerHTML=gradeClassicQuestions().map(q=>`<option value="${q.id}">Soru ${q.order_no} (${q.points} puan)</option>`).join('');if(prev)sel.value=prev;}
 document.getElementById('gradeGridCard')?.addEventListener('toggle',e=>{if(e.target.open)fillGradeGridQuestions()});
 document.getElementById('gradeGridLoad')?.addEventListener('click',async()=>{

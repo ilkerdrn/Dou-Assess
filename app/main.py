@@ -3233,6 +3233,68 @@ def submit_responses(exam_id: int, student_id: int, data: ResponsesSubmit, db: S
     return {"saved": saved}
 
 
+class AnswerGroupApply(BaseModel):
+    response_ids: list[int] = Field(min_length=1, max_length=500)
+    rubric_scores: dict[str, float]
+
+
+@app.get("/api/exams/{exam_id}/questions/{question_id}/answer-groups")
+def answer_groups(exam_id: int, question_id: int, threshold: float = 0.55, db: Session = Depends(get_db)):
+    """Metin olarak girilmiş klasik cevapları benzerliğe göre gruplar (yerel, dış servis yok)."""
+    require_exam_access(db, exam_id, write=False)
+    q = db.get(m.Question, question_id)
+    if not q or q.exam_id != exam_id or q.question_type != "classic":
+        raise HTTPException(404, "Klasik soru bulunamadı")
+    from .services.answer_groups import group_answers
+    rows = db.execute(
+        select(m.Response, m.Student.student_no)
+        .join(m.ExamStudent, m.ExamStudent.id == m.Response.exam_student_id)
+        .join(m.Student, m.Student.id == m.ExamStudent.student_id)
+        .where(m.ExamStudent.exam_id == exam_id, m.Response.question_id == question_id)
+    ).all()
+    meta = {r.id: {"response_id": r.id, "student_no": no, "answer_text": r.answer_text or "", "graded": r.graded_at is not None,
+                   "awarded_points": float(r.awarded_points or 0.0)} for r, no in rows}
+    groups = group_answers([{"id": rid, "text": v["answer_text"]} for rid, v in meta.items()], threshold)
+    return {"question_id": q.id, "points": float(q.points), "criteria": (q.rubric or {}).get("criteria") or [],
+            "total": len(meta), "group_count": len(groups),
+            "groups": [{"group_no": g["group_no"], "size": g["size"], "sample": g["sample"], "blank": bool(g.get("blank")),
+                        "ungraded": sum(1 for x in g["members"] if not meta[x["id"]]["graded"]),
+                        "members": [meta[x["id"]] for x in g["members"]]} for g in groups]}
+
+
+@app.post("/api/exams/{exam_id}/questions/{question_id}/answer-groups/apply")
+def apply_answer_group(exam_id: int, question_id: int, data: AnswerGroupApply, db: Session = Depends(get_db)):
+    """Seçilen grubun tüm cevaplarına aynı rubrik puanını uygular (tek işlem, hepsi ya da hiçbiri, denetim kaydıyla)."""
+    require_exam_access(db, exam_id, write=True)
+    exam = db.get(m.Exam, exam_id)
+    if not exam: raise HTTPException(404, "Sınav bulunamadı")
+    if exam.status != "grading": raise HTTPException(409, "Puan girişi yalnızca değerlendirme (grading) durumunda yapılabilir")
+    if exam.grade_locked_at: raise HTTPException(409, "Puanlar kilitli. Değişiklik yalnız resmî itiraz/yeniden değerlendirme akışından yapılabilir")
+    q = db.get(m.Question, question_id)
+    if not q or q.exam_id != exam_id or q.question_type != "classic": raise HTTPException(404, "Klasik soru bulunamadı")
+    criteria = (q.rubric or {}).get("criteria") or []
+    if not criteria: raise HTTPException(400, "Rubriksiz klasik soru toplu puanlanamaz")
+    scores: dict[str, float] = {}
+    for c in criteria:
+        cid = str(c.get("id")); mx = float(c.get("max_points") or 0)
+        if cid not in data.rubric_scores: raise HTTPException(400, f"'{c.get('label')}' puanı zorunludur")
+        v = float(data.rubric_scores[cid])
+        if v < 0 or v > mx: raise HTTPException(400, f"Rubrik puanı 0-{mx:g} arasında olmalıdır: {c.get('label')}")
+        scores[cid] = round(v, 4)
+    awarded = round(sum(scores.values()), 4)
+    responses = db.scalars(select(m.Response).join(m.ExamStudent, m.ExamStudent.id == m.Response.exam_student_id).where(
+        m.Response.id.in_(data.response_ids), m.Response.question_id == question_id, m.ExamStudent.exam_id == exam_id)).all()
+    if len(responses) != len(set(data.response_ids)): raise HTTPException(400, "Seçilen cevaplardan bazıları bu sorunun cevabı değil")
+    grader = current_user().get("email") or "system"; now = datetime.now(timezone.utc)
+    for r in responses:
+        old_points, old_rubric = r.awarded_points, dict(r.rubric_scores or {})
+        r.awarded_points = awarded; r.rubric_scores = dict(scores); r.is_correct = None
+        r.graded_by = grader; r.graded_at = now; r.revision_no = int(r.revision_no or 1) + 1
+        _log_grade_revision(db, r, old_points, old_rubric, "group", grader)
+    audit(db, "grade_group", "question", q.id, {"exam_id": exam_id, "responses": len(responses), "points": awarded}); _commit(db)
+    return {"applied": len(responses), "awarded_points": awarded}
+
+
 @app.get("/api/exams/{exam_id}/students/{student_id}/grade-history")
 def student_grade_history(exam_id: int, student_id: int, db: Session = Depends(get_db)):
     require_exam_access(db, exam_id, write=False)
