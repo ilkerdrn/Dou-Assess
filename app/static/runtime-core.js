@@ -99,3 +99,136 @@ function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&l
   new MutationObserver(ms=>{if(busy||term==='Öğrenim')return;busy=true;try{ms.forEach(m=>m.addedNodes.forEach(a=>{if(a.nodeType===1)fix(a);else if(a.nodeType===3&&a.parentNode)fix(a.parentNode)}))}finally{busy=false}}).observe(document.documentElement,{childList:true,subtree:true});
   fetch('/api/auth/config').then(r=>r.ok?r.json():null).then(c=>{if(c&&c.outcome_term)window.applyOutcomeTerm(c.outcome_term)}).catch(()=>{});
 })();
+
+/* 6.70.11.4 — Pilot login runtime hardening
+   Login is owned by the small shared runtime so a later app initialization error
+   cannot trap an already verified pilot user behind the login gate. */
+(function installPilotLoginRuntime(){
+  const SESSION_KEY='douPilotSession';
+  const USER_KEY='douPilotUser';
+
+  function loginError(message=''){
+    const err=document.getElementById('pilotLoginError');
+    if(!err)return;
+    err.textContent=String(message||'');
+    err.classList.toggle('show',!!message);
+  }
+  function loginBusy(busy){
+    const box=document.getElementById('pilotLoginBox');
+    const btn=document.getElementById('loginPilotBtn');
+    box?.classList.toggle('is-busy',!!busy);
+    if(btn){
+      btn.disabled=!!busy;
+      const label=busy?'Giriş yapılıyor… ':'Sisteme giriş yap ';
+      if(btn.firstChild)btn.firstChild.textContent=label;
+    }
+  }
+  async function readResponse(r){
+    const ct=r.headers.get('content-type')||'';
+    const data=ct.includes('application/json')?await r.json():await r.text();
+    if(r.ok)return data;
+    throw new Error(typeof window.msgText==='function'?window.msgText(data):(data?.error?.message||data?.detail||data?.message||`HTTP ${r.status}`));
+  }
+  async function verifyPilot(email){
+    const chosen=String(email||'').trim().toLowerCase();
+    if(!chosen)throw new Error('Lütfen bir akademik kullanıcı seçin.');
+    const r=await fetch('/api/auth/me',{
+      method:'GET',
+      cache:'no-store',
+      headers:{'X-DOU-Pilot-User':chosen,'Cache-Control':'no-cache'}
+    });
+    const user=await readResponse(r);
+    if(!user?.email)throw new Error('Kullanıcı oturumu doğrulanamadı.');
+    return {chosen,user};
+  }
+  function paintVerifiedUser(chosen,user){
+    window.state=window.state||{};
+    window.state.currentUser=user;
+    const n=document.getElementById('currentUserName');
+    if(n)n.textContent=user.display_name||user.email;
+    const roles=document.getElementById('currentUserRoles');
+    if(roles)roles.textContent=(user.roles||[]).map(x=>x.role_label||x.role).join(' · ')||'Rol atanmamış';
+    const side=document.getElementById('pilotUserSelect');
+    if(side&&[...side.options].some(o=>o.value===chosen))side.value=chosen;
+    document.body.classList.remove('login-active');
+    document.getElementById('loginGate')?.classList.add('hidden');
+    document.querySelector('.shell')?.classList.remove('app-shell-hidden');
+    document.getElementById('onboardingModal')?.classList.add('hidden');
+  }
+  async function finishApplication(chosen,user){
+    paintVerifiedUser(chosen,user);
+    try{ if(typeof window.renderCurrentUserScope==='function')window.renderCurrentUserScope(); }catch(e){console.warn('renderCurrentUserScope',e);}
+    try{ if(typeof window.applyRoleUI==='function')window.applyRoleUI(); }catch(e){console.warn('applyRoleUI',e);}
+    try{ if(typeof window.enterApplication==='function')window.enterApplication(); }catch(e){console.warn('enterApplication',e);}
+    try{ if(typeof window.checkReady==='function')await window.checkReady(); }catch(e){console.warn('checkReady',e);}
+    try{ if(typeof window.refreshCore==='function')await window.refreshCore(); }catch(e){console.warn('refreshCore',e);}
+    try{ if(typeof window.refreshNotificationBadge==='function')await window.refreshNotificationBadge(); }catch(e){console.warn('refreshNotificationBadge',e);}
+    try{
+      if(typeof window.showPage==='function'){
+        const names=new Set(user.role_names||[]);
+        const qualityOnly=names.has('quality')&&!names.has('admin');
+        window.showPage(qualityOnly?'quality360':'dashboard');
+      }
+    }catch(e){console.warn('showPage',e);}
+  }
+  async function robustPilotLogin(email){
+    loginError('');
+    loginBusy(true);
+    try{
+      const {chosen,user}=await verifyPilot(email);
+      localStorage.setItem(USER_KEY,chosen);
+      localStorage.setItem(SESSION_KEY,'1');
+      await finishApplication(chosen,user);
+      return true;
+    }catch(err){
+      localStorage.removeItem(SESSION_KEY);
+      loginError(err?.message||'Pilot kullanıcı girişi başarısız.');
+      document.body.classList.add('login-active');
+      document.getElementById('loginGate')?.classList.remove('hidden');
+      document.querySelector('.shell')?.classList.add('app-shell-hidden');
+      return false;
+    }finally{loginBusy(false);}
+  }
+  window.robustPilotLogin=robustPilotLogin;
+
+  document.addEventListener('click',event=>{
+    const btn=event.target?.closest?.('#loginPilotBtn');
+    if(!btn)return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    robustPilotLogin(document.getElementById('loginPilotUser')?.value);
+  },true);
+
+  document.addEventListener('keydown',event=>{
+    if(event.key!=='Enter'||event.target?.id!=='loginPilotUser')return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    robustPilotLogin(event.target.value);
+  },true);
+
+  // In a fresh/incognito window populate the pilot selector independently from app.js.
+  setTimeout(async()=>{
+    try{
+      const cfg=await readResponse(await fetch('/api/auth/config',{cache:'no-store'}));
+      window.state=window.state||{};window.state.authConfig=cfg;
+      if(cfg.auth_required)return;
+      const select=document.getElementById('loginPilotUser');
+      if(select&&!select.options.length){
+        const saved=localStorage.getItem(USER_KEY)||'pilot-admin@local';
+        const users=await readResponse(await fetch('/api/auth/pilot-users',{cache:'no-store',headers:{'X-DOU-Pilot-User':saved}}));
+        if(Array.isArray(users)){
+          select.innerHTML=users.map(x=>`<option value="${String(x.email||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}">${String(x.display_name||x.email||'Kullanıcı').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))} · ${String(x.email||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</option>`).join('');
+          if([...select.options].some(o=>o.value===saved))select.value=saved;
+        }
+      }
+      // If a verified pilot session already exists, never let later page-init errors re-gate it.
+      const remembered=localStorage.getItem(USER_KEY);
+      if(localStorage.getItem(SESSION_KEY)==='1'&&remembered){
+        const {chosen,user}=await verifyPilot(remembered);
+        await finishApplication(chosen,user);
+      }
+    }catch(err){
+      console.warn('Pilot login runtime bootstrap',err);
+    }
+  },0);
+})();

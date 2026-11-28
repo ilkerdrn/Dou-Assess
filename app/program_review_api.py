@@ -388,6 +388,27 @@ def _evidence_hub_rows(db: Session, *, program_id:int|None,q:str|None,source_typ
     return rows,total
 
 
+@router.get("/api/evidence-hub/summary")
+def evidence_hub_summary(program_id:int|None=None,db:Session=Depends(get_db)):
+    rows,total=_evidence_hub_rows(db,program_id=program_id,q=None,source_type=None,integrity_status=None,tag=None,fetch=5000)
+    status_counts={k:0 for k in ("verified","unchecked","mismatch","missing")}
+    source_counts={k:0 for k in SOURCE_TYPES}
+    for x in rows:
+        status=str(x.get("integrity_status") or "unchecked")
+        status_counts[status]=status_counts.get(status,0)+1
+        source_counts[x.get("source_type")]=source_counts.get(x.get("source_type"),0)+1
+    keys=[(x["source_type"],x["source_id"]) for x in rows]
+    usage=_usage_counts(db,keys)
+    used=sum(1 for key in keys if usage.get(key,0)>0)
+    sha={}
+    for x in rows:
+        value=str(x.get("sha256") or "")
+        if value: sha[value]=sha.get(value,0)+1
+    duplicate_groups=sum(1 for count in sha.values() if count>1)
+    attention=status_counts.get("unchecked",0)+status_counts.get("mismatch",0)+status_counts.get("missing",0)
+    return {"total":total,"verified":status_counts.get("verified",0),"attention":attention,"unchecked":status_counts.get("unchecked",0),"mismatch":status_counts.get("mismatch",0),"missing":status_counts.get("missing",0),"used_in_review":used,"duplicate_groups":duplicate_groups,"source_counts":source_counts}
+
+
 @router.get("/api/evidence-hub")
 def evidence_hub(q:str|None=None,program_id:int|None=None,source_type:str|None=None,integrity_status:str|None=None,tag:str|None=None,limit:int=Query(50,ge=1,le=100),offset:int=Query(0,ge=0,le=5000),db:Session=Depends(get_db)):
     rows,total=_evidence_hub_rows(db,program_id=program_id,q=q,source_type=source_type,integrity_status=integrity_status,tag=tag,fetch=offset+limit)

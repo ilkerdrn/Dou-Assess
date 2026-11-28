@@ -1,0 +1,9 @@
+/* DOU Assess 6.70.11.6 — Login Gate Visibility Closure */
+
+#loginGate.hidden,
+.login-gate.hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
