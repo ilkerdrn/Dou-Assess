@@ -56,6 +56,10 @@ def student_ctx(exam_id: int, student_id: int, x_dou_student_token: str = Header
         raise HTTPException(404, "Kayıt bulunamadı")
     if not exam.grade_locked_at:
         raise HTTPException(403, "Sonuçlar henüz açıklanmadı")
+    locked = exam.grade_locked_at if exam.grade_locked_at.tzinfo else exam.grade_locked_at.replace(tzinfo=timezone.utc)
+    expires = locked + timedelta(days=max(0, int(settings.student_appeal_days)) + max(0, int(settings.student_link_view_days)))
+    if datetime.now(timezone.utc) > expires:
+        raise HTTPException(410, "Bu bağlantının süresi doldu. Yeni bağlantı için öğretim elemanınızla görüşün.")
     return Ctx(exam, es, student)
 
 

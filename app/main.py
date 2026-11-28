@@ -752,6 +752,27 @@ def auth_configuration():
     return auth_config()
 
 
+OBS_LOGIN_MAX_FAILURES = 5
+OBS_LOGIN_LOCK_MINUTES = 15
+
+
+def _obs_login_lockout_check(db: Session, username: str) -> None:
+    """Aynı kullanıcı adı için son 15 dakikada 5 hatalı şifre denemesi olduysa Proliz'e hiç gitmeden 429 döner.
+    Sayaç IntegrationSyncRun kayıtlarından okunur (süreç yeniden başlasa/çok süreç olsa da geçerli); ağ hataları sayılmaz."""
+    since = datetime.now(timezone.utc) - timedelta(minutes=OBS_LOGIN_LOCK_MINUTES)
+    rows = db.scalars(select(m.IntegrationSyncRun).where(
+        m.IntegrationSyncRun.provider == "obs-proliz", m.IntegrationSyncRun.mode == "login",
+        m.IntegrationSyncRun.filename == f"teacher-login-{username}", m.IntegrationSyncRun.status == "failed",
+        m.IntegrationSyncRun.created_at >= since).order_by(m.IntegrationSyncRun.id.desc()).limit(OBS_LOGIN_MAX_FAILURES + 5)).all()
+    last_ok = db.scalar(select(m.IntegrationSyncRun.id).where(
+        m.IntegrationSyncRun.provider == "obs-proliz", m.IntegrationSyncRun.mode == "login",
+        m.IntegrationSyncRun.filename == f"teacher-login-{username}", m.IntegrationSyncRun.status == "success",
+        m.IntegrationSyncRun.created_at >= since).order_by(m.IntegrationSyncRun.id.desc()).limit(1))
+    bad = [r for r in rows if (r.summary or {}).get("kind") == "bad_credentials" and (last_ok is None or r.id > last_ok)]
+    if len(bad) >= OBS_LOGIN_MAX_FAILURES:
+        raise HTTPException(429, f"Çok fazla hatalı giriş denemesi. {OBS_LOGIN_LOCK_MINUTES} dakika sonra tekrar deneyin.")
+
+
 @app.post("/api/auth/obs-login")
 def obs_login(payload: ObsLoginRequest, db: Session = Depends(get_db)):
     if settings.auth_provider != "obs":
@@ -759,6 +780,7 @@ def obs_login(payload: ObsLoginRequest, db: Session = Depends(get_db)):
     if not settings.obs_proliz_enabled:
         raise HTTPException(503, "OBS_PROLIZ_ENABLED=false; Proliz entegrasyonu kapalı")
     username = payload.username.strip()
+    _obs_login_lockout_check(db, username)
     try:
         db.rollback()
         with db.begin():
@@ -768,7 +790,7 @@ def obs_login(payload: ObsLoginRequest, db: Session = Depends(get_db)):
             db.add(run)
     except ObsLoginError as exc:
         db.rollback()
-        run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="failed", summary={"error": str(exc)[:500]})
+        run = m.IntegrationSyncRun(provider="obs-proliz", filename=f"teacher-login-{username}", mode="login", source_sha256="n/a", status="failed", summary={"error": str(exc)[:500], "kind": "bad_credentials"})
         db.add(run); db.flush(); audit(db, "obs_login_failed", "integration_sync_run", run.id, {"username": username, "error": str(exc)[:500]}); _commit(db)
         raise HTTPException(exc.status_code, str(exc)) from exc
     except obs_proliz.ProlizError as exc:
