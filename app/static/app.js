@@ -1769,7 +1769,7 @@ function renderAnalytics(a){
   const decisionCopy=decisionTone==='good'?`Öğrenim ve Program Çıktıları hedefleri genel olarak karşılanıyor.`:`${loRisk} Öğrenim Çıktısı, ${poRisk} Program Çıktısı ve ${questionRisk} soru inceleme adayı.`;
   document.getElementById('analyticsResult').innerHTML=`
     <div class="analytics-sticky-tabs card">
-      <div class="analytics-tabs" role="tablist"><button class="active" data-analytics-tab="overview">Genel Bakış</button><button data-analytics-tab="lo">Öğrenim Çıktısı</button><button data-analytics-tab="po">Program Çıktısı</button><button data-analytics-tab="students">Öğrenciler <span>${a.student_count}</span></button><button data-analytics-tab="questions">Sorular <span>${(a.question_analysis||[]).length}</span></button><button data-analytics-tab="evidence">Kanıt</button></div>
+      <div class="analytics-tabs" role="group" aria-label="Analiz sekmeleri"><button class="active" data-analytics-tab="overview">Genel Bakış</button><button data-analytics-tab="lo">Öğrenim Çıktısı</button><button data-analytics-tab="po">Program Çıktısı</button><button data-analytics-tab="students">Öğrenciler <span>${a.student_count}</span></button><button data-analytics-tab="questions">Sorular <span>${(a.question_analysis||[]).length}</span></button><button data-analytics-tab="evidence">Kanıt</button></div>
     </div>
     <div class="analytics-panel-view active" data-analytics-panel="overview">
       <div class="analytics-decision-brief ${decisionTone}"><div><span class="eyebrow">YÖNETİCİ ÖZETİ</span><h3>${decisionTitle}</h3><p>${decisionCopy}</p></div><div class="analytics-decision-actions">${loRisk?'<button class="ghost small" data-analytics-tab="lo">ÖÇ açıklarını gör</button>':''}${questionRisk?'<button class="ghost small" data-analytics-tab="questions">Soruları incele</button>':''}<button class="ghost small" data-analytics-tab="students">Öğrencileri gör</button></div></div>
@@ -3444,3 +3444,6 @@ markRequiredFields();
 
 window.addEventListener('resize',()=>{if(window.innerWidth<=900)syncMobileQuickNavActive();});
 setTimeout(()=>{renderMobileQuickNav();syncMobileQuickNavActive();},0);
+
+function a11yScrollRegions(){document.querySelectorAll('.table-wrap,.table-scroll,.pilot-issue-list').forEach(el=>{if(!el.hasAttribute('tabindex'))el.setAttribute('tabindex','0');if(!el.hasAttribute('role'))el.setAttribute('role','region');if(!el.hasAttribute('aria-label'))el.setAttribute('aria-label','Tablo (kaydırılabilir)');});}
+new MutationObserver(()=>a11yScrollRegions()).observe(document.body,{childList:true,subtree:true});a11yScrollRegions();
