@@ -24,8 +24,8 @@ git fetch origin "$BRANCH"
 git merge --ff-only "origin/$BRANCH"
 git log --oneline -1
 
-echo "==> 3/5 İmaj derleniyor"
-"${DC[@]}" build api
+echo "==> 3/5 İmajlar derleniyor (api, worker, scheduler)"
+"${DC[@]}" build
 
 echo "==> 4/5 Servisler başlatılıyor (migration otomatik çalışır)"
 "${DC[@]}" up -d
